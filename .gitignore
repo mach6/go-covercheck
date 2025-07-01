@@ -1,0 +1,6 @@
+.idea/
+.vscode/
+dist/
+coverage.out
+.DS_Store
+unit-test-report.json
