@@ -1,0 +1,53 @@
+# threshold % for statement coverage. 
+# considers per file % and total %. 
+# default 70.
+# disabled with 0
+statementThreshold: 65.0
+
+# threshold % for block coverage.
+# considers per file % and total %
+# default 50.
+# disabled with 0
+blockThreshold: 60.0
+
+# sortBy condition for table output formats.
+# file|blocks|statements|statement-percent|block-percent
+# default file
+sortBy: statement-percent
+
+# sortOrder direction for table output formats
+# asc|desc
+# default asc
+sortOrder: desc
+
+# disable table output and only show the summary
+# default false
+noTable: false
+
+# disable the summary and only show the table output
+# default false
+noSummary: false
+
+# disable use of color
+# default false
+noColor: false
+
+# the format for output
+# table|json|yaml|md|html|csv|tsv
+# default table
+format: table
+
+# per-file thresholds
+# default {"statements": {}, "blocks": {}}
+perFile:
+  statements:
+  #    main.go: 0
+  #    cmd/root.go: 32
+  blocks:
+#    main.go: 0
+#    cmd/root.go: 20
+
+# skip package(s) and/or file(s) regex
+# default []
+skip:
+#  - cmd/root.go
