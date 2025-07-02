@@ -1,7 +1,8 @@
 .idea/
 .vscode/
-go-covercheck
 dist/
 coverage.out
 .DS_Store
 unit-test-report.json
+go-covercheck
+!**/go-covercheck/
