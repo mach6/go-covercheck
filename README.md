@@ -112,10 +112,10 @@ Flags:
 
 By default, `go-covercheck` uses color in table format(s). The color is used to indicate severity as follows:
 
-- text in ${\color{red}red}$ indicates the actual is <= 50% of the threshold goal
-- text in ${\color{yellow}yellow}$ indicates the actual is <= 99% of the threshold goal 
-- text in ${\color{green}green}$ indicates the threshold goal is met or exceeded
-- text in ${\color{gray}gray}$ indicates the goal and actual are 0 or the goal is 0
+- % in ${\color{red}red}$ indicates the actual is <= 50% of the threshold goal
+- % in ${\color{yellow}yellow}$ indicates the actual is <= 99% of the threshold goal 
+- % in ${\color{green}green}$ indicates the threshold goal is met or exceeded
+- % in no color indicates the goal and actual are 0 or the goal is 0
 
 
 ## License
