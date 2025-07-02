@@ -1,11 +1,12 @@
 APP_MODULE_PATH		?= github.com/mach6/
 APP_NAME			?= go-covercheck
 APP_REVISION 		:= $(shell git rev-parse --short HEAD)
-APP_VERSION 		?= $(shell cat VERSION)-$(APP_REVISION)
+APP_VERSION 		?= $(shell cat VERSION)
 BUILD_TIME_STAMP 	:= $(shell date +%FT%TZ)
 BUILT_BY 			?= $(shell whoami)
 
 LD_FLAGS := " -X $(APP_MODULE_PATH)$(APP_NAME)/pkg/config.AppVersion=$(APP_VERSION) \
+			  -X $(APP_MODULE_PATH)$(APP_NAME)/pkg/config.AppRevision=$(APP_REVISION) \
 			  -X $(APP_MODULE_PATH)$(APP_NAME)/pkg/config.AppName=$(APP_NAME) \
 			  -X $(APP_MODULE_PATH)$(APP_NAME)/pkg/config.BuildTimeStamp=$(BUILD_TIME_STAMP) \
 			  -X $(APP_MODULE_PATH)$(APP_NAME)/pkg/config.BuiltBy=$(BUILT_BY)"

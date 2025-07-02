@@ -13,7 +13,7 @@ import (
 func getTerminalWidth() int {
 	width, _, err := term.GetSize(int(os.Stdout.Fd()))
 	if err != nil {
-		return 80 // fallback
+		return 80 //nolint:mnd
 	}
 	return width
 }
@@ -44,12 +44,18 @@ func renderTable(results Results, cfg *config.Config) {
 
 	t.AppendHeader(table.Row{"File", "Statements", "Blocks", "Statement %", "Block %"})
 
+	fixedWidth := 15
 	t.SetColumnConfigs([]table.ColumnConfig{
-		{Name: "File", Align: text.AlignLeft, AlignFooter: text.AlignLeft},
-		{Name: "Statements", Align: text.AlignRight, AlignFooter: text.AlignRight, WidthMin: 15},
-		{Name: "Blocks", Align: text.AlignRight, AlignFooter: text.AlignRight, WidthMin: 15},
-		{Name: "Statement %", Align: text.AlignRight, AlignFooter: text.AlignRight, WidthMax: 15, WidthMin: 15},
-		{Name: "Block %", Align: text.AlignRight, AlignFooter: text.AlignRight, WidthMax: 15, WidthMin: 15},
+		{Name: "File", Align: text.AlignLeft,
+			AlignFooter: text.AlignLeft},
+		{Name: "Statements", Align: text.AlignRight,
+			AlignFooter: text.AlignRight, WidthMin: fixedWidth},
+		{Name: "Blocks", Align: text.AlignRight,
+			AlignFooter: text.AlignRight, WidthMin: fixedWidth},
+		{Name: "Statement %", Align: text.AlignRight,
+			AlignFooter: text.AlignRight, WidthMax: fixedWidth, WidthMin: fixedWidth},
+		{Name: "Block %", Align: text.AlignRight,
+			AlignFooter: text.AlignRight, WidthMax: fixedWidth, WidthMin: fixedWidth},
 	})
 
 	for _, r := range results.Results {

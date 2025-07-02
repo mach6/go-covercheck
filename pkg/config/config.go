@@ -12,8 +12,9 @@ import (
 // Application config variables that are updated by the build.
 var (
 	AppName        = "go-covercheck"
-	AppVersion     = "1.0.0"
-	BuiltBy        = "dev"
+	AppVersion     = "1.0.0-dev"
+	AppRevision    = "HEAD"
+	BuiltBy        = ""
 	BuildTimeStamp = ""
 )
 

@@ -99,16 +99,11 @@ var (
 	SkipFlagDefault []string
 
 	rootCmd = &cobra.Command{
+		Version: getVersion(),
 		Use:     config.AppName + " [coverage.out]",
 		Short:   config.AppName + ": Coverage gatekeeper for enforcing test thresholds in Go",
-		Version: config.AppVersion,
 		Args:    cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			profiles, err := cover.ParseProfiles(args[0])
-			if err != nil {
-				return err
-			}
-
 			cfgPath, _ := cmd.Flags().GetString(ConfigFlag)
 			cfg := new(config.Config)
 			cfg.ApplyDefaults()
@@ -165,6 +160,11 @@ var (
 				return err
 			}
 
+			profiles, err := cover.ParseProfiles(args[0])
+			if err != nil {
+				return err
+			}
+
 			// Filter profiles
 			var filtered []*cover.Profile
 			for _, p := range profiles {
@@ -186,6 +186,23 @@ var (
 		},
 	}
 )
+
+func getVersion() string {
+	if config.BuiltBy != "" && config.BuildTimeStamp != "" {
+		return fmt.Sprintf(
+			"%s [%s] built by %s on %s",
+			config.AppVersion,
+			config.AppRevision,
+			config.BuiltBy,
+			config.BuildTimeStamp,
+		)
+	}
+	return fmt.Sprintf(
+		"%s [%s]",
+		config.AppVersion,
+		config.AppRevision,
+	)
+}
 
 func init() {
 	rootCmd.Flags().StringP(

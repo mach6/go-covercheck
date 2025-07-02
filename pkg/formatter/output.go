@@ -36,10 +36,7 @@ type Results struct {
 
 // FormatAndReport creates and writes out formatted profile results and return true or false if there is/are coverage
 // failure(s).
-func FormatAndReport(
-	profiles []*cover.Profile,
-	cfg *config.Config,
-) bool {
+func FormatAndReport(profiles []*cover.Profile, cfg *config.Config) bool {
 	normalizeNames(profiles)
 	results, hasFailure := collect(profiles, cfg)
 
