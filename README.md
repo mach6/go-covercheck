@@ -83,7 +83,7 @@ $ go-covercheck coverage.out
 │ TOTAL                        │ 155/200    │ 85/110     │ 77.5%        │ 77.3%     │
 └──────────────────────────────┴────────────┴────────────┴──────────────┴───────────┘
 ✘ Coverage check failed.
- - pkg/bar.go [statement % needs improvement of 5.0% to meet threshold 75.0%]
+ [S] pkg/bar.go [improvement of 5.0% required to meet 75.0% threshold]
 ```
 
 Flags for the `go-covercheck` CLI.
