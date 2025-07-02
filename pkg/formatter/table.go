@@ -7,7 +7,16 @@ import (
 	"github.com/jedib0t/go-pretty/v6/table"
 	"github.com/jedib0t/go-pretty/v6/text"
 	"github.com/mach6/go-covercheck/pkg/config"
+	"golang.org/x/term"
 )
+
+func getTerminalWidth() int {
+	width, _, err := term.GetSize(int(os.Stdout.Fd()))
+	if err != nil {
+		return 80 // fallback
+	}
+	return width
+}
 
 func renderTable(results Results, cfg *config.Config) {
 	if cfg.NoTable {
@@ -16,15 +25,31 @@ func renderTable(results Results, cfg *config.Config) {
 
 	t := table.NewWriter()
 	t.SetOutputMirror(os.Stdout)
-	t.SetStyle(table.StyleRounded)
+	t.SetAllowedRowLength(getTerminalWidth())
+	t.SetStyle(
+		table.Style{
+			Name:    "Custom",
+			Box:     table.StyleBoxLight,
+			Color:   table.ColorOptionsDefault,
+			Format:  table.FormatOptionsDefault,
+			HTML:    table.DefaultHTMLOptions,
+			Options: table.OptionsDefault,
+			Size: table.SizeOptions{
+				WidthMax: getTerminalWidth(),
+				WidthMin: 0,
+			},
+			Title: table.TitleOptionsDefault,
+		},
+	)
+
 	t.AppendHeader(table.Row{"File", "Statements", "Blocks", "Statement %", "Block %"})
 
 	t.SetColumnConfigs([]table.ColumnConfig{
 		{Name: "File", Align: text.AlignLeft, AlignFooter: text.AlignLeft},
-		{Name: "Statements", Align: text.AlignRight, AlignFooter: text.AlignRight},
-		{Name: "Blocks", Align: text.AlignRight, AlignFooter: text.AlignRight},
-		{Name: "Statement %", Align: text.AlignRight, AlignFooter: text.AlignRight},
-		{Name: "Block %", Align: text.AlignRight, AlignFooter: text.AlignRight},
+		{Name: "Statements", Align: text.AlignRight, AlignFooter: text.AlignRight, WidthMin: 15},
+		{Name: "Blocks", Align: text.AlignRight, AlignFooter: text.AlignRight, WidthMin: 15},
+		{Name: "Statement %", Align: text.AlignRight, AlignFooter: text.AlignRight, WidthMax: 15, WidthMin: 15},
+		{Name: "Block %", Align: text.AlignRight, AlignFooter: text.AlignRight, WidthMax: 15, WidthMin: 15},
 	})
 
 	for _, r := range results.Results {

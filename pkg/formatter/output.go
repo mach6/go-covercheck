@@ -46,6 +46,7 @@ func FormatAndReport(
 	switch cfg.Format {
 	case config.FormatTable, config.FormatMD, config.FormatHTML, config.FormatCSV, config.FormatTSV:
 		renderTable(results, cfg)
+		_ = os.Stdout.Sync()
 		renderSummary(hasFailure, results, cfg)
 	case config.FormatJSON:
 		if cfg.NoColor {

@@ -19,6 +19,8 @@ func renderSummary(hasFailure bool, results Results, cfg *config.Config) {
 	}
 
 	fmt.Fprintln(os.Stderr, color.New(color.FgRed).Sprint("✘"), "Coverage check failed")
+	msgF := " [%s] %s [improvement of %s required to meet %s threshold]\n"
+
 	for _, r := range results.Results {
 		if !r.Failed {
 			continue
@@ -26,18 +28,21 @@ func renderSummary(hasFailure bool, results Results, cfg *config.Config) {
 
 		if r.StatementPercentage < r.StatementThreshold {
 			gap := r.StatementThreshold - r.StatementPercentage
-			fmt.Fprintf(os.Stderr, " - %s [statement %% needs improvement of %s to meet threshold %s]\n",
+			fmt.Fprintf(os.Stderr, msgF,
+				color.New(color.FgCyan).Sprint("S"),
 				r.File,
 				severityColor(r.StatementPercentage, r.StatementThreshold)(fmt.Sprintf("%.1f%%", gap)),
-				color.New(color.FgBlue).Sprintf("%.1f%%", r.StatementThreshold),
+				color.New(color.FgCyan).Sprintf("%.1f%%", r.StatementThreshold),
 			)
 		}
+
 		if r.BlockPercentage < cfg.BlockThreshold {
 			gap := r.BlockThreshold - r.BlockPercentage
-			fmt.Fprintf(os.Stderr, "   %s [block %% needs improvement of %s to meet threshold %s]\n",
+			fmt.Fprintf(os.Stderr, msgF,
+				color.New(color.FgHiMagenta).Sprint("B"),
 				r.File,
 				severityColor(r.BlockPercentage, r.BlockThreshold)(fmt.Sprintf("%.1f%%", gap)),
-				color.New(color.FgBlue).Sprintf("%.1f%%", r.BlockThreshold),
+				color.New(color.FgHiMagenta).Sprintf("%.1f%%", r.BlockThreshold),
 			)
 		}
 	}
@@ -45,18 +50,22 @@ func renderSummary(hasFailure bool, results Results, cfg *config.Config) {
 	percentTotalStatements := percent(results.TotalCoveredStatements, results.TotalStatements)
 	if percentTotalStatements < cfg.StatementThreshold {
 		gap := cfg.StatementThreshold - percentTotalStatements
-		fmt.Fprintf(os.Stderr, " - total statement %% needs improvement of %s to meet threshold %s\n",
+		fmt.Fprintf(os.Stderr, msgF,
+			color.New(color.FgCyan).Sprint("S"),
+			"total statements",
 			severityColor(percentTotalStatements, cfg.StatementThreshold)(fmt.Sprintf("%.1f%%", gap)),
-			color.New(color.FgBlue).Sprintf("%.1f%%", cfg.StatementThreshold),
+			color.New(color.FgCyan).Sprintf("%.1f%%", cfg.StatementThreshold),
 		)
 	}
 
 	percentTotalBlocks := percent(results.TotalCoveredBlocks, results.TotalBlocks)
 	if percentTotalBlocks < cfg.BlockThreshold {
 		gap := cfg.BlockThreshold - percentTotalBlocks
-		fmt.Fprintf(os.Stderr, " - total block %% needs improvement of %s to meet threshold %s\n",
+		fmt.Fprintf(os.Stderr, msgF,
+			color.New(color.FgHiMagenta).Sprint("B"),
+			"total blocks",
 			severityColor(percentTotalBlocks, cfg.BlockThreshold)(fmt.Sprintf("%.1f%%", gap)),
-			color.New(color.FgBlue).Sprintf("%.1f%%", cfg.BlockThreshold),
+			color.New(color.FgHiMagenta).Sprintf("%.1f%%", cfg.BlockThreshold),
 		)
 	}
 }
