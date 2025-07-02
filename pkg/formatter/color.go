@@ -64,3 +64,22 @@ func yamlColor(bytes []byte) {
 	writer := colorable.NewColorableStdout()
 	_, _ = writer.Write([]byte(p.PrintTokens(tokens) + "\n"))
 }
+
+func severityColor(actual, goal float64) func(a ...interface{}) string {
+	switch {
+	case goal <= 0 && actual <= 0:
+		return color.New(color.Reset).SprintFunc()
+	case goal <= 0:
+		return color.New(color.Reset).SprintFunc()
+	}
+
+	pct := percentFloat(actual, goal)
+	switch {
+	case pct <= 50: //nolint:mnd
+		return color.New(color.FgRed).SprintFunc()
+	case pct <= 99: //nolint:mnd
+		return color.New(color.FgYellow).SprintFunc()
+	default:
+		return color.New(color.FgGreen).SprintFunc()
+	}
+}

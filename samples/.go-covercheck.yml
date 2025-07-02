@@ -41,8 +41,8 @@ format: table
 # default {"statements": {}, "blocks": {}}
 perFile:
   statements:
-  #    main.go: 0
-  #    cmd/root.go: 32
+#    main.go: 0
+#    cmd/root.go: 32
   blocks:
 #    main.go: 0
 #    cmd/root.go: 20

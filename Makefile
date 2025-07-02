@@ -10,7 +10,7 @@ LD_FLAGS := " -X $(APP_MODULE_PATH)$(APP_NAME)/pkg/config.AppVersion=$(APP_VERSI
 			  -X $(APP_MODULE_PATH)$(APP_NAME)/pkg/config.BuildTimeStamp=$(BUILD_TIME_STAMP) \
 			  -X $(APP_MODULE_PATH)$(APP_NAME)/pkg/config.BuiltBy=$(BUILT_BY)"
 
-all: lint test build self-gate dist docker
+all: lint test build covercheck dist docker
 
 lint:
 	golangci-lint run ./...
@@ -22,8 +22,12 @@ build:
 	go build -trimpath -a -o $(APP_NAME) -ldflags=$(LD_FLAGS) \
 		$(APP_MODULE_PATH)$(APP_NAME)/cmd/$(APP_NAME)
 
-self-gate:
-	./$(APP_NAME) coverage.out -s 55 -b 45 -w --skip main.go --skip color.go
+covercheck:
+	./$(APP_NAME) coverage.out \
+		-s 60 -b 50 -w \
+		--skip main.go \
+		--skip color.go \
+		--skip root.go
 
 clean:
 	rm -rf dist/ \
@@ -69,4 +73,4 @@ dist:
 docker:
 	docker build -t $(APP_NAME):$(APP_VERSION) .
 
-.PHONY: clean lint build test self-gate dist docker
+.PHONY: clean lint build test covercheck dist docker
