@@ -3,6 +3,7 @@
 ![Go Version](https://img.shields.io/badge/Go-1.24%2B-blue)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Contribute](https://img.shields.io/badge/contributions-welcome-brightgreen.svg)](CONTRIBUTING.md)
+[![CI](https://github.com/mach6/go-covercheck/actions/workflows/ci.yaml/badge.svg)](https://github.com/mach6/go-covercheck/actions/workflows/ci.yaml)
 
 🚦 A fast, flexible CLI tool for enforcing test coverage thresholds in Go projects.
 
