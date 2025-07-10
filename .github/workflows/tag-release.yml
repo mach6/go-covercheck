@@ -26,3 +26,20 @@ jobs:
         uses: softprops/action-gh-release@v1
         with:
           files: dist/*
+
+      - name: Build Docker image
+        run: make docker
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Tag and Push Docker image
+        run: |
+          IMAGE_NAME=ghcr.io/${{ github.repository }}/go-covercheck
+          TAG=${GITHUB_REF#refs/tags/}
+          docker tag go-covercheck:latest $IMAGE_NAME:$TAG
+          docker push $IMAGE_NAME:$TAG
