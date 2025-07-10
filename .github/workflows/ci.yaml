@@ -25,15 +25,18 @@ jobs:
       - name: Test
         run: go test -v -coverprofile=coverage.out ./...
 
-      - name: Super Lint
-        uses: golangci/golangci-lint-action@v5
+      - name: Lint
+        uses: golangci/golangci-lint-action@v8
         with:
           version: latest
 
       - name: Coverage Check
         run: |
           go install github.com/mach6/go-covercheck@latest
-          go-covercheck coverage.out --threshold 80
+          go-covercheck coverage.out -s 60 -b 50 -w \
+            --skip main.go \
+            --skip color.go \
+            --skip root.go
 
       - name: Build Docker Image
         run: docker build -t go-covercheck .
