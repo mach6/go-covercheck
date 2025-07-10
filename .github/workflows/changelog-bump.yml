@@ -25,7 +25,7 @@ jobs:
         run: |
           TAG=${GITHUB_REF#refs/tags/}
           echo $TAG > VERSION
-          sed -i "s/const AppVersion = \".*\"/const AppVersion = \"$TAG\"/" main.go
+          sed -i "s/AppVersion = \".*\"/AppVersion = \"$TAG\"/" pkg/config/config.go
 
       - name: Generate Changelog
         run: |
