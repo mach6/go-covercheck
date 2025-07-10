@@ -1,0 +1,53 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build-test-lint:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.24'
+
+      - name: Build
+        run: go build -v ./...
+
+      - name: Test
+        run: go test -v -coverprofile=coverage.out ./...
+
+      - name: Super Lint
+        uses: golangci/golangci-lint-action@v5
+        with:
+          version: latest
+
+      - name: Coverage Check
+        run: |
+          go install github.com/mach6/go-covercheck@latest
+          go-covercheck coverage.out --threshold 80
+
+      - name: Build Docker Image
+        run: docker build -t go-covercheck .
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Tag and Push Docker image
+        run: |
+          IMAGE_NAME=ghcr.io/${{ github.repository }}/go-covercheck
+          TAG=${GITHUB_REF#refs/tags/}
+          docker tag go-covercheck:latest $IMAGE_NAME:$TAG
+          docker push $IMAGE_NAME:$TAG
