@@ -1,0 +1,41 @@
+name: Bump Version and Generate Changelog
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+jobs:
+  bump-version:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.24'
+
+      - name: Extract tag and bump version
+        run: |
+          TAG=${GITHUB_REF#refs/tags/}
+          echo $TAG > VERSION
+          sed -i "s/const AppVersion = \".*\"/const AppVersion = \"$TAG\"/" main.go
+
+      - name: Generate Changelog
+        run: |
+          go install github.com/git-chglog/git-chglog/cmd/git-chglog@latest
+          git-chglog -o CHANGELOG.md
+
+      - name: Commit and Push Updates
+        run: |
+          git config --global user.name "GitHub Actions"
+          git config --global user.email "actions@github.com"
+          git add VERSION CHANGELOG.md main.go
+          git commit -m "chore: bump version to $TAG and update changelog"
+          git push
