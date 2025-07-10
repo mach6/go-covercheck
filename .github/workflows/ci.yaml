@@ -32,7 +32,7 @@ jobs:
 
       - name: Coverage Check
         run: |
-          go install github.com/mach6/go-covercheck@latest
+          go install github.com/mach6/go-covercheck/cmd/go-covercheck@latest
           go-covercheck coverage.out -s 60 -b 50 -w \
             --skip main.go \
             --skip color.go \
