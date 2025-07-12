@@ -18,7 +18,7 @@ func renderSummary(hasFailure bool, results Results, cfg *config.Config) {
 		return
 	}
 
-	fmt.Fprintln(os.Stderr, color.New(color.FgRed).Sprint("✘"), "Coverage check failed")
+	_, _ = fmt.Fprintln(os.Stderr, color.New(color.FgRed).Sprint("✘"), "Coverage check failed")
 	msgF := " [%s] %s [improvement of %s required to meet %s threshold]\n"
 
 	for _, r := range results.Results {
@@ -28,7 +28,7 @@ func renderSummary(hasFailure bool, results Results, cfg *config.Config) {
 
 		if r.StatementPercentage < r.StatementThreshold {
 			gap := r.StatementThreshold - r.StatementPercentage
-			fmt.Fprintf(os.Stderr, msgF,
+			_, _ = fmt.Fprintf(os.Stderr, msgF,
 				color.New(color.FgCyan).Sprint("S"),
 				r.File,
 				severityColor(r.StatementPercentage, r.StatementThreshold)(fmt.Sprintf("%.1f%%", gap)),
@@ -38,7 +38,7 @@ func renderSummary(hasFailure bool, results Results, cfg *config.Config) {
 
 		if r.BlockPercentage < cfg.BlockThreshold {
 			gap := r.BlockThreshold - r.BlockPercentage
-			fmt.Fprintf(os.Stderr, msgF,
+			_, _ = fmt.Fprintf(os.Stderr, msgF,
 				color.New(color.FgHiMagenta).Sprint("B"),
 				r.File,
 				severityColor(r.BlockPercentage, r.BlockThreshold)(fmt.Sprintf("%.1f%%", gap)),
@@ -50,7 +50,7 @@ func renderSummary(hasFailure bool, results Results, cfg *config.Config) {
 	percentTotalStatements := percent(results.TotalCoveredStatements, results.TotalStatements)
 	if percentTotalStatements < cfg.StatementThreshold {
 		gap := cfg.StatementThreshold - percentTotalStatements
-		fmt.Fprintf(os.Stderr, msgF,
+		_, _ = fmt.Fprintf(os.Stderr, msgF,
 			color.New(color.FgCyan).Sprint("S"),
 			"total statements",
 			severityColor(percentTotalStatements, cfg.StatementThreshold)(fmt.Sprintf("%.1f%%", gap)),
@@ -61,7 +61,7 @@ func renderSummary(hasFailure bool, results Results, cfg *config.Config) {
 	percentTotalBlocks := percent(results.TotalCoveredBlocks, results.TotalBlocks)
 	if percentTotalBlocks < cfg.BlockThreshold {
 		gap := cfg.BlockThreshold - percentTotalBlocks
-		fmt.Fprintf(os.Stderr, msgF,
+		_, _ = fmt.Fprintf(os.Stderr, msgF,
 			color.New(color.FgHiMagenta).Sprint("B"),
 			"total blocks",
 			severityColor(percentTotalBlocks, cfg.BlockThreshold)(fmt.Sprintf("%.1f%%", gap)),
