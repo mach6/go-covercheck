@@ -6,6 +6,10 @@ on:
   pull_request:
   workflow_dispatch:
 
+env:
+  FORCE_COLOR: 1
+  COLUMNS: 120
+
 jobs:
   build-test-lint:
     runs-on: ubuntu-latest
