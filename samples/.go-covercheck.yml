@@ -37,6 +37,11 @@ noColor: false
 # default table
 format: table
 
+# force output to the specified column width
+# autoselected when <= 0
+# default 0
+terminalWidth: 0
+
 # per-file thresholds
 # default {"statements": {}, "blocks": {}}
 perFile:

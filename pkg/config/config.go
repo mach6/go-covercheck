@@ -67,6 +67,7 @@ type Config struct {
 	NoSummary          bool                          `yaml:"noSummary,omitempty"`
 	NoColor            bool                          `yaml:"noColor,omitempty"`
 	Format             string                        `yaml:"format,omitempty"`
+	TerminalWidth      int                           `yaml:"terminalWidth,omitempty"`
 }
 
 // Load a Config from a path or produce an error.

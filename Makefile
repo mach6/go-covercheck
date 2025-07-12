@@ -25,7 +25,7 @@ build:
 
 covercheck:
 	./$(APP_NAME) coverage.out \
-		-s 60 -b 50 -w \
+		-s 60 -b 50 \
 		--skip main.go \
 		--skip color.go \
 		--skip root.go

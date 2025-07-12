@@ -4,11 +4,14 @@ import (
 	"fmt"
 	"os"
 	"regexp"
+	"strconv"
+	"strings"
 
 	"github.com/fatih/color"
 	"github.com/mach6/go-covercheck/pkg/config"
 	"github.com/mach6/go-covercheck/pkg/formatter"
 	"github.com/spf13/cobra"
+	"golang.org/x/term"
 	"golang.org/x/tools/cover"
 )
 
@@ -48,6 +51,9 @@ const (
 	NoColorFlagShort   = "w"
 	NoColorFlagDefault = false
 	NoColorFlagUsage   = "disable color output"
+
+	TerminalWidthFlag      = "term-width"
+	TerminalWidthFlagUsage = "force output to specified column width - autodetect with 0"
 )
 
 // Execute the CLI application.
@@ -103,89 +109,211 @@ var (
 		Use:     config.AppName + " [coverage.out]",
 		Short:   config.AppName + ": Coverage gatekeeper for enforcing test thresholds in Go",
 		Args:    cobra.ExactArgs(1),
-		RunE: func(cmd *cobra.Command, args []string) error {
-			cfgPath, _ := cmd.Flags().GetString(ConfigFlag)
-			cfg := new(config.Config)
-			cfg.ApplyDefaults()
-			noConfigFile := true
-
-			// Load the config if the file exists.
-			if _, err := os.Stat(cfgPath); err == nil {
-				cfg, err = config.Load(cfgPath)
-				if err != nil {
-					return err
-				}
-				noConfigFile = false
-			}
-
-			// CLI overrides when a config file exists or values to use when it does not exist.
-			if v, _ := cmd.Flags().GetFloat64(StatementThresholdFlag); cmd.Flags().Changed(StatementThresholdFlag) ||
-				noConfigFile {
-				cfg.StatementThreshold = v
-			}
-			if v, _ := cmd.Flags().GetFloat64(BlockThresholdFlag); cmd.Flags().Changed(BlockThresholdFlag) ||
-				noConfigFile {
-				cfg.BlockThreshold = v
-			}
-			if v, _ := cmd.Flags().GetString(SortByFlag); cmd.Flags().Changed(SortByFlag) ||
-				noConfigFile {
-				cfg.SortBy = v
-			}
-			if v, _ := cmd.Flags().GetString(SortOrderFlag); cmd.Flags().Changed(SortOrderFlag) ||
-				noConfigFile {
-				cfg.SortOrder = v
-			}
-			if v, _ := cmd.Flags().GetStringArray(SkipFlag); cmd.Flags().Changed(SkipFlag) ||
-				noConfigFile {
-				cfg.Skip = v
-			}
-			if v, _ := cmd.Flags().GetString(FormatFlag); cmd.Flags().Changed(FormatFlag) ||
-				noConfigFile {
-				cfg.Format = v
-			}
-			if v, _ := cmd.Flags().GetBool(NoTableFlag); cmd.Flags().Changed(NoTableFlag) ||
-				noConfigFile {
-				cfg.NoTable = v
-			}
-			if v, _ := cmd.Flags().GetBool(NoSummaryFlag); cmd.Flags().Changed(NoSummaryFlag) ||
-				noConfigFile {
-				cfg.NoSummary = v
-			}
-			if v, _ := cmd.Flags().GetBool(NoColorFlag); cmd.Flags().Changed(NoColorFlag) ||
-				noConfigFile {
-				cfg.NoColor = v
-			}
-
-			if err := cfg.Validate(); err != nil {
-				return err
-			}
-
-			profiles, err := cover.ParseProfiles(args[0])
-			if err != nil {
-				return err
-			}
-
-			// Filter profiles
-			var filtered []*cover.Profile
-			for _, p := range profiles {
-				if shouldSkip(p.FileName, cfg.Skip) {
-					continue
-				}
-				filtered = append(filtered, p)
-			}
-
-			if cfg.NoColor {
-				color.NoColor = true // disables color globally via fatih/color, in theory
-			}
-
-			failed := formatter.FormatAndReport(filtered, cfg)
-			if failed {
-				os.Exit(1)
-			}
-			return nil
+		RunE: func(cmd *cobra.Command, args []string) error { //nolint:gocritic
+			return run(cmd, args)
 		},
 	}
 )
+
+func run(cmd *cobra.Command, args []string) error {
+	cfg, err := getConfig(cmd)
+	if err != nil {
+		return err
+	}
+
+	profiles, err := cover.ParseProfiles(args[0])
+	if err != nil {
+		return err
+	}
+
+	// Filter profiles
+	filtered := make([]*cover.Profile, 0)
+	for _, p := range profiles {
+		if shouldSkip(p.FileName, cfg.Skip) {
+			continue
+		}
+		filtered = append(filtered, p)
+	}
+
+	setupColor(cfg)
+	setupTerminalWidth(cfg)
+
+	failed := formatter.FormatAndReport(filtered, cfg)
+	if failed {
+		os.Exit(1)
+	}
+	return nil
+}
+
+func isCIEnvWithColor(env []string) bool {
+	// likely not an exhaustive list
+	supportedCIs := []string{
+		"GITHUB_ACTIONS",
+		"GITLAB_CI",
+		"CIRCLECI",
+		"BITBUCKET_BUILD_NUMBER",
+		"BUILDKITE",
+		"APPVEYOR",
+		"TEAMCITY_VERSION",
+		"DRONE",
+		"GITEA_ACTIONS",
+	}
+
+	// Detect CI systems that support color
+	for _, e := range env {
+		for _, ciVar := range supportedCIs {
+			if strings.HasPrefix(e, ciVar+"=") {
+				return true
+			}
+		}
+	}
+
+	// Detect 'act' runner
+	if os.Getenv("ACT") == "true" || os.Getenv("ACT") == "1" {
+		return true
+	}
+	return false
+}
+
+func setupColor(cfg *config.Config) {
+	_, noColor := os.LookupEnv("NO_COLOR")
+	if cfg.NoColor || noColor {
+		color.NoColor = true
+		return
+	}
+
+	if isCIEnvWithColor(os.Environ()) || os.Getenv("FORCE_COLOR") != "0" {
+		color.NoColor = false
+		return
+	}
+}
+
+func isAnyCIEnv(env []string) bool {
+	knownCIEnvVars := []string{
+		"CI",
+		"GITHUB_ACTIONS",
+		"GITLAB_CI",
+		"CIRCLECI",
+		"TRAVIS",
+		"DRONE",
+		"BITBUCKET_BUILD_NUMBER",
+		"BUILDKITE",
+		"APPVEYOR",
+		"TEAMCITY_VERSION",
+		"JENKINS_URL",
+		"TF_BUILD", // Azure Pipelines
+		"HEROKU_TEST_RUN_ID",
+		"CIRRUS_CI",
+		"CODEBUILD_BUILD_ID",
+		"GOCD_SERVER_HOST",
+		"SEMAPHORE",
+		"WERCKER",
+		"HUDSON_URL",
+		"ACT",
+	}
+
+	for _, e := range env {
+		for _, ciVar := range knownCIEnvVars {
+			if strings.HasPrefix(e, ciVar+"=") {
+				return true
+			}
+		}
+	}
+
+	return false
+}
+
+func getTerminalWidth() int {
+	// respect common env var
+	if col := os.Getenv("COLUMNS"); col != "" {
+		if w, err := strconv.Atoi(col); err == nil && w > 0 {
+			return w
+		}
+	}
+	if isAnyCIEnv(os.Environ()) {
+		return 120 //nolint:mnd
+	}
+	// real tty
+	if term.IsTerminal(int(os.Stdout.Fd())) {
+		if w, _, err := term.GetSize(int(os.Stdout.Fd())); err == nil && w > 0 {
+			return w
+		}
+	}
+	return 80 //nolint:mnd
+}
+
+func setupTerminalWidth(cfg *config.Config) {
+	if cfg.TerminalWidth <= 0 {
+		cfg.TerminalWidth = getTerminalWidth()
+	}
+}
+
+func getConfig(cmd *cobra.Command) (*config.Config, error) {
+	cfgPath, _ := cmd.Flags().GetString(ConfigFlag)
+	cfg := new(config.Config)
+	cfg.ApplyDefaults()
+	noConfigFile := true
+
+	// Load the config if the file exists.
+	if _, err := os.Stat(cfgPath); err == nil {
+		cfg, err = config.Load(cfgPath)
+		if err != nil {
+			return cfg, err
+		}
+		noConfigFile = false
+	}
+
+	applyConfigOverrides(cfg, cmd, noConfigFile)
+
+	if err := cfg.Validate(); err != nil {
+		return cfg, err
+	}
+	return cfg, nil
+}
+
+func applyConfigOverrides(cfg *config.Config, cmd *cobra.Command, noConfigFile bool) { //nolint:cyclop
+	// CLI overrides when a config file exists or values to use when it does not exist.
+	if v, _ := cmd.Flags().GetFloat64(StatementThresholdFlag); cmd.Flags().Changed(StatementThresholdFlag) ||
+		noConfigFile {
+		cfg.StatementThreshold = v
+	}
+	if v, _ := cmd.Flags().GetFloat64(BlockThresholdFlag); cmd.Flags().Changed(BlockThresholdFlag) ||
+		noConfigFile {
+		cfg.BlockThreshold = v
+	}
+	if v, _ := cmd.Flags().GetString(SortByFlag); cmd.Flags().Changed(SortByFlag) ||
+		noConfigFile {
+		cfg.SortBy = v
+	}
+	if v, _ := cmd.Flags().GetString(SortOrderFlag); cmd.Flags().Changed(SortOrderFlag) ||
+		noConfigFile {
+		cfg.SortOrder = v
+	}
+	if v, _ := cmd.Flags().GetStringArray(SkipFlag); cmd.Flags().Changed(SkipFlag) ||
+		noConfigFile {
+		cfg.Skip = v
+	}
+	if v, _ := cmd.Flags().GetString(FormatFlag); cmd.Flags().Changed(FormatFlag) ||
+		noConfigFile {
+		cfg.Format = v
+	}
+	if v, _ := cmd.Flags().GetBool(NoTableFlag); cmd.Flags().Changed(NoTableFlag) ||
+		noConfigFile {
+		cfg.NoTable = v
+	}
+	if v, _ := cmd.Flags().GetBool(NoSummaryFlag); cmd.Flags().Changed(NoSummaryFlag) ||
+		noConfigFile {
+		cfg.NoSummary = v
+	}
+	if v, _ := cmd.Flags().GetBool(NoColorFlag); cmd.Flags().Changed(NoColorFlag) ||
+		noConfigFile {
+		cfg.NoColor = v
+	}
+	if v, _ := cmd.Flags().GetInt(TerminalWidthFlag); cmd.Flags().Changed(TerminalWidthFlag) ||
+		noConfigFile {
+		cfg.TerminalWidth = v
+	}
+}
 
 func getVersion() string {
 	if config.BuiltBy != "" && config.BuildTimeStamp != "" {
@@ -271,6 +399,12 @@ func init() {
 		SkipFlagShort,
 		SkipFlagDefault,
 		SkipFlagUsage,
+	)
+
+	rootCmd.Flags().Int(
+		TerminalWidthFlag,
+		0,
+		TerminalWidthFlagUsage,
 	)
 }
 

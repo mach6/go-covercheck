@@ -33,6 +33,7 @@ The following items are noteworthy and not (currently) supported.
 - Table style is not configurable.
 - Color codes (see [Color Legend](#Color-Legend)) are not configurable.
 - Severity weights (see [Color Legend](#Color-Legend)) are not configurable.
+- Does not support package thresholds.
 
 ## Background
 
@@ -108,6 +109,7 @@ Flags:
       --sort-by string              sort-by: file|blocks|statements|statement-percent|block-percent (default "file")
       --sort-order string           sort order: asc|desc (default "asc")
   -s, --statement-threshold float   statement threshold to enforce - disabled with 0 (default 70)
+      --term-width int              force output to specified column width - autodetect with 0
   -v, --version                     version for go-covercheck
 
 ```
