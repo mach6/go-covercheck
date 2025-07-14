@@ -22,7 +22,7 @@ jobs:
       - name: Extract Tag and Set Version
         run: |
           TAG=${GITHUB_REF#refs/tags/}
-          echo $TAG > VERSION
+          echo "${TAG#v}" > VERSION
 
       - name: Make Dist
         run: make dist
@@ -46,8 +46,9 @@ jobs:
         run: |
           IMAGE_NAME=ghcr.io/${{ github.repository }}/go-covercheck
           TAG=${GITHUB_REF#refs/tags/}
-          docker tag go-covercheck:latest $IMAGE_NAME:$TAG
-          docker push $IMAGE_NAME:$TAG
+          docker tag $IMAGE_NAME:${TAG#v} go-covercheck:latest
+          docker push $IMAGE_NAME:${TAG#v}
+          docker push $IMAGE_NAME:latest
 
       - name: Generate Changelog
         run: |
