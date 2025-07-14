@@ -56,10 +56,12 @@ jobs:
           go install github.com/git-chglog/git-chglog/cmd/git-chglog@latest
           git-chglog -o CHANGELOG.md
 
-      - name: Commit and Push Changelog
+      - name: Commit and Push Changelog As Branch
         run: |
+          TAG=${GITHUB_REF#refs/tags/}
           git config --global user.name "GitHub Actions"
           git config --global user.email "actions@github.com"
           git add CHANGELOG.md
           git commit -m "chore: update changelog"
-          git push
+          git checkout -b update_changelog_:${TAG#v}
+          git push origin update_changelog_:${TAG#v}
