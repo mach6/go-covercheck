@@ -44,9 +44,10 @@ jobs:
 
       - name: Tag and Push Docker image
         run: |
-          IMAGE_NAME=ghcr.io/${{ github.repository }}/go-covercheck
+          IMAGE_NAME=ghcr.io/${{ github.repository }}
           TAG=${GITHUB_REF#refs/tags/}
-          docker tag $IMAGE_NAME:${TAG#v} go-covercheck:latest
+          docker tag go-covercheck:${TAG#v} $IMAGE_NAME:${TAG#v}
+          docker tag go-covercheck:${TAG#v} $IMAGE_NAME:latest
           docker push $IMAGE_NAME:${TAG#v}
           docker push $IMAGE_NAME:latest
 
