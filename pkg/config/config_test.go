@@ -24,7 +24,7 @@ perFile:
 	cfg, err := config.Load(tmpFile)
 	require.NoError(t, err)
 	require.InEpsilon(t, 75.0, cfg.StatementThreshold, 1)
-	require.InEpsilon(t, 90.0, cfg.PerFile[config.PerFileStatementThresholdSection]["foo/bar.go"], 1)
+	require.InEpsilon(t, 90.0, cfg.PerFile.Statements["foo/bar.go"], 1)
 	require.Equal(t, "file", cfg.SortBy)
 	require.Equal(t, "asc", cfg.SortOrder)
 }

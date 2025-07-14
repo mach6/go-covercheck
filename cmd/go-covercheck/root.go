@@ -34,11 +34,19 @@ const (
 
 	StatementThresholdFlag      = "statement-threshold"
 	StatementThresholdFlagShort = "s"
-	StatementThresholdFlagUsage = "statement threshold to enforce - disabled with 0"
+	StatementThresholdFlagUsage = "global statement threshold to enforce - disabled with 0"
 
 	BlockThresholdFlag      = "block-threshold"
 	BlockThresholdFlagShort = "b"
-	BlockThresholdFlagUsage = "block threshold to enforce - disabled with 0"
+	BlockThresholdFlagUsage = "global block threshold to enforce - disabled with 0"
+
+	TotalStatementThresholdFlag      = "total-statement-threshold"
+	TotalStatementThresholdFlagShort = "r"
+	TotalStatementThresholdFlagUsage = "total statement threshold to enforce - disabled with 0"
+
+	TotalBlockThresholdFlag      = "total-block-threshold"
+	TotalBlockThresholdFlagShort = "a"
+	TotalBlockThresholdFlagUsage = "total block threshold to enforce - disabled with 0"
 
 	SortByFlag    = "sort-by"
 	SortOrderFlag = "sort-order"
@@ -281,6 +289,12 @@ func applyConfigOverrides(cfg *config.Config, cmd *cobra.Command, noConfigFile b
 		noConfigFile {
 		cfg.BlockThreshold = v
 	}
+	if v, _ := cmd.Flags().GetFloat64(TotalStatementThresholdFlag); cmd.Flags().Changed(TotalStatementThresholdFlag) {
+		cfg.Total[config.StatementsSection] = v
+	}
+	if v, _ := cmd.Flags().GetFloat64(TotalBlockThresholdFlag); cmd.Flags().Changed(TotalBlockThresholdFlag) {
+		cfg.Total[config.BlocksSection] = v
+	}
 	if v, _ := cmd.Flags().GetString(SortByFlag); cmd.Flags().Changed(SortByFlag) ||
 		noConfigFile {
 		cfg.SortBy = v
@@ -380,6 +394,20 @@ func init() {
 		BlockThresholdFlagShort,
 		config.BlockThresholdDefault,
 		BlockThresholdFlagUsage,
+	)
+
+	rootCmd.Flags().Float64P(
+		TotalStatementThresholdFlag,
+		TotalStatementThresholdFlagShort,
+		0,
+		TotalStatementThresholdFlagUsage,
+	)
+
+	rootCmd.Flags().Float64P(
+		TotalBlockThresholdFlag,
+		TotalBlockThresholdFlagShort,
+		0,
+		TotalBlockThresholdFlagUsage,
 	)
 
 	rootCmd.Flags().String(

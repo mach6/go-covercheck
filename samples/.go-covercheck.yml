@@ -1,11 +1,11 @@
-# threshold % for statement coverage. 
-# considers per file % and total %. 
+# global threshold % for statement coverage.
+# global default for per file %, per package %, and total %.
 # default 70.
 # disabled with 0
 statementThreshold: 65.0
 
-# threshold % for block coverage.
-# considers per file % and total %
+# global threshold % for block coverage.
+# global default for per file %, per package %, and total %
 # default 50.
 # disabled with 0
 blockThreshold: 60.0
@@ -42,8 +42,9 @@ format: table
 # default 0
 terminalWidth: 0
 
-# per-file thresholds
+# per-file threshold overrides
 # default {"statements": {}, "blocks": {}}
+# disabled with 0
 perFile:
   statements:
 #    main.go: 0
@@ -51,6 +52,23 @@ perFile:
   blocks:
 #    main.go: 0
 #    cmd/root.go: 20
+
+# per-package threshold overrides
+# default {"statements": {}, "blocks": {}}
+# disabled with 0
+perPackage:
+  statements:
+#    pkg/config: 10
+  blocks:
+#    pkg/config: 10
+#    pkg/formatter: 0
+
+# total threshold overrides
+# default {"statements": statementThreshold, "blocks": blockThreshold}
+# disabled with 0
+total:
+  statements: 65.0
+  blocks: 60
 
 # skip package(s) and/or file(s) regex
 # default []

@@ -51,23 +51,34 @@ const (
 	BlockThresholdOff     = thresholdOff
 	BlockThresholdMax     = thresholdMax
 
-	PerFileStatementThresholdSection = "statements"
-	PerFileBlockThresholdSection     = "blocks"
+	StatementsSection = "statements"
+	BlocksSection     = "blocks"
 )
+
+// PerOverride holds override per thresholds.
+type PerOverride map[string]float64
+
+// PerThresholdOverride holds PerOverride's for Statements and Blocks.
+type PerThresholdOverride struct {
+	Statements PerOverride `yaml:"statements"`
+	Blocks     PerOverride `yaml:"blocks"`
+}
 
 // Config for application.
 type Config struct {
-	StatementThreshold float64                       `yaml:"statementThreshold,omitempty"`
-	BlockThreshold     float64                       `yaml:"blockThreshold,omitempty"`
-	SortBy             string                        `yaml:"sortBy,omitempty"`
-	SortOrder          string                        `yaml:"sortOrder,omitempty"`
-	Skip               []string                      `yaml:"skip,omitempty"`
-	PerFile            map[string]map[string]float64 `yaml:"perFile,omitempty"`
-	NoTable            bool                          `yaml:"noTable,omitempty"`
-	NoSummary          bool                          `yaml:"noSummary,omitempty"`
-	NoColor            bool                          `yaml:"noColor,omitempty"`
-	Format             string                        `yaml:"format,omitempty"`
-	TerminalWidth      int                           `yaml:"terminalWidth,omitempty"`
+	StatementThreshold float64              `yaml:"statementThreshold,omitempty"`
+	BlockThreshold     float64              `yaml:"blockThreshold,omitempty"`
+	SortBy             string               `yaml:"sortBy,omitempty"`
+	SortOrder          string               `yaml:"sortOrder,omitempty"`
+	Skip               []string             `yaml:"skip,omitempty"`
+	PerFile            PerThresholdOverride `yaml:"perFile,omitempty"`
+	PerPackage         PerThresholdOverride `yaml:"perPackage,omitempty"`
+	Total              PerOverride          `yaml:"total,omitempty"`
+	NoTable            bool                 `yaml:"noTable,omitempty"`
+	NoSummary          bool                 `yaml:"noSummary,omitempty"`
+	NoColor            bool                 `yaml:"noColor,omitempty"`
+	Format             string               `yaml:"format,omitempty"`
+	TerminalWidth      int                  `yaml:"terminalWidth,omitempty"`
 }
 
 // Load a Config from a path or produce an error.
@@ -100,6 +111,8 @@ func (c *Config) ApplyDefaults() {
 	c.Format = FormatDefault
 
 	c.initPerFileWhenNil()
+	c.initPerPackageWhenNil()
+	c.setTotalThresholds(StatementThresholdDefault, BlockThresholdDefault)
 }
 
 // Validate the config or return an error if it is not valid.
@@ -143,18 +156,38 @@ func (c *Config) Validate() error { //nolint:cyclop
 	}
 
 	c.initPerFileWhenNil()
+	c.initPerPackageWhenNil()
+	c.setTotalThresholds(c.StatementThreshold, c.BlockThreshold)
 
 	return nil
 }
 
 func (c *Config) initPerFileWhenNil() {
-	if c.PerFile == nil {
-		c.PerFile = map[string]map[string]float64{}
+	if c.PerFile.Blocks == nil {
+		c.PerFile.Blocks = PerOverride{}
 	}
-	if _, exists := c.PerFile[PerFileStatementThresholdSection]; !exists {
-		c.PerFile[PerFileStatementThresholdSection] = map[string]float64{}
+	if c.PerFile.Statements == nil {
+		c.PerFile.Statements = PerOverride{}
 	}
-	if _, exists := c.PerFile[PerFileBlockThresholdSection]; !exists {
-		c.PerFile[PerFileBlockThresholdSection] = map[string]float64{}
+}
+
+func (c *Config) initPerPackageWhenNil() {
+	if c.PerPackage.Blocks == nil {
+		c.PerPackage.Blocks = PerOverride{}
+	}
+	if c.PerPackage.Statements == nil {
+		c.PerPackage.Statements = PerOverride{}
+	}
+}
+
+func (c *Config) setTotalThresholds(totalStatement, totalBlock float64) {
+	if c.Total == nil {
+		c.Total = PerOverride{}
+	}
+	if _, exists := c.Total[StatementsSection]; !exists {
+		c.Total[StatementsSection] = totalStatement
+	}
+	if _, exists := c.Total[BlocksSection]; !exists {
+		c.Total[BlocksSection] = totalBlock
 	}
 }
