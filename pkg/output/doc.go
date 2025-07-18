@@ -1,2 +1,2 @@
-// Package output writes reports, history, and summaries33333333333333333 to stdout.
+// Package output writes reports, history, and summaries to stdout.
 package output
