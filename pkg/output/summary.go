@@ -1,18 +1,18 @@
-package formatter
+package output
 
 import (
 	"fmt"
-	"os"
+	"github.com/mach6/go-covercheck/pkg/compute"
+	"github.com/mach6/go-covercheck/pkg/config"
 
 	"github.com/fatih/color"
-	"github.com/mach6/go-covercheck/pkg/config"
 )
 
 var (
-	msgF = " [%s] %s [improvement of %s required to meet %s threshold]\n"
+	msgF = "    [%s] %s [+%s required for %s threshold]\n"
 )
 
-func renderSummary(hasFailure bool, results Results, cfg *config.Config) {
+func renderSummary(hasFailure bool, results compute.Results, cfg *config.Config) {
 	if cfg.NoSummary {
 		return
 	}
@@ -22,23 +22,23 @@ func renderSummary(hasFailure bool, results Results, cfg *config.Config) {
 		return
 	}
 
-	_, _ = fmt.Fprintln(os.Stderr, color.New(color.FgRed).Sprint("✘"), "Coverage check failed")
+	_, _ = fmt.Println(color.New(color.FgRed).Sprint("✘"), "Coverage check failed")
 	renderByFile(results)
 	renderByPackage(results)
 	renderTotal(results)
 }
 
-func renderTotal(results Results) {
+func renderTotal(results compute.Results) {
 	if !results.ByTotal.Statements.Failed && !results.ByTotal.Blocks.Failed {
 		return
 	}
 
-	_, _ = fmt.Fprintln(os.Stderr, "\nBy Total")
+	_, _ = fmt.Println(" → By Total")
 	totalExpect := results.ByTotal.Statements.Threshold
 	percentTotalStatements := results.ByTotal.Statements.Percentage
 	if percentTotalStatements < totalExpect {
 		gap := totalExpect - percentTotalStatements
-		_, _ = fmt.Fprintf(os.Stderr, msgF,
+		_, _ = fmt.Printf(msgF,
 			color.New(color.FgCyan).Sprint("S"),
 			"total",
 			severityColor(percentTotalStatements, totalExpect)(fmt.Sprintf("%.1f%%", gap)),
@@ -50,7 +50,7 @@ func renderTotal(results Results) {
 	percentTotalBlocks := results.ByTotal.Blocks.Percentage
 	if percentTotalBlocks < totalExpect {
 		gap := totalExpect - percentTotalBlocks
-		_, _ = fmt.Fprintf(os.Stderr, msgF,
+		_, _ = fmt.Printf(msgF,
 			color.New(color.FgHiMagenta).Sprint("B"),
 			"total",
 			severityColor(percentTotalBlocks, totalExpect)(fmt.Sprintf("%.1f%%", gap)),
@@ -59,7 +59,7 @@ func renderTotal(results Results) {
 	}
 }
 
-func renderByPackage(results Results) {
+func renderByPackage(results compute.Results) {
 	bPrinted := false
 	for _, r := range results.ByPackage {
 		if !r.Failed {
@@ -67,7 +67,7 @@ func renderByPackage(results Results) {
 		}
 
 		if !bPrinted {
-			_, _ = fmt.Fprintln(os.Stderr, "\nBy Package")
+			_, _ = fmt.Println(" → By Package")
 			bPrinted = true
 		}
 
@@ -75,7 +75,7 @@ func renderByPackage(results Results) {
 	}
 }
 
-func renderByFile(results Results) {
+func renderByFile(results compute.Results) {
 	bPrinted := false
 	for _, r := range results.ByFile {
 		if !r.Failed {
@@ -83,7 +83,7 @@ func renderByFile(results Results) {
 		}
 
 		if !bPrinted {
-			_, _ = fmt.Fprintln(os.Stderr, "\nBy File")
+			_, _ = fmt.Println(" → By File")
 			bPrinted = true
 		}
 
@@ -91,12 +91,12 @@ func renderByFile(results Results) {
 	}
 }
 
-func renderBy[T HasBy](by T, item string) {
+func renderBy[T compute.HasBy](by T, item string) {
 	r := by.GetBy()
 
 	if r.StatementPercentage < r.StatementThreshold {
 		gap := r.StatementThreshold - r.StatementPercentage
-		_, _ = fmt.Fprintf(os.Stderr, msgF,
+		_, _ = fmt.Printf(msgF,
 			color.New(color.FgCyan).Sprint("S"),
 			item,
 			severityColor(r.StatementPercentage, r.StatementThreshold)(fmt.Sprintf("%.1f%%", gap)),
@@ -106,7 +106,7 @@ func renderBy[T HasBy](by T, item string) {
 
 	if r.BlockPercentage < r.BlockThreshold {
 		gap := r.BlockThreshold - r.BlockPercentage
-		_, _ = fmt.Fprintf(os.Stderr, msgF,
+		_, _ = fmt.Printf(msgF,
 			color.New(color.FgHiMagenta).Sprint("B"),
 			item,
 			severityColor(r.BlockPercentage, r.BlockThreshold)(fmt.Sprintf("%.1f%%", gap)),

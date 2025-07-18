@@ -1,15 +1,17 @@
-package formatter
+package output
 
 import (
 	"fmt"
 	"os"
 
+	"github.com/mach6/go-covercheck/pkg/compute"
+	"github.com/mach6/go-covercheck/pkg/config"
+
 	"github.com/jedib0t/go-pretty/v6/table"
 	"github.com/jedib0t/go-pretty/v6/text"
-	"github.com/mach6/go-covercheck/pkg/config"
 )
 
-func renderTable(results Results, cfg *config.Config) {
+func renderTable(results compute.Results, cfg *config.Config) {
 	if cfg.NoTable {
 		return
 	}

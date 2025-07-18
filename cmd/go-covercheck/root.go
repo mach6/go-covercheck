@@ -2,14 +2,18 @@ package main
 
 import (
 	"fmt"
+	"io"
 	"os"
 	"regexp"
 	"strconv"
 	"strings"
 
-	"github.com/fatih/color"
+	"github.com/mach6/go-covercheck/pkg/compute"
 	"github.com/mach6/go-covercheck/pkg/config"
-	"github.com/mach6/go-covercheck/pkg/formatter"
+	"github.com/mach6/go-covercheck/pkg/history"
+	"github.com/mach6/go-covercheck/pkg/output"
+
+	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 	"golang.org/x/term"
 	"golang.org/x/tools/cover"
@@ -34,19 +38,19 @@ const (
 
 	StatementThresholdFlag      = "statement-threshold"
 	StatementThresholdFlagShort = "s"
-	StatementThresholdFlagUsage = "global statement threshold to enforce - disabled with 0"
+	StatementThresholdFlagUsage = "global statement threshold to enforce [0=disabled]"
 
 	BlockThresholdFlag      = "block-threshold"
 	BlockThresholdFlagShort = "b"
-	BlockThresholdFlagUsage = "global block threshold to enforce - disabled with 0"
+	BlockThresholdFlagUsage = "global block threshold to enforce [0=disabled]"
 
 	TotalStatementThresholdFlag      = "total-statement-threshold"
-	TotalStatementThresholdFlagShort = "r"
-	TotalStatementThresholdFlagUsage = "total statement threshold to enforce - disabled with 0"
+	TotalStatementThresholdFlagShort = "S"
+	TotalStatementThresholdFlagUsage = "total statement threshold to enforce [0=disabled]"
 
 	TotalBlockThresholdFlag      = "total-block-threshold"
-	TotalBlockThresholdFlagShort = "a"
-	TotalBlockThresholdFlagUsage = "total block threshold to enforce - disabled with 0"
+	TotalBlockThresholdFlagShort = "B"
+	TotalBlockThresholdFlagUsage = "total block threshold to enforce [0=disabled]"
 
 	SortByFlag    = "sort-by"
 	SortOrderFlag = "sort-order"
@@ -61,7 +65,29 @@ const (
 	NoColorFlagUsage   = "disable color output"
 
 	TerminalWidthFlag      = "term-width"
-	TerminalWidthFlagUsage = "force output to specified column width - autodetect with 0"
+	TerminalWidthFlagUsage = "force output to specified column width [0=autodetect]"
+
+	SaveHistoryFlag      = "save-history"
+	SaveHistoryFlagShort = "H"
+	SaveHistoryFlagUsage = "add coverage result to history"
+
+	HistoryFileFlag = "history-file"
+
+	HistoryLabelFlag      = "label"
+	HistoryLabelFlagShort = "l"
+	HistoryLabelFlagUsage = "optional label name for history entry"
+
+	CompareHistoryFlag      = "compare-history"
+	CompareHistoryFlagShort = "C"
+	CompareHistoryFlagUsage = "compare current coverage against historical ref [commit|branch|tag|label]"
+
+	ShowHistoryFlag      = "show-history"
+	ShowHistoryFlagShort = "I"
+	ShowHistoryFlagUsage = "show historical entries in tabular format"
+
+	HistoryLimitFlag      = "limit-history"
+	HistoryLimitFlagShort = "L"
+	HistoryLimitFlagUsage = "limit number of historical entries to save or display [0=no limit]"
 )
 
 // Execute the CLI application.
@@ -76,18 +102,21 @@ func Execute() {
 var (
 	ConfigFlagDefault = "." + config.AppName + ".yml"
 
+	HistoryFileFlagUsage   = "path to " + config.AppName + " history file"
+	HistoryFileFlagDefault = "." + config.AppName + ".history.json"
+
 	NoTableFlagUsage = fmt.Sprintf(
-		"suppress table output and only show failure summary - disabled by default for %s|%s",
+		"suppress tabular output and only show failure summary [disabled for %s|%s]",
 		config.FormatJSON, config.FormatYAML,
 	)
 
 	NoSummaryFlagUsage = fmt.Sprintf(
-		"suppress failure summary and only show table output - disabled by default for %s|%s",
+		"suppress failure summary and only show tabular output [disabled for %s|%s]",
 		config.FormatJSON, config.FormatYAML,
 	)
 
 	SortByFlagUsage = fmt.Sprintf(
-		"sort-by: %s|%s|%s|%s|%s",
+		"sort-by [%s|%s|%s|%s|%s]",
 		config.SortByFile,
 		config.SortByBlocks,
 		config.SortByStatements,
@@ -95,12 +124,12 @@ var (
 		config.SortByBlockPercent,
 	)
 
-	SortOrderFlagUsage = fmt.Sprintf("sort order: %s|%s",
+	SortOrderFlagUsage = fmt.Sprintf("sort order [%s|%s]",
 		config.SortOrderAsc,
 		config.SortOrderDesc,
 	)
 
-	FormatFlagUsage = fmt.Sprintf("output format: %s|%s|%s|%s|%s|%s|%s",
+	FormatFlagUsage = fmt.Sprintf("output format [%s|%s|%s|%s|%s|%s|%s]",
 		config.FormatTable,
 		config.FormatJSON,
 		config.FormatYAML,
@@ -116,10 +145,11 @@ var (
 		Version: getVersion(),
 		Use:     config.AppName + " [coverage.out]",
 		Short:   config.AppName + ": Coverage gatekeeper for enforcing test thresholds in Go",
-		Args:    cobra.ExactArgs(1),
+		Args:    cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error { //nolint:gocritic
 			return run(cmd, args)
 		},
+		SilenceUsage: true,
 	}
 )
 
@@ -129,12 +159,64 @@ func run(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	profiles, err := cover.ParseProfiles(args[0])
+	setupColor(cfg)
+	setupTerminalWidth(cfg)
+
+	// show history and exit when requested.
+	historyFile, _ := cmd.Flags().GetString(HistoryFileFlag)
+	historyLimit, _ := cmd.Flags().GetInt(HistoryLimitFlag)
+	showHistory, _ := cmd.Flags().GetBool(ShowHistoryFlag)
+	if showHistory && historyFile != "" {
+		h, err := history.Load(historyFile)
+		if err != nil {
+			return fmt.Errorf("failed to load history: %s", err)
+		}
+		output.ShowHistory(h, historyLimit, cfg)
+		return nil
+	}
+
+	// we need coverage profile input from here on.
+	profiles, err := getCoverProfileData(args)
 	if err != nil {
 		return err
 	}
+	filtered := filter(profiles, cfg)
 
-	// Filter profiles
+	results, failed := compute.CollectResults(filtered, cfg)
+	output.FormatAndReport(results, cfg, failed)
+
+	// compare against history, when requested
+	compareRef, _ := cmd.Flags().GetString(CompareHistoryFlag)
+	if compareRef != "" && historyFile != "" {
+		h, err := history.Load(historyFile)
+		if err != nil {
+			return fmt.Errorf("failed to load history: %s", err)
+		}
+
+		refEntry := history.FindByRef(h, compareRef)
+		if refEntry == nil {
+			return fmt.Errorf("no history entry found for ref: %s", compareRef)
+		}
+		output.CompareHistory(compareRef, refEntry, results)
+	}
+
+	// save to history, when requested
+	saveHistory, _ := cmd.Flags().GetBool(SaveHistoryFlag)
+	if saveHistory && historyFile != "" {
+		label, _ := cmd.Flags().GetString(HistoryLabelFlag)
+		if err := history.Save(historyFile, results, label, historyLimit); err != nil {
+			return err
+		}
+	}
+
+	if failed {
+		os.Exit(1)
+	}
+	return nil
+}
+
+// filter profiles
+func filter(profiles []*cover.Profile, cfg *config.Config) []*cover.Profile {
 	filtered := make([]*cover.Profile, 0)
 	for _, p := range profiles {
 		if shouldSkip(p.FileName, cfg.Skip) {
@@ -142,15 +224,51 @@ func run(cmd *cobra.Command, args []string) error {
 		}
 		filtered = append(filtered, p)
 	}
+	return filtered
+}
 
-	setupColor(cfg)
-	setupTerminalWidth(cfg)
-
-	failed := formatter.FormatAndReport(filtered, cfg)
-	if failed {
-		os.Exit(1)
+func getCoverProfileData(args []string) ([]*cover.Profile, error) {
+	var coveragePath string
+	if len(args) > 0 {
+		coveragePath = args[0]
 	}
-	return nil
+
+	var profiles []*cover.Profile
+	var err error
+
+	if coveragePath != "" && coveragePath != "-" {
+		// use positional file argument
+		profiles, err = cover.ParseProfiles(coveragePath)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse coverage file %q: %v", coveragePath, err)
+		}
+	} else {
+		// check if stdin is available
+		stat, _ := os.Stdin.Stat()
+		if (stat.Mode() & os.ModeCharDevice) == 0 {
+			// data is being piped
+			data, err := io.ReadAll(os.Stdin)
+			if err != nil {
+				return nil, fmt.Errorf("failed to read coverage from stdin: %v", err)
+			}
+			profiles, err = cover.ParseProfilesFromReader(strings.NewReader(string(data)))
+			if err != nil {
+				return nil, fmt.Errorf("failed to parse coverage from stdin: %v", err)
+			}
+		} else {
+			// fallback to coverage.out file
+			if _, err := os.Stat("coverage.out"); err == nil {
+				profiles, err = cover.ParseProfiles("coverage.out")
+				if err != nil {
+					return nil, fmt.Errorf("failed to parse default coverage.out: %v", err)
+				}
+			} else {
+				return nil, fmt.Errorf("no coverprofile input provided (pass a filename, pipe via stdin, " +
+					"or include it via a 'coverage.out' file in the present working directory)")
+			}
+		}
+	}
+	return profiles, nil
 }
 
 func isCIEnvWithColor(env []string) bool {
@@ -433,6 +551,47 @@ func init() {
 		TerminalWidthFlag,
 		0,
 		TerminalWidthFlagUsage,
+	)
+
+	rootCmd.Flags().String(
+		HistoryFileFlag,
+		HistoryFileFlagDefault,
+		HistoryFileFlagUsage,
+	)
+
+	rootCmd.Flags().BoolP(
+		SaveHistoryFlag,
+		SaveHistoryFlagShort,
+		false,
+		SaveHistoryFlagUsage,
+	)
+
+	rootCmd.Flags().StringP(
+		HistoryLabelFlag,
+		HistoryLabelFlagShort,
+		"",
+		HistoryLabelFlagUsage,
+	)
+
+	rootCmd.Flags().StringP(
+		CompareHistoryFlag,
+		CompareHistoryFlagShort,
+		"",
+		CompareHistoryFlagUsage,
+	)
+
+	rootCmd.Flags().BoolP(
+		ShowHistoryFlag,
+		ShowHistoryFlagShort,
+		false,
+		ShowHistoryFlagUsage,
+	)
+
+	rootCmd.Flags().IntP(
+		HistoryLimitFlag,
+		HistoryLimitFlagShort,
+		0,
+		HistoryLimitFlagUsage,
 	)
 }
 
