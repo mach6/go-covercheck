@@ -499,6 +499,15 @@ func applyConfigOverrides(cfg *config.Config, cmd *cobra.Command, noConfigFile b
 		noConfigFile {
 		cfg.TerminalWidth = v
 	}
+
+	// set cfg.Total thresholds to the global values, iff no override was specified for each.
+	if v, _ := cmd.Flags().GetFloat64(StatementThresholdFlag); !cmd.Flags().Changed(TotalStatementThresholdFlag) {
+		cfg.Total[config.StatementsSection] = v
+	}
+	if v, _ := cmd.Flags().GetFloat64(BlockThresholdFlag); !cmd.Flags().Changed(TotalBlockThresholdFlag) {
+		cfg.Total[config.BlocksSection] = v
+	}
+
 }
 
 func getVersion() string {

@@ -45,11 +45,11 @@ func compareByPackage(results compute.Results, refEntry *history.Entry) bool {
 
 					if ss {
 						compareShowS()
-						fmt.Printf("%s [%s]", curr.Package, s)
+						fmt.Printf("%s [%s]\n", curr.Package, s)
 					}
 					if sb {
 						compareShowB()
-						fmt.Printf("%s [%s]", curr.Package, b)
+						fmt.Printf("%s [%s]\n", curr.Package, b)
 					}
 					fmt.Println()
 				}
@@ -98,11 +98,11 @@ func compareByFile(results compute.Results, refEntry *history.Entry) bool {
 
 					if ss {
 						compareShowS()
-						fmt.Printf("%s [%s]", curr.File, s)
+						fmt.Printf("%s [%s]\n", curr.File, s)
 					}
 					if sb {
 						compareShowB()
-						fmt.Printf("%s [%s]", curr.File, b)
+						fmt.Printf("%s [%s]\n", curr.File, b)
 					}
 					fmt.Println()
 				}
@@ -232,7 +232,7 @@ func wrapText(text string, width int) string {
 }
 
 func compareShowS() {
-	fmt.Printf("    [%s] ", color.New(color.FgCyan).Sprint("S"))
+	fmt.Printf("    [%s]", color.New(color.FgCyan).Sprint("S"))
 }
 
 func compareShowB() {
