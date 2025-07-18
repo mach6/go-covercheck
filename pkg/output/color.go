@@ -1,4 +1,3 @@
-// Package report implements report formats.
 package output
 
 import (

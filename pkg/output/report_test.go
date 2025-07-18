@@ -1,4 +1,4 @@
-package output
+package output_test
 
 import (
 	"bytes"
@@ -7,7 +7,7 @@ import (
 
 	"github.com/mach6/go-covercheck/pkg/compute"
 	"github.com/mach6/go-covercheck/pkg/config"
-
+	"github.com/mach6/go-covercheck/pkg/output"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/tools/cover"
 )
@@ -35,7 +35,7 @@ func TestFormatAndReport_FailsWhenUnderThreshold(t *testing.T) {
 	os.Stdout = w
 
 	results, failed := compute.CollectResults(profiles, cfg)
-	FormatAndReport(results, cfg, failed)
+	output.FormatAndReport(results, cfg, failed)
 
 	_ = w.Close()
 	os.Stdout = old
@@ -68,7 +68,7 @@ func TestFormatAndReport_JSONOutput(t *testing.T) {
 	os.Stdout = w
 
 	results, failed := compute.CollectResults(profiles, cfg)
-	FormatAndReport(results, cfg, failed)
+	output.FormatAndReport(results, cfg, failed)
 
 	_ = w.Close()
 	os.Stdout = old

@@ -1,3 +1,4 @@
+// Package history implements go-covercheck history.
 package history
 
 import (
@@ -11,6 +12,7 @@ import (
 	"github.com/mach6/go-covercheck/pkg/compute"
 )
 
+// Entry holds details for a single go-covercheck historical outcome.
 type Entry struct {
 	Commit    string          `json:"commit"`
 	Branch    string          `json:"branch"`
@@ -20,64 +22,78 @@ type Entry struct {
 	Results   compute.Results `json:"results"`
 }
 
+// History holds multiple Entry details for go-covercheck historical outcomes.
 type History struct {
 	Entries []Entry `json:"entries"`
+	path    string
 }
 
+// New creates a History collection for the path specified.
+func New(path string) *History {
+	return &History{
+		path: path,
+	}
+}
+
+// Load History from a file path.
 func Load(path string) (*History, error) {
-	var h History
-	b, err := os.ReadFile(path)
+	h := &History{
+		path: path,
+	}
+	b, err := os.ReadFile(h.path)
 	if err != nil {
 		return nil, err
 	}
 
-	err = json.Unmarshal(b, &h)
+	err = json.Unmarshal(b, h)
 	if err != nil {
 		return nil, err
 	}
 
-	return &h, nil
+	return h, nil
 }
 
-func Save(path string, results compute.Results, label string, limit int) error {
+// AddResults adds results to the History, optionally with a label.
+func (h *History) AddResults(results compute.Results, label string) {
 	entry := startEntry(label)
 	entry.Results = results
 
-	// loads previous history if it exists, so we can dedup when writing.
-	history, err := Load(path)
-	if err != nil {
-		history = &History{Entries: []Entry{}}
-	}
-
 	updated := false
-	for i, existing := range history.Entries {
+	for i, existing := range h.Entries {
 		if existing.Commit == entry.Commit {
 			entry.Timestamp = time.Now().UTC()
-			history.Entries[i] = entry
+			h.Entries[i] = entry
 			updated = true
 			break
 		}
 	}
 
 	if !updated {
-		history.Entries = append(history.Entries, entry)
+		h.Entries = append(h.Entries, entry)
 	}
 
 	// Sort newest-first by Timestamp
-	sort.SliceStable(history.Entries, func(i, j int) bool {
-		return history.Entries[i].Timestamp.After(history.Entries[j].Timestamp)
+	sort.SliceStable(h.Entries, func(i, j int) bool {
+		return h.Entries[i].Timestamp.After(h.Entries[j].Timestamp)
 	})
-
-	// limit how much is written
-	if limit > 0 {
-		history.Entries = history.Entries[:limit]
-	}
-
-	b, _ := json.MarshalIndent(history, "", "  ")
-	return os.WriteFile(path, b, 0644)
 }
 
-func FindByRef(h *History, ref string) *Entry {
+// Save results as an Entry to all the History in the file path.
+func (h *History) Save(limit int) error {
+	// limit how much is written
+	if limit > 0 {
+		h.Entries = h.Entries[:limit]
+	}
+
+	b, err := json.MarshalIndent(h, "", "  ")
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(h.path, b, 0600) //nolint:mnd
+}
+
+// FindByRef finds a History Entry that matches the ref string and returns it.
+func (h *History) FindByRef(ref string) *Entry {
 	for _, entry := range h.Entries {
 		if entry.Commit == ref || entry.Branch == ref || entry.Label == ref {
 			return &entry
@@ -97,16 +113,15 @@ func startEntry(label string) Entry {
 	var tags []string
 
 	repo, err := git.PlainOpen(".")
-	if err == nil {
+	if err == nil { //nolint:nestif
 		head, herr := repo.Head()
 		if herr == nil {
 			commit = head.Hash().String()
 
 			// Detect if HEAD is pointing to a named branch
+			branch = "detached"
 			if head.Name().IsBranch() {
 				branch = head.Name().Short()
-			} else {
-				branch = "detached"
 			}
 
 			tagIter, _ := repo.Tags()

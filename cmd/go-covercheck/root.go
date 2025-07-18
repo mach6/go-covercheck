@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -162,49 +163,32 @@ func run(cmd *cobra.Command, args []string) error {
 	setupColor(cfg)
 	setupTerminalWidth(cfg)
 
-	// show history and exit when requested.
-	historyFile, _ := cmd.Flags().GetString(HistoryFileFlag)
 	historyLimit, _ := cmd.Flags().GetInt(HistoryLimitFlag)
-	showHistory, _ := cmd.Flags().GetBool(ShowHistoryFlag)
-	if showHistory && historyFile != "" {
-		h, err := history.Load(historyFile)
-		if err != nil {
-			return fmt.Errorf("failed to load history: %s", err)
-		}
-		output.ShowHistory(h, historyLimit, cfg)
-		return nil
+
+	// show history and exit when requested.
+	bShowHistory, _ := cmd.Flags().GetBool(ShowHistoryFlag)
+	if bShowHistory {
+		return showHistory(cmd, historyLimit, cfg)
 	}
 
-	// we need coverage profile input from here on.
-	profiles, err := getCoverProfileData(args)
+	// showCoverage and get the results.
+	results, failed, err := showCoverage(args, cfg)
 	if err != nil {
 		return err
 	}
-	filtered := filter(profiles, cfg)
 
-	results, failed := compute.CollectResults(filtered, cfg)
-	output.FormatAndReport(results, cfg, failed)
-
-	// compare against history, when requested
+	// compare results against history, when requested
 	compareRef, _ := cmd.Flags().GetString(CompareHistoryFlag)
-	if compareRef != "" && historyFile != "" {
-		h, err := history.Load(historyFile)
-		if err != nil {
-			return fmt.Errorf("failed to load history: %s", err)
+	if compareRef != "" {
+		if err := compareHistory(cmd, compareRef, results); err != nil {
+			return err
 		}
-
-		refEntry := history.FindByRef(h, compareRef)
-		if refEntry == nil {
-			return fmt.Errorf("no history entry found for ref: %s", compareRef)
-		}
-		output.CompareHistory(compareRef, refEntry, results)
 	}
 
-	// save to history, when requested
-	saveHistory, _ := cmd.Flags().GetBool(SaveHistoryFlag)
-	if saveHistory && historyFile != "" {
-		label, _ := cmd.Flags().GetString(HistoryLabelFlag)
-		if err := history.Save(historyFile, results, label, historyLimit); err != nil {
+	// save results to history, when requested.
+	bSaveHistory, _ := cmd.Flags().GetBool(SaveHistoryFlag)
+	if bSaveHistory {
+		if err := saveHistory(cmd, results, historyLimit); err != nil {
 			return err
 		}
 	}
@@ -215,7 +199,74 @@ func run(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-// filter profiles
+func showCoverage(args []string, cfg *config.Config) (compute.Results, bool, error) {
+	// we need coverage profile input from here on.
+	profiles, err := getCoverProfileData(args)
+	if err != nil {
+		return compute.Results{}, false, err
+	}
+	filtered := filter(profiles, cfg)
+
+	results, failed := compute.CollectResults(filtered, cfg)
+	output.FormatAndReport(results, cfg, failed)
+	return results, failed, nil
+}
+
+func getHistory(cmd *cobra.Command) (*history.History, error) {
+	historyFile, _ := cmd.Flags().GetString(HistoryFileFlag)
+	if historyFile == "" {
+		return nil, errors.New("no history file specified")
+	}
+
+	// loads previous history if it exists
+	return history.Load(historyFile)
+}
+
+func saveHistory(cmd *cobra.Command, results compute.Results, historyLimit int) error {
+	h, err := getHistory(cmd)
+	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			path, _ := cmd.Flags().GetString(HistoryFileFlag)
+			h = history.New(path)
+		} else {
+			return fmt.Errorf("failed to load history: %w", err)
+		}
+	}
+
+	label, _ := cmd.Flags().GetString(HistoryLabelFlag)
+	h.AddResults(results, label)
+
+	if err := h.Save(historyLimit); err != nil {
+		return err
+	}
+	return nil
+}
+
+func compareHistory(cmd *cobra.Command, compareRef string, results compute.Results) error {
+	h, err := getHistory(cmd)
+	if err != nil {
+		return fmt.Errorf("failed to load history: %w", err)
+	}
+
+	refEntry := h.FindByRef(compareRef)
+	if refEntry == nil {
+		return fmt.Errorf("no history entry found for ref: %s", compareRef)
+	}
+	output.CompareHistory(compareRef, refEntry, results)
+	return nil
+}
+
+func showHistory(cmd *cobra.Command, historyLimit int, cfg *config.Config) error {
+	h, err := getHistory(cmd)
+	if err != nil {
+		return fmt.Errorf("failed to load history: %w", err)
+	}
+
+	output.ShowHistory(h, historyLimit, cfg)
+	return nil
+}
+
+// filter profiles.
 func filter(profiles []*cover.Profile, cfg *config.Config) []*cover.Profile {
 	filtered := make([]*cover.Profile, 0)
 	for _, p := range profiles {
@@ -240,34 +291,37 @@ func getCoverProfileData(args []string) ([]*cover.Profile, error) {
 		// use positional file argument
 		profiles, err = cover.ParseProfiles(coveragePath)
 		if err != nil {
-			return nil, fmt.Errorf("failed to parse coverage file %q: %v", coveragePath, err)
+			return nil, fmt.Errorf("failed to parse coverage file %q: %w", coveragePath, err)
+		}
+		return profiles, nil
+	}
+
+	// check if stdin is available
+	stat, _ := os.Stdin.Stat()
+	if (stat.Mode() & os.ModeCharDevice) == 0 {
+		// data is being piped
+		data, err := io.ReadAll(os.Stdin)
+		if err != nil {
+			return nil, fmt.Errorf("failed to read coverage from stdin: %w", err)
+		}
+		profiles, err = cover.ParseProfilesFromReader(strings.NewReader(string(data)))
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse coverage from stdin: %w", err)
+		}
+		return profiles, nil
+	}
+
+	// fallback to coverage.out file
+	if _, err := os.Stat("coverage.out"); err == nil {
+		profiles, err = cover.ParseProfiles("coverage.out")
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse default coverage.out: %w", err)
 		}
 	} else {
-		// check if stdin is available
-		stat, _ := os.Stdin.Stat()
-		if (stat.Mode() & os.ModeCharDevice) == 0 {
-			// data is being piped
-			data, err := io.ReadAll(os.Stdin)
-			if err != nil {
-				return nil, fmt.Errorf("failed to read coverage from stdin: %v", err)
-			}
-			profiles, err = cover.ParseProfilesFromReader(strings.NewReader(string(data)))
-			if err != nil {
-				return nil, fmt.Errorf("failed to parse coverage from stdin: %v", err)
-			}
-		} else {
-			// fallback to coverage.out file
-			if _, err := os.Stat("coverage.out"); err == nil {
-				profiles, err = cover.ParseProfiles("coverage.out")
-				if err != nil {
-					return nil, fmt.Errorf("failed to parse default coverage.out: %v", err)
-				}
-			} else {
-				return nil, fmt.Errorf("no coverprofile input provided (pass a filename, pipe via stdin, " +
-					"or include it via a 'coverage.out' file in the present working directory)")
-			}
-		}
+		return nil, errors.New("no coverprofile input provided (pass a filename, pipe via stdin, " +
+			"or include it via a 'coverage.out' file in the present working directory)")
 	}
+
 	return profiles, nil
 }
 

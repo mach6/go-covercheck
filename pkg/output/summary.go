@@ -2,10 +2,10 @@ package output
 
 import (
 	"fmt"
-	"github.com/mach6/go-covercheck/pkg/compute"
-	"github.com/mach6/go-covercheck/pkg/config"
 
 	"github.com/fatih/color"
+	"github.com/mach6/go-covercheck/pkg/compute"
+	"github.com/mach6/go-covercheck/pkg/config"
 )
 
 var (

@@ -11,6 +11,7 @@ import (
 	"golang.org/x/tools/cover"
 )
 
+// CollectResults collects all the details from a []*cover.Profile and returns Results.
 func CollectResults(profiles []*cover.Profile, cfg *config.Config) (Results, bool) {
 	normalizeNames(profiles)
 	return collect(profiles, cfg)

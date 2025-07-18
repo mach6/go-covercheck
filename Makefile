@@ -24,7 +24,7 @@ build:
 		$(APP_MODULE_PATH)$(APP_NAME)/cmd/$(APP_NAME)
 
 covercheck:
-	./$(APP_NAME) coverage.out \
+	./$(APP_NAME) -C v0.4.1 \
 		-s 65 -b 50 \
 		--skip main.go \
 		--skip color.go \
