@@ -232,7 +232,7 @@ func wrapText(text string, width int) string {
 }
 
 func compareShowS() {
-	fmt.Printf("    [%s]", color.New(color.FgCyan).Sprint("S"))
+	fmt.Printf("    [%s] ", color.New(color.FgCyan).Sprint("S"))
 }
 
 func compareShowB() {

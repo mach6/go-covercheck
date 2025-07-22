@@ -93,6 +93,7 @@ const (
 
 // Execute the CLI application.
 func Execute() {
+	initFlags(rootCmd)
 	if err := rootCmd.Execute(); err != nil {
 		// the error message is printed by default -- just exit.
 		os.Exit(1)
@@ -507,7 +508,6 @@ func applyConfigOverrides(cfg *config.Config, cmd *cobra.Command, noConfigFile b
 	if v, _ := cmd.Flags().GetFloat64(BlockThresholdFlag); !cmd.Flags().Changed(TotalBlockThresholdFlag) {
 		cfg.Total[config.BlocksSection] = v
 	}
-
 }
 
 func getVersion() string {
@@ -527,130 +527,130 @@ func getVersion() string {
 	)
 }
 
-func init() {
-	rootCmd.Flags().StringP(
+func initFlags(cmd *cobra.Command) {
+	cmd.Flags().StringP(
 		ConfigFlag,
 		ConfigFlagShort,
 		ConfigFlagDefault,
 		ConfigFlagUsage,
 	)
 
-	rootCmd.Flags().BoolP(
+	cmd.Flags().BoolP(
 		NoTableFlag,
 		NoTableFlagShort,
 		NoTableFlagDefault,
 		NoTableFlagUsage,
 	)
 
-	rootCmd.Flags().BoolP(
+	cmd.Flags().BoolP(
 		NoSummaryFlag,
 		NoSummaryFlagShort,
 		NoSummaryFlagDefault,
 		NoSummaryFlagUsage,
 	)
 
-	rootCmd.Flags().BoolP(
+	cmd.Flags().BoolP(
 		NoColorFlag,
 		NoColorFlagShort,
 		NoColorFlagDefault,
 		NoColorFlagUsage,
 	)
 
-	rootCmd.Flags().StringP(
+	cmd.Flags().StringP(
 		FormatFlag,
 		FormatFlagShort,
 		config.FormatDefault,
 		FormatFlagUsage,
 	)
 
-	rootCmd.Flags().Float64P(
+	cmd.Flags().Float64P(
 		StatementThresholdFlag,
 		StatementThresholdFlagShort,
 		config.StatementThresholdDefault,
 		StatementThresholdFlagUsage,
 	)
 
-	rootCmd.Flags().Float64P(
+	cmd.Flags().Float64P(
 		BlockThresholdFlag,
 		BlockThresholdFlagShort,
 		config.BlockThresholdDefault,
 		BlockThresholdFlagUsage,
 	)
 
-	rootCmd.Flags().Float64P(
+	cmd.Flags().Float64P(
 		TotalStatementThresholdFlag,
 		TotalStatementThresholdFlagShort,
 		0,
 		TotalStatementThresholdFlagUsage,
 	)
 
-	rootCmd.Flags().Float64P(
+	cmd.Flags().Float64P(
 		TotalBlockThresholdFlag,
 		TotalBlockThresholdFlagShort,
 		0,
 		TotalBlockThresholdFlagUsage,
 	)
 
-	rootCmd.Flags().String(
+	cmd.Flags().String(
 		SortByFlag,
 		config.SortByDefault,
 		SortByFlagUsage,
 	)
 
-	rootCmd.Flags().String(
+	cmd.Flags().String(
 		SortOrderFlag,
 		config.SortOrderDefault,
 		SortOrderFlagUsage,
 	)
 
-	rootCmd.Flags().StringArrayP(
+	cmd.Flags().StringArrayP(
 		SkipFlag,
 		SkipFlagShort,
 		SkipFlagDefault,
 		SkipFlagUsage,
 	)
 
-	rootCmd.Flags().Int(
+	cmd.Flags().Int(
 		TerminalWidthFlag,
 		0,
 		TerminalWidthFlagUsage,
 	)
 
-	rootCmd.Flags().String(
+	cmd.Flags().String(
 		HistoryFileFlag,
 		HistoryFileFlagDefault,
 		HistoryFileFlagUsage,
 	)
 
-	rootCmd.Flags().BoolP(
+	cmd.Flags().BoolP(
 		SaveHistoryFlag,
 		SaveHistoryFlagShort,
 		false,
 		SaveHistoryFlagUsage,
 	)
 
-	rootCmd.Flags().StringP(
+	cmd.Flags().StringP(
 		HistoryLabelFlag,
 		HistoryLabelFlagShort,
 		"",
 		HistoryLabelFlagUsage,
 	)
 
-	rootCmd.Flags().StringP(
+	cmd.Flags().StringP(
 		CompareHistoryFlag,
 		CompareHistoryFlagShort,
 		"",
 		CompareHistoryFlagUsage,
 	)
 
-	rootCmd.Flags().BoolP(
+	cmd.Flags().BoolP(
 		ShowHistoryFlag,
 		ShowHistoryFlagShort,
 		false,
 		ShowHistoryFlagUsage,
 	)
 
-	rootCmd.Flags().IntP(
+	cmd.Flags().IntP(
 		HistoryLimitFlag,
 		HistoryLimitFlagShort,
 		0,

@@ -26,9 +26,8 @@ build:
 covercheck:
 	./$(APP_NAME) -C v0.4.1 \
 		-s 65 -b 50 \
-		--skip main.go \
-		--skip color.go \
-		--skip root.go
+		--skip cmd/go-covercheck/main.go \
+		--skip color.go
 
 clean:
 	rm -rf dist/ \
