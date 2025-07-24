@@ -1,0 +1,21 @@
+statementThreshold: 1.0
+blockThreshold: 1.0
+sortBy: statement-percent
+sortOrder: desc
+noColor: true
+format: yaml
+
+perFile:
+  blocks:
+    github.com/mach6/go-covercheck/pkg/math/math.go: 40.0
+
+perPackage:
+  statements:
+    github.com/mach6/go-covercheck/pkg/math: 50.0
+
+total:
+  statements: 2.0
+  blocks: 3.0
+
+skip:
+  - _test.go

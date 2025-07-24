@@ -5,6 +5,7 @@ import (
 
 	"github.com/mach6/go-covercheck/pkg/config"
 	"github.com/stretchr/testify/require"
+	"golang.org/x/tools/cover"
 )
 
 func Test_sortResults_ByFile(t *testing.T) {
@@ -64,4 +65,27 @@ func Test_sortResults_ByFile(t *testing.T) {
 	for i, v := range results {
 		require.Equal(t, expect[i], v.File)
 	}
+}
+
+func TestCollectResults(t *testing.T) {
+	profiles := make([]*cover.Profile, 0)
+	profiles = append(profiles, &cover.Profile{
+		FileName: "foo",
+		Mode:     "set",
+		Blocks: []cover.ProfileBlock{
+			{
+				StartLine: 0,
+				StartCol:  0,
+				EndLine:   10,
+				EndCol:    120,
+				NumStmt:   150,
+				Count:     1,
+			},
+		},
+	})
+	r, failed := CollectResults(profiles, new(config.Config))
+	require.False(t, failed)
+	require.NotNil(t, r)
+	require.InEpsilon(t, 100.0, r.ByTotal.Blocks.Percentage, 0)
+	require.InEpsilon(t, 100.0, r.ByTotal.Statements.Percentage, 0)
 }

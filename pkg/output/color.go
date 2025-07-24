@@ -3,11 +3,10 @@ package output
 import (
 	"fmt"
 
-	"github.com/mach6/go-covercheck/pkg/math"
-
 	"github.com/fatih/color"
 	"github.com/goccy/go-yaml/lexer"
 	"github.com/goccy/go-yaml/printer"
+	"github.com/mach6/go-covercheck/pkg/math"
 	"github.com/mattn/go-colorable"
 )
 

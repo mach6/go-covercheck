@@ -17,4 +17,8 @@ func TestPercentFloat(t *testing.T) {
 	expect := 50.0
 	actual := math.PercentFloat(50.0, 100)
 	require.InEpsilon(t, expect, actual, 0)
+
+	expect = 100
+	actual = math.PercentFloat(100, 0)
+	require.InEpsilon(t, expect, actual, 0)
 }

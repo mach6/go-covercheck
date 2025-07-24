@@ -24,10 +24,7 @@ build:
 		$(APP_MODULE_PATH)$(APP_NAME)/cmd/$(APP_NAME)
 
 covercheck:
-	./$(APP_NAME) -C v0.4.1 \
-		-s 65 -b 50 \
-		--skip cmd/go-covercheck/main.go \
-		--skip color.go
+	./$(APP_NAME) -C v0.4.1
 
 clean:
 	rm -rf dist/ \

@@ -502,10 +502,12 @@ func applyConfigOverrides(cfg *config.Config, cmd *cobra.Command, noConfigFile b
 	}
 
 	// set cfg.Total thresholds to the global values, iff no override was specified for each.
-	if v, _ := cmd.Flags().GetFloat64(StatementThresholdFlag); !cmd.Flags().Changed(TotalStatementThresholdFlag) {
+	if v, _ := cmd.Flags().GetFloat64(StatementThresholdFlag); !cmd.Flags().Changed(TotalStatementThresholdFlag) &&
+		cfg.Total[config.StatementsSection] == config.StatementThresholdDefault {
 		cfg.Total[config.StatementsSection] = v
 	}
-	if v, _ := cmd.Flags().GetFloat64(BlockThresholdFlag); !cmd.Flags().Changed(TotalBlockThresholdFlag) {
+	if v, _ := cmd.Flags().GetFloat64(BlockThresholdFlag); !cmd.Flags().Changed(TotalBlockThresholdFlag) &&
+		cfg.Total[config.BlocksSection] == config.BlockThresholdDefault {
 		cfg.Total[config.BlocksSection] = v
 	}
 }
