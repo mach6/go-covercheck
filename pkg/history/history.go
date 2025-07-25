@@ -90,7 +90,7 @@ func (h *History) AddResults(results compute.Results, label string) {
 // Save results as an Entry to all the History in the file path.
 func (h *History) Save(limit int) error {
 	// limit how much is written
-	if limit > 0 {
+	if limit > 0 && limit < len(h.Entries) {
 		h.Entries = h.Entries[:limit]
 	}
 
@@ -104,7 +104,8 @@ func (h *History) Save(limit int) error {
 // FindByRef finds a History Entry that matches the ref string and returns it.
 func (h *History) FindByRef(ref string) *Entry {
 	for _, entry := range h.Entries {
-		if entry.Commit == ref || entry.Branch == ref || entry.Label == ref {
+		if entry.Commit == ref || entry.Commit[:7] == ref ||
+			entry.Branch == ref || entry.Label == ref {
 			return &entry
 		}
 		for _, t := range entry.Tags {
