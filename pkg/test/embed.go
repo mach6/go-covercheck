@@ -6,7 +6,7 @@ import _ "embed"
 // TestCoverageOut contains the contents of the embedded `assets/coverage.out` file.
 // This file is typically used for test coverage data.
 //
-//go:embed assets/coverage.out
+//go:embed assets/valid.coverage.out
 var TestCoverageOut string
 
 // InvalidTestCoverageOut contains the contents of the embedded `assets/invalid.coverage.out` file.
