@@ -3,7 +3,7 @@ package test
 
 import _ "embed"
 
-// TestCoverageOut contains the contents of the embedded `assets/coverage.out` file.
+// TestCoverageOut contains the contents of the embedded `assets/valid.coverage.out` file.
 // This file is typically used for test coverage data.
 //
 //go:embed assets/valid.coverage.out
