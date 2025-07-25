@@ -1,0 +1,49 @@
+{
+  "entries": [
+    {
+      "commit": "e40262964cc463a18753e2834c04230c2a356f20",
+      "branch": "main",
+      "timestamp": "2025-07-18T08:41:38.076764523Z",
+      "results": {
+        "byFile": [
+          {
+            "statementCoverage": "3/4",
+            "blockCoverage": "3/4",
+            "statementPercentage": 75,
+            "blockPercentage": 75,
+            "statementThreshold": 65,
+            "blockThreshold": 50,
+            "failed": false,
+            "file": "github.com/mach6/go-covercheck/pkg/math/math.go"
+          }
+        ],
+        "byPackage": [
+          {
+            "statementCoverage": "3/4",
+            "blockCoverage": "3/4",
+            "statementPercentage": 75,
+            "blockPercentage": 75,
+            "statementThreshold": 65,
+            "blockThreshold": 50,
+            "failed": false,
+            "package": "github.com/mach6/go-covercheck/pkg/math"
+          }
+        ],
+        "byTotal": {
+          "statements": {
+            "coverage": "180/648",
+            "threshold": 70,
+            "percentage": 27.77777777777778,
+            "failed": true
+          },
+          "blocks": {
+            "coverage": "95/409",
+            "threshold": 50,
+            "percentage": 23.227383863080682,
+            "failed": true
+          }
+        }
+      }
+    }
+  ]
+}

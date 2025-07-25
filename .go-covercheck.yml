@@ -1,0 +1,9 @@
+blockThreshold: 50
+statementThreshold: 65
+
+skip:
+  - pkg/test/*
+
+total:
+  statements: 80.0
+  blocks: 75

@@ -1,5 +1,4 @@
-// Package formatter implements output formats and processing.
-package formatter
+package output
 
 import (
 	"fmt"
@@ -7,6 +6,7 @@ import (
 	"github.com/fatih/color"
 	"github.com/goccy/go-yaml/lexer"
 	"github.com/goccy/go-yaml/printer"
+	"github.com/mach6/go-covercheck/pkg/math"
 	"github.com/mattn/go-colorable"
 )
 
@@ -73,7 +73,7 @@ func severityColor(actual, goal float64) func(a ...interface{}) string {
 		return color.New(color.Reset).SprintFunc()
 	}
 
-	pct := percentFloat(actual, goal)
+	pct := math.PercentFloat(actual, goal)
 	switch {
 	case pct <= 50: //nolint:mnd
 		return color.New(color.FgRed).SprintFunc()

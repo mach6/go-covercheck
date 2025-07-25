@@ -1,81 +1,12 @@
-package formatter //nolint:testpackage
+package compute //nolint:testpackage
 
 import (
-	"bytes"
-	"os"
 	"testing"
 
 	"github.com/mach6/go-covercheck/pkg/config"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/tools/cover"
 )
-
-func TestFormatAndReport_FailsWhenUnderThreshold(t *testing.T) {
-	cfg := new(config.Config)
-	cfg.ApplyDefaults()
-	cfg.StatementThreshold = 80.0
-	cfg.BlockThreshold = 70.0
-	cfg.SortBy = "file"
-	cfg.SortOrder = "asc"
-
-	profiles := []*cover.Profile{
-		{
-			FileName: "example/foo.go",
-			Blocks: []cover.ProfileBlock{
-				{NumStmt: 10, Count: 1},
-				{NumStmt: 10, Count: 0},
-			},
-		},
-	}
-
-	old := os.Stdout
-	r, w, _ := os.Pipe()
-	os.Stdout = w
-
-	failed := FormatAndReport(profiles, cfg)
-
-	_ = w.Close()
-	os.Stdout = old
-
-	var out bytes.Buffer
-	_, _ = out.ReadFrom(r)
-
-	require.True(t, failed)
-	require.Contains(t, out.String(), "TOTAL")
-}
-
-func TestFormatAndReport_JSONOutput(t *testing.T) {
-	cfg := new(config.Config)
-	cfg.ApplyDefaults()
-	cfg.Format = config.FormatJSON
-	cfg.StatementThreshold = 0
-	cfg.BlockThreshold = 0
-
-	profiles := []*cover.Profile{
-		{
-			FileName: "main.go",
-			Blocks: []cover.ProfileBlock{
-				{NumStmt: 5, Count: 1},
-			},
-		},
-	}
-
-	old := os.Stdout
-	r, w, _ := os.Pipe()
-	os.Stdout = w
-
-	failed := FormatAndReport(profiles, cfg)
-
-	_ = w.Close()
-	os.Stdout = old
-
-	var out bytes.Buffer
-	_, _ = out.ReadFrom(r)
-
-	require.False(t, failed)
-	require.Contains(t, out.String(), `"file":`)
-	require.Contains(t, out.String(), `"main.go"`)
-}
 
 func Test_sortResults_ByFile(t *testing.T) {
 	results := []ByFile{
@@ -134,4 +65,27 @@ func Test_sortResults_ByFile(t *testing.T) {
 	for i, v := range results {
 		require.Equal(t, expect[i], v.File)
 	}
+}
+
+func TestCollectResults(t *testing.T) {
+	profiles := make([]*cover.Profile, 0)
+	profiles = append(profiles, &cover.Profile{
+		FileName: "foo",
+		Mode:     "set",
+		Blocks: []cover.ProfileBlock{
+			{
+				StartLine: 0,
+				StartCol:  0,
+				EndLine:   10,
+				EndCol:    120,
+				NumStmt:   150,
+				Count:     1,
+			},
+		},
+	})
+	r, failed := CollectResults(profiles, new(config.Config))
+	require.False(t, failed)
+	require.NotNil(t, r)
+	require.InEpsilon(t, 100.0, r.ByTotal.Blocks.Percentage, 0)
+	require.InEpsilon(t, 100.0, r.ByTotal.Statements.Percentage, 0)
 }

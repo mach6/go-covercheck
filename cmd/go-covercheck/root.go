@@ -1,15 +1,20 @@
 package main
 
 import (
+	"errors"
 	"fmt"
+	"io"
 	"os"
 	"regexp"
 	"strconv"
 	"strings"
 
 	"github.com/fatih/color"
+	"github.com/jedib0t/go-pretty/v6/text"
+	"github.com/mach6/go-covercheck/pkg/compute"
 	"github.com/mach6/go-covercheck/pkg/config"
-	"github.com/mach6/go-covercheck/pkg/formatter"
+	"github.com/mach6/go-covercheck/pkg/history"
+	"github.com/mach6/go-covercheck/pkg/output"
 	"github.com/spf13/cobra"
 	"golang.org/x/term"
 	"golang.org/x/tools/cover"
@@ -34,19 +39,19 @@ const (
 
 	StatementThresholdFlag      = "statement-threshold"
 	StatementThresholdFlagShort = "s"
-	StatementThresholdFlagUsage = "global statement threshold to enforce - disabled with 0"
+	StatementThresholdFlagUsage = "global statement threshold to enforce [0=disabled]"
 
 	BlockThresholdFlag      = "block-threshold"
 	BlockThresholdFlagShort = "b"
-	BlockThresholdFlagUsage = "global block threshold to enforce - disabled with 0"
+	BlockThresholdFlagUsage = "global block threshold to enforce [0=disabled]"
 
 	TotalStatementThresholdFlag      = "total-statement-threshold"
-	TotalStatementThresholdFlagShort = "r"
-	TotalStatementThresholdFlagUsage = "total statement threshold to enforce - disabled with 0"
+	TotalStatementThresholdFlagShort = "S"
+	TotalStatementThresholdFlagUsage = "total statement threshold to enforce [0=disabled]"
 
 	TotalBlockThresholdFlag      = "total-block-threshold"
-	TotalBlockThresholdFlagShort = "a"
-	TotalBlockThresholdFlagUsage = "total block threshold to enforce - disabled with 0"
+	TotalBlockThresholdFlagShort = "B"
+	TotalBlockThresholdFlagUsage = "total block threshold to enforce [0=disabled]"
 
 	SortByFlag    = "sort-by"
 	SortOrderFlag = "sort-order"
@@ -61,11 +66,34 @@ const (
 	NoColorFlagUsage   = "disable color output"
 
 	TerminalWidthFlag      = "term-width"
-	TerminalWidthFlagUsage = "force output to specified column width - autodetect with 0"
+	TerminalWidthFlagUsage = "force output to specified column width [0=autodetect]"
+
+	SaveHistoryFlag      = "save-history"
+	SaveHistoryFlagShort = "H"
+	SaveHistoryFlagUsage = "add coverage result to history"
+
+	HistoryFileFlag = "history-file"
+
+	HistoryLabelFlag      = "label"
+	HistoryLabelFlagShort = "l"
+	HistoryLabelFlagUsage = "optional label name for history entry"
+
+	CompareHistoryFlag      = "compare-history"
+	CompareHistoryFlagShort = "C"
+	CompareHistoryFlagUsage = "compare current coverage against historical ref [commit|branch|tag|label]"
+
+	ShowHistoryFlag      = "show-history"
+	ShowHistoryFlagShort = "I"
+	ShowHistoryFlagUsage = "show historical entries in tabular format"
+
+	HistoryLimitFlag      = "limit-history"
+	HistoryLimitFlagShort = "L"
+	HistoryLimitFlagUsage = "limit number of historical entries to save or display [0=no limit]"
 )
 
 // Execute the CLI application.
 func Execute() {
+	initFlags(rootCmd)
 	if err := rootCmd.Execute(); err != nil {
 		// the error message is printed by default -- just exit.
 		os.Exit(1)
@@ -76,18 +104,21 @@ func Execute() {
 var (
 	ConfigFlagDefault = "." + config.AppName + ".yml"
 
+	HistoryFileFlagUsage   = "path to " + config.AppName + " history file"
+	HistoryFileFlagDefault = "." + config.AppName + ".history.json"
+
 	NoTableFlagUsage = fmt.Sprintf(
-		"suppress table output and only show failure summary - disabled by default for %s|%s",
+		"suppress tabular output and only show failure summary [disabled for %s|%s]",
 		config.FormatJSON, config.FormatYAML,
 	)
 
 	NoSummaryFlagUsage = fmt.Sprintf(
-		"suppress failure summary and only show table output - disabled by default for %s|%s",
+		"suppress failure summary and only show tabular output [disabled for %s|%s]",
 		config.FormatJSON, config.FormatYAML,
 	)
 
 	SortByFlagUsage = fmt.Sprintf(
-		"sort-by: %s|%s|%s|%s|%s",
+		"sort-by [%s|%s|%s|%s|%s]",
 		config.SortByFile,
 		config.SortByBlocks,
 		config.SortByStatements,
@@ -95,12 +126,12 @@ var (
 		config.SortByBlockPercent,
 	)
 
-	SortOrderFlagUsage = fmt.Sprintf("sort order: %s|%s",
+	SortOrderFlagUsage = fmt.Sprintf("sort order [%s|%s]",
 		config.SortOrderAsc,
 		config.SortOrderDesc,
 	)
 
-	FormatFlagUsage = fmt.Sprintf("output format: %s|%s|%s|%s|%s|%s|%s",
+	FormatFlagUsage = fmt.Sprintf("output format [%s|%s|%s|%s|%s|%s|%s]",
 		config.FormatTable,
 		config.FormatJSON,
 		config.FormatYAML,
@@ -116,10 +147,11 @@ var (
 		Version: getVersion(),
 		Use:     config.AppName + " [coverage.out]",
 		Short:   config.AppName + ": Coverage gatekeeper for enforcing test thresholds in Go",
-		Args:    cobra.ExactArgs(1),
+		Args:    cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error { //nolint:gocritic
 			return run(cmd, args)
 		},
+		SilenceUsage: true,
 	}
 )
 
@@ -129,12 +161,114 @@ func run(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	profiles, err := cover.ParseProfiles(args[0])
+	setupColor(cfg)
+	setupTerminalWidth(cfg)
+
+	historyLimit, _ := cmd.Flags().GetInt(HistoryLimitFlag)
+
+	// show history and exit when requested.
+	bShowHistory, _ := cmd.Flags().GetBool(ShowHistoryFlag)
+	if bShowHistory {
+		return showHistory(cmd, historyLimit, cfg)
+	}
+
+	// showCoverage and get the results.
+	results, failed, err := showCoverage(args, cfg)
 	if err != nil {
 		return err
 	}
 
-	// Filter profiles
+	// compare results against history, when requested
+	compareRef, _ := cmd.Flags().GetString(CompareHistoryFlag)
+	if compareRef != "" {
+		if err := compareHistory(cmd, compareRef, results); err != nil {
+			return err
+		}
+	}
+
+	// save results to history, when requested.
+	bSaveHistory, _ := cmd.Flags().GetBool(SaveHistoryFlag)
+	if bSaveHistory {
+		if err := saveHistory(cmd, results, historyLimit); err != nil {
+			return err
+		}
+	}
+
+	if failed {
+		os.Exit(1)
+	}
+	return nil
+}
+
+func showCoverage(args []string, cfg *config.Config) (compute.Results, bool, error) {
+	// we need coverage profile input from here on.
+	profiles, err := getCoverProfileData(args)
+	if err != nil {
+		return compute.Results{}, false, err
+	}
+	filtered := filter(profiles, cfg)
+
+	results, failed := compute.CollectResults(filtered, cfg)
+	output.FormatAndReport(results, cfg, failed)
+	return results, failed, nil
+}
+
+func getHistory(cmd *cobra.Command) (*history.History, error) {
+	historyFile, _ := cmd.Flags().GetString(HistoryFileFlag)
+	if historyFile == "" {
+		return nil, errors.New("no history file specified")
+	}
+
+	// loads previous history if it exists
+	return history.Load(historyFile)
+}
+
+func saveHistory(cmd *cobra.Command, results compute.Results, historyLimit int) error {
+	h, err := getHistory(cmd)
+	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			path, _ := cmd.Flags().GetString(HistoryFileFlag)
+			h = history.New(path)
+		} else {
+			return fmt.Errorf("failed to load history: %w", err)
+		}
+	}
+
+	label, _ := cmd.Flags().GetString(HistoryLabelFlag)
+	h.AddResults(results, label)
+
+	if err := h.Save(historyLimit); err != nil {
+		return err
+	}
+	return nil
+}
+
+func compareHistory(cmd *cobra.Command, compareRef string, results compute.Results) error {
+	h, err := getHistory(cmd)
+	if err != nil {
+		return fmt.Errorf("failed to load history: %w", err)
+	}
+
+	refEntry := h.FindByRef(compareRef)
+	if refEntry == nil {
+		return fmt.Errorf("no history entry found for ref: %s", compareRef)
+	}
+	output.CompareHistory(compareRef, refEntry, results)
+	return nil
+}
+
+func showHistory(cmd *cobra.Command, historyLimit int, cfg *config.Config) error {
+	h, err := getHistory(cmd)
+	if err != nil {
+		return fmt.Errorf("failed to load history: %w", err)
+	}
+
+	output.ShowHistory(h, historyLimit, cfg)
+	return nil
+}
+
+// filter profiles.
+func filter(profiles []*cover.Profile, cfg *config.Config) []*cover.Profile {
 	filtered := make([]*cover.Profile, 0)
 	for _, p := range profiles {
 		if shouldSkip(p.FileName, cfg.Skip) {
@@ -142,15 +276,54 @@ func run(cmd *cobra.Command, args []string) error {
 		}
 		filtered = append(filtered, p)
 	}
+	return filtered
+}
 
-	setupColor(cfg)
-	setupTerminalWidth(cfg)
-
-	failed := formatter.FormatAndReport(filtered, cfg)
-	if failed {
-		os.Exit(1)
+func getCoverProfileData(args []string) ([]*cover.Profile, error) {
+	var coveragePath string
+	if len(args) > 0 {
+		coveragePath = args[0]
 	}
-	return nil
+
+	var profiles []*cover.Profile
+	var err error
+
+	if coveragePath != "" && coveragePath != "-" {
+		// use positional file argument
+		profiles, err = cover.ParseProfiles(coveragePath)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse coverage file %q: %w", coveragePath, err)
+		}
+		return profiles, nil
+	}
+
+	// check if stdin is available
+	stat, _ := os.Stdin.Stat()
+	if (stat.Mode() & os.ModeCharDevice) == 0 {
+		// data is being piped
+		data, err := io.ReadAll(os.Stdin)
+		if err != nil {
+			return nil, fmt.Errorf("failed to read coverage from stdin: %w", err)
+		}
+		profiles, err = cover.ParseProfilesFromReader(strings.NewReader(string(data)))
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse coverage from stdin: %w", err)
+		}
+		return profiles, nil
+	}
+
+	// fallback to coverage.out file
+	if _, err := os.Stat("coverage.out"); err == nil {
+		profiles, err = cover.ParseProfiles("coverage.out")
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse default coverage.out: %w", err)
+		}
+	} else {
+		return nil, errors.New("no coverprofile input provided (pass a filename, pipe via stdin, " +
+			"or include it via a 'coverage.out' file in the present working directory)")
+	}
+
+	return profiles, nil
 }
 
 func isCIEnvWithColor(env []string) bool {
@@ -187,6 +360,7 @@ func setupColor(cfg *config.Config) {
 	_, noColor := os.LookupEnv("NO_COLOR")
 	if cfg.NoColor || noColor {
 		color.NoColor = true
+		text.DisableColors()
 		return
 	}
 
@@ -327,6 +501,16 @@ func applyConfigOverrides(cfg *config.Config, cmd *cobra.Command, noConfigFile b
 		noConfigFile {
 		cfg.TerminalWidth = v
 	}
+
+	// set cfg.Total thresholds to the global values, iff no override was specified for each.
+	if v, _ := cmd.Flags().GetFloat64(StatementThresholdFlag); !cmd.Flags().Changed(TotalStatementThresholdFlag) &&
+		cfg.Total[config.StatementsSection] == config.StatementThresholdDefault {
+		cfg.Total[config.StatementsSection] = v
+	}
+	if v, _ := cmd.Flags().GetFloat64(BlockThresholdFlag); !cmd.Flags().Changed(TotalBlockThresholdFlag) &&
+		cfg.Total[config.BlocksSection] == config.BlockThresholdDefault {
+		cfg.Total[config.BlocksSection] = v
+	}
 }
 
 func getVersion() string {
@@ -346,93 +530,134 @@ func getVersion() string {
 	)
 }
 
-func init() {
-	rootCmd.Flags().StringP(
+func initFlags(cmd *cobra.Command) {
+	cmd.Flags().StringP(
 		ConfigFlag,
 		ConfigFlagShort,
 		ConfigFlagDefault,
 		ConfigFlagUsage,
 	)
 
-	rootCmd.Flags().BoolP(
+	cmd.Flags().BoolP(
 		NoTableFlag,
 		NoTableFlagShort,
 		NoTableFlagDefault,
 		NoTableFlagUsage,
 	)
 
-	rootCmd.Flags().BoolP(
+	cmd.Flags().BoolP(
 		NoSummaryFlag,
 		NoSummaryFlagShort,
 		NoSummaryFlagDefault,
 		NoSummaryFlagUsage,
 	)
 
-	rootCmd.Flags().BoolP(
+	cmd.Flags().BoolP(
 		NoColorFlag,
 		NoColorFlagShort,
 		NoColorFlagDefault,
 		NoColorFlagUsage,
 	)
 
-	rootCmd.Flags().StringP(
+	cmd.Flags().StringP(
 		FormatFlag,
 		FormatFlagShort,
 		config.FormatDefault,
 		FormatFlagUsage,
 	)
 
-	rootCmd.Flags().Float64P(
+	cmd.Flags().Float64P(
 		StatementThresholdFlag,
 		StatementThresholdFlagShort,
 		config.StatementThresholdDefault,
 		StatementThresholdFlagUsage,
 	)
 
-	rootCmd.Flags().Float64P(
+	cmd.Flags().Float64P(
 		BlockThresholdFlag,
 		BlockThresholdFlagShort,
 		config.BlockThresholdDefault,
 		BlockThresholdFlagUsage,
 	)
 
-	rootCmd.Flags().Float64P(
+	cmd.Flags().Float64P(
 		TotalStatementThresholdFlag,
 		TotalStatementThresholdFlagShort,
 		0,
 		TotalStatementThresholdFlagUsage,
 	)
 
-	rootCmd.Flags().Float64P(
+	cmd.Flags().Float64P(
 		TotalBlockThresholdFlag,
 		TotalBlockThresholdFlagShort,
 		0,
 		TotalBlockThresholdFlagUsage,
 	)
 
-	rootCmd.Flags().String(
+	cmd.Flags().String(
 		SortByFlag,
 		config.SortByDefault,
 		SortByFlagUsage,
 	)
 
-	rootCmd.Flags().String(
+	cmd.Flags().String(
 		SortOrderFlag,
 		config.SortOrderDefault,
 		SortOrderFlagUsage,
 	)
 
-	rootCmd.Flags().StringArrayP(
+	cmd.Flags().StringArrayP(
 		SkipFlag,
 		SkipFlagShort,
 		SkipFlagDefault,
 		SkipFlagUsage,
 	)
 
-	rootCmd.Flags().Int(
+	cmd.Flags().Int(
 		TerminalWidthFlag,
 		0,
 		TerminalWidthFlagUsage,
+	)
+
+	cmd.Flags().String(
+		HistoryFileFlag,
+		HistoryFileFlagDefault,
+		HistoryFileFlagUsage,
+	)
+
+	cmd.Flags().BoolP(
+		SaveHistoryFlag,
+		SaveHistoryFlagShort,
+		false,
+		SaveHistoryFlagUsage,
+	)
+
+	cmd.Flags().StringP(
+		HistoryLabelFlag,
+		HistoryLabelFlagShort,
+		"",
+		HistoryLabelFlagUsage,
+	)
+
+	cmd.Flags().StringP(
+		CompareHistoryFlag,
+		CompareHistoryFlagShort,
+		"",
+		CompareHistoryFlagUsage,
+	)
+
+	cmd.Flags().BoolP(
+		ShowHistoryFlag,
+		ShowHistoryFlagShort,
+		false,
+		ShowHistoryFlagUsage,
+	)
+
+	cmd.Flags().IntP(
+		HistoryLimitFlag,
+		HistoryLimitFlagShort,
+		0,
+		HistoryLimitFlagUsage,
 	)
 }
 

@@ -1,130 +1,20 @@
-package formatter
+package compute
 
 import (
-	"encoding/json"
 	"fmt"
-	"os"
 	"path"
 	"sort"
 
-	"github.com/fatih/color"
-	"github.com/hokaccha/go-prettyjson"
 	"github.com/mach6/go-covercheck/pkg/config"
+	"github.com/mach6/go-covercheck/pkg/math"
+
 	"golang.org/x/tools/cover"
-	"gopkg.in/yaml.v3"
 )
 
-// HasBy required interface for all descendants of By.
-type HasBy interface {
-	GetBy() By
-}
-
-// By holds cover.Profile information.
-type By struct {
-	Statements                         string  `json:"statementCoverage"   yaml:"statementCoverage"`
-	Blocks                             string  `json:"blockCoverage"       yaml:"blockCoverage"`
-	StatementPercentage                float64 `json:"statementPercentage" yaml:"statementPercentage"`
-	BlockPercentage                    float64 `json:"blockPercentage"     yaml:"blockPercentage"`
-	StatementThreshold                 float64 `json:"statementThreshold"  yaml:"statementThreshold"`
-	BlockThreshold                     float64 `json:"blockThreshold"      yaml:"blockThreshold"`
-	Failed                             bool    `json:"failed"              yaml:"failed"`
-	stmts, blocks, stmtHits, blockHits int
-}
-
-// ByFile holds information for a cover.Profile result of a file.
-type ByFile struct {
-	By   `yaml:",inline"`
-	File string `json:"file"    yaml:"file"`
-}
-
-// GetBy returns the By struct for ByFile.
-func (f ByFile) GetBy() By {
-	return f.By
-}
-
-// ByPackage holds information for cover.Profile results by package.
-type ByPackage struct {
-	By      `yaml:",inline"`
-	Package string `json:"package" yaml:"package"`
-}
-
-// GetBy returns the By struct for ByPackage.
-func (f ByPackage) GetBy() By {
-	return f.By
-}
-
-// Totals holds cover.Profile total results.
-type Totals struct {
-	Statements TotalStatements `json:"statements" yaml:"statements"`
-	Blocks     TotalBlocks     `json:"blocks"     yaml:"blocks"`
-}
-
-// TotalBlocks holds cover.Profile total block results.
-type TotalBlocks struct {
-	totalBlocks        int
-	totalCoveredBlocks int
-	Coverage           string  `json:"coverage"   yaml:"coverage"`
-	Threshold          float64 `json:"threshold"  yaml:"threshold"`
-	Percentage         float64 `json:"percentage" yaml:"percentage"`
-	Failed             bool    `json:"failed"     yaml:"failed"`
-}
-
-// TotalStatements holds cover.Profile total statement results.
-type TotalStatements struct {
-	Coverage               string  `json:"coverage"   yaml:"coverage"`
-	Threshold              float64 `json:"threshold"  yaml:"threshold"`
-	Percentage             float64 `json:"percentage" yaml:"percentage"`
-	Failed                 bool    `json:"failed"     yaml:"failed"`
-	totalCoveredStatements int
-	totalStatements        int
-}
-
-// Results holds information for all stats collected form the cover.Profile data.
-type Results struct {
-	ByFile    []ByFile    `json:"byFile"    yaml:"byFile"`
-	ByPackage []ByPackage `json:"byPackage" yaml:"byPackage"`
-	ByTotal   Totals      `json:"byTotal"   yaml:"byTotal"`
-}
-
-// FormatAndReport creates and writes out formatted profile results and return true or false if there is/are coverage
-// failure(s).
-func FormatAndReport(profiles []*cover.Profile, cfg *config.Config) bool {
+// CollectResults collects all the details from a []*cover.Profile and returns Results.
+func CollectResults(profiles []*cover.Profile, cfg *config.Config) (Results, bool) {
 	normalizeNames(profiles)
-	results, hasFailure := collect(profiles, cfg)
-
-	switch cfg.Format {
-	case config.FormatTable, config.FormatMD, config.FormatHTML, config.FormatCSV, config.FormatTSV:
-		renderTable(results, cfg)
-		_ = os.Stdout.Sync()
-		renderSummary(hasFailure, results, cfg)
-	case config.FormatJSON:
-		if cfg.NoColor {
-			enc := json.NewEncoder(os.Stdout)
-			enc.SetIndent("", "  ")
-			if err := enc.Encode(results); err != nil {
-				fmt.Println(err)
-				os.Exit(1)
-			}
-		} else {
-			s, err := prettyjson.Marshal(results)
-			if err != nil {
-				fmt.Println(err)
-				os.Exit(1)
-			}
-			fmt.Println(string(s))
-		}
-	case config.FormatYAML:
-		if cfg.NoColor {
-			_ = yaml.NewEncoder(os.Stdout).Encode(results)
-		} else {
-			y, _ := yaml.Marshal(results)
-			yamlColor(y)
-		}
-	default:
-		fmt.Fprintln(os.Stderr, color.RedString("Unsupported format: %s", cfg.Format))
-	}
-
-	return hasFailure
+	return collect(profiles, cfg)
 }
 
 func collect(profiles []*cover.Profile, cfg *config.Config) (Results, bool) { //nolint:cyclop
@@ -149,8 +39,8 @@ func collect(profiles []*cover.Profile, cfg *config.Config) (Results, bool) { //
 			blocks++
 		}
 
-		stmtPct := percent(stmtHits, stmts)
-		blockPct := percent(blockHits, blocks)
+		stmtPct := math.Percent(stmtHits, stmts)
+		blockPct := math.Percent(blockHits, blocks)
 
 		stmtThreshold := cfg.StatementThreshold
 		if t, ok := cfg.PerFile.Statements[p.FileName]; ok {
@@ -221,8 +111,8 @@ func collectPackageResults(results *Results, cfg *config.Config) bool {
 	for _, v := range working {
 		v.Statements = fmt.Sprintf("%d/%d", v.stmtHits, v.stmts)
 		v.Blocks = fmt.Sprintf("%d/%d", v.blockHits, v.blocks)
-		v.StatementPercentage = percent(v.stmtHits, v.stmts)
-		v.BlockPercentage = percent(v.blockHits, v.blocks)
+		v.StatementPercentage = math.Percent(v.stmtHits, v.stmts)
+		v.BlockPercentage = math.Percent(v.blockHits, v.blocks)
 
 		v.StatementThreshold = cfg.StatementThreshold
 		if t, ok := cfg.PerPackage.Statements[v.Package]; ok {
@@ -249,7 +139,7 @@ func setTotals(results *Results, cfg *config.Config) {
 	results.ByTotal.Statements.Coverage =
 		fmt.Sprintf("%d/%d", results.ByTotal.Statements.totalCoveredStatements,
 			results.ByTotal.Statements.totalStatements)
-	results.ByTotal.Statements.Percentage = percent(results.ByTotal.Statements.totalCoveredStatements,
+	results.ByTotal.Statements.Percentage = math.Percent(results.ByTotal.Statements.totalCoveredStatements,
 		results.ByTotal.Statements.totalStatements)
 	results.ByTotal.Statements.Failed = results.ByTotal.Statements.Percentage < results.ByTotal.Statements.Threshold
 
@@ -257,7 +147,7 @@ func setTotals(results *Results, cfg *config.Config) {
 	results.ByTotal.Blocks.Coverage =
 		fmt.Sprintf("%d/%d", results.ByTotal.Blocks.totalCoveredBlocks,
 			results.ByTotal.Blocks.totalBlocks)
-	results.ByTotal.Blocks.Percentage = percent(results.ByTotal.Blocks.totalCoveredBlocks,
+	results.ByTotal.Blocks.Percentage = math.Percent(results.ByTotal.Blocks.totalCoveredBlocks,
 		results.ByTotal.Blocks.totalBlocks)
 	results.ByTotal.Blocks.Failed = results.ByTotal.Blocks.Percentage < results.ByTotal.Blocks.Threshold
 }

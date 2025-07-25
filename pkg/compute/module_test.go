@@ -1,4 +1,4 @@
-package formatter //nolint:testpackage
+package compute //nolint:testpackage
 
 import (
 	"testing"
