@@ -12,6 +12,15 @@ import (
 	"github.com/mach6/go-covercheck/pkg/compute"
 )
 
+var (
+	// defaultRepoPath is the default path to the git repository.
+	// It is used when no specific path is provided.
+	// Typically, it is the current working directory.
+	//
+	// Defined as a package variable to allow testing with different paths.
+	defaultRepoPath = "."
+)
+
 // Entry holds details for a single go-covercheck historical outcome.
 type Entry struct {
 	Commit    string          `json:"commit"`
@@ -55,7 +64,7 @@ func Load(path string) (*History, error) {
 
 // AddResults adds results to the History, optionally with a label.
 func (h *History) AddResults(results compute.Results, label string) {
-	entry := startEntry(label)
+	entry := startEntry(label, defaultRepoPath)
 	entry.Results = results
 
 	updated := false
@@ -107,12 +116,12 @@ func (h *History) FindByRef(ref string) *Entry {
 	return nil
 }
 
-func startEntry(label string) Entry {
+func startEntry(label, repoPath string) Entry {
 	var commit = "unknown"
 	var branch = "unknown"
 	var tags []string
 
-	repo, err := git.PlainOpen(".")
+	repo, err := git.PlainOpen(repoPath)
 	if err == nil { //nolint:nestif
 		head, herr := repo.Head()
 		if herr == nil {

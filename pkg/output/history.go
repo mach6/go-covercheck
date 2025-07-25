@@ -62,22 +62,20 @@ func compareByPackage(results compute.Results, refEntry *history.Entry) bool {
 func compareByTotal(results compute.Results, refEntry *history.Entry) bool {
 	// Totals
 	bPrintedTotal := false
-	if deltaStr, ok := formatDelta(results.ByTotal.Statements.Percentage -
-		refEntry.Results.ByTotal.Statements.Percentage); ok {
-		if !bPrintedTotal {
-			fmt.Printf(" → By Total\n")
-			bPrintedTotal = true
+	deltaS, okS := formatDelta(results.ByTotal.Statements.Percentage - refEntry.Results.ByTotal.Statements.Percentage)
+	deltaB, okB := formatDelta(results.ByTotal.Blocks.Percentage - refEntry.Results.ByTotal.Blocks.Percentage)
+
+	if okS || okB {
+		fmt.Printf(" → By Total\n")
+		bPrintedTotal = true
+		if okS {
+			compareShowS()
+			fmt.Printf("total [%s]\n", deltaS)
 		}
-		compareShowS()
-		fmt.Printf("total [%s]\n", deltaStr)
-	}
-	if deltaStr, ok := formatDelta(results.ByTotal.Blocks.Percentage -
-		refEntry.Results.ByTotal.Blocks.Percentage); ok {
-		if !bPrintedTotal {
-			fmt.Printf(" → By Total\n")
+		if okB {
+			compareShowB()
+			fmt.Printf("total [%s]\n", deltaB)
 		}
-		compareShowB()
-		fmt.Printf("total [%s]\n", deltaStr)
 	}
 	return bPrintedTotal
 }

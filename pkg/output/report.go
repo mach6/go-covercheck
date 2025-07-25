@@ -2,16 +2,23 @@ package output
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 
-	"github.com/mach6/go-covercheck/pkg/compute"
-	"github.com/mach6/go-covercheck/pkg/config"
-
 	"github.com/fatih/color"
 	"github.com/hokaccha/go-prettyjson"
+	"github.com/mach6/go-covercheck/pkg/compute"
+	"github.com/mach6/go-covercheck/pkg/config"
 	"gopkg.in/yaml.v3"
 )
+
+func bailOnError(err error) {
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
+}
 
 // FormatAndReport writes out formatted profile results.
 func FormatAndReport(results compute.Results, cfg *config.Config, hasFailure bool) {
@@ -24,26 +31,23 @@ func FormatAndReport(results compute.Results, cfg *config.Config, hasFailure boo
 		if cfg.NoColor {
 			enc := json.NewEncoder(os.Stdout)
 			enc.SetIndent("", "  ")
-			if err := enc.Encode(results); err != nil {
-				fmt.Println(err)
-				os.Exit(1)
-			}
+			err := enc.Encode(results)
+			bailOnError(err)
 		} else {
 			s, err := prettyjson.Marshal(results)
-			if err != nil {
-				fmt.Println(err)
-				os.Exit(1)
-			}
+			bailOnError(err)
 			fmt.Println(string(s))
 		}
 	case config.FormatYAML:
 		if cfg.NoColor {
-			_ = yaml.NewEncoder(os.Stdout).Encode(results)
+			err := yaml.NewEncoder(os.Stdout).Encode(results)
+			bailOnError(err)
 		} else {
-			y, _ := yaml.Marshal(results)
+			y, err := yaml.Marshal(results)
+			bailOnError(err)
 			yamlColor(y)
 		}
 	default:
-		fmt.Fprintln(os.Stderr, color.RedString("Unsupported format: %s", cfg.Format))
+		bailOnError(errors.New(color.RedString("Unsupported format: %s", cfg.Format)))
 	}
 }

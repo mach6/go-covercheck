@@ -11,5 +11,5 @@ skip:
   - pkg/test/*
 
 total:
-  statements: 75.0
-  blocks: 65
+  statements: 80.0
+  blocks: 75

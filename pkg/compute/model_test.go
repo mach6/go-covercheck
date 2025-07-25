@@ -1,17 +1,18 @@
-package compute
+package compute_test
 
 import (
 	"encoding/json"
-	"gopkg.in/yaml.v3"
 	"testing"
 
+	"github.com/mach6/go-covercheck/pkg/compute"
 	"github.com/mach6/go-covercheck/pkg/config"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/tools/cover"
+	"gopkg.in/yaml.v3"
 )
 
 const (
-	expectJson = `{
+	expectJSON = `{
   "byFile": [
     {
       "statementCoverage": "150/150",
@@ -52,7 +53,7 @@ const (
   }
 }`
 
-	expectYaml = `byFile:
+	expectYAML = `byFile:
     - statementCoverage: 150/150
       blockCoverage: 1/1
       statementPercentage: 100
@@ -85,9 +86,9 @@ byTotal:
 )
 
 func TestByFile_GetBy(t *testing.T) {
-	f := &ByFile{
+	f := &compute.ByFile{
 		File: "foo",
-		By: By{
+		By: compute.By{
 			Failed: true,
 		},
 	}
@@ -95,9 +96,9 @@ func TestByFile_GetBy(t *testing.T) {
 }
 
 func TestByPackage_GetBy(t *testing.T) {
-	p := &ByPackage{
+	p := &compute.ByPackage{
 		Package: "foo",
-		By: By{
+		By: compute.By{
 			Failed: true,
 		},
 	}
@@ -122,11 +123,11 @@ func TestModelMarshalYaml(t *testing.T) {
 		},
 	}
 
-	r, _ := CollectResults(profiles, new(config.Config))
+	r, _ := compute.CollectResults(profiles, new(config.Config))
 	out, err := yaml.Marshal(r)
 	require.NoError(t, err)
 	require.NotEmpty(t, out)
-	require.Equal(t, expectYaml, string(out))
+	require.YAMLEq(t, expectYAML, string(out))
 }
 
 func TestModelMarshalJson(t *testing.T) {
@@ -147,9 +148,9 @@ func TestModelMarshalJson(t *testing.T) {
 		},
 	}
 
-	r, _ := CollectResults(profiles, new(config.Config))
+	r, _ := compute.CollectResults(profiles, new(config.Config))
 	out, err := json.MarshalIndent(r, "", "  ")
 	require.NoError(t, err)
 	require.NotEmpty(t, out)
-	require.Equal(t, expectJson, string(out))
+	require.JSONEq(t, expectJSON, string(out))
 }

@@ -1,4 +1,4 @@
-package output
+package output_test
 
 import (
 	"testing"
@@ -6,6 +6,7 @@ import (
 	"github.com/mach6/go-covercheck/pkg/compute"
 	"github.com/mach6/go-covercheck/pkg/config"
 	"github.com/mach6/go-covercheck/pkg/history"
+	"github.com/mach6/go-covercheck/pkg/output"
 	"github.com/mach6/go-covercheck/pkg/test"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/tools/cover"
@@ -23,7 +24,7 @@ func TestCompareHistory(t *testing.T) {
 		h, err := history.Load(hPath)
 		require.NoError(t, err)
 		entry := h.FindByRef("main")
-		CompareHistory("main", entry, results)
+		output.CompareHistory("main", entry, results)
 	})
 
 	require.Empty(t, stderr)
@@ -48,7 +49,7 @@ func TestShowHistory(t *testing.T) {
 		hPath := test.CreateTempHistoryFile(t, test.TestCoverageHistory)
 		h, err := history.Load(hPath)
 		require.NoError(t, err)
-		ShowHistory(h, 1, new(config.Config))
+		output.ShowHistory(h, 1, new(config.Config))
 	})
 	require.Empty(t, stderr)
 	require.Equal(t, `┌────────────┬─────────┬─────────────────┬─────────────────┬─────────────────┬─────────────┐

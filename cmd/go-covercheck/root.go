@@ -9,12 +9,12 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/fatih/color"
+	"github.com/jedib0t/go-pretty/v6/text"
 	"github.com/mach6/go-covercheck/pkg/compute"
 	"github.com/mach6/go-covercheck/pkg/config"
 	"github.com/mach6/go-covercheck/pkg/history"
 	"github.com/mach6/go-covercheck/pkg/output"
-
-	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 	"golang.org/x/term"
 	"golang.org/x/tools/cover"
@@ -360,6 +360,7 @@ func setupColor(cfg *config.Config) {
 	_, noColor := os.LookupEnv("NO_COLOR")
 	if cfg.NoColor || noColor {
 		color.NoColor = true
+		text.DisableColors()
 		return
 	}
 
