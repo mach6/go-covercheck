@@ -61,7 +61,7 @@ chmod +x go-covercheck
 ### Via `go install`
 
 You can install `go-covercheck` using the `go install` command, if you don't care about official releases. Versions installed
-this way are not be stamped with build information, such as the version number or commit sha.
+this way are not stamped with build information, such as the version number or commit sha.
 
 ```shell
 go install github.com/mach6/go-covercheck/cmd/go-covercheck@latest
@@ -248,8 +248,7 @@ $ go-covercheck --show-history
 ### Limit History
 
 You can limit the number of history entries displayed or saved with the `--limit-history` flag. This is useful to avoid
-overloading the output with too many entries. Set it to `0` to disable the limit. This is the default behavior.
-
+overloading the output with too many entries. Set it to `0` (the default) to disable any limit.
 ```shell
 go-covercheck --save-history --limit-history 5 -l my-label
 ```
@@ -312,7 +311,7 @@ Note: Here the `-u` flag was used to suppress the summary lines.
 
 ### Other Tabular Formats
 
-The `go-covercheck` tool also supports other tabular formats such as `csv`, `tsv`, and `md`. These formats are useful for
+`go-covercheck` supports other tabular formats such as `csv`, `tsv`, and `md`. These formats are useful for
 exporting coverage data to other tools or visualizations. The flag `-u` (or `--no-summary`) can be used to suppress the
 summary lines in these formats, as well, which is necessary for generating clean output for further processing.
 
@@ -322,9 +321,7 @@ The `json` format provides a structured output that is easy to read and parse. I
 package, and total. It also includes the thresholds and the actual coverage percentages.
 
 JSON output is color-coded by default, but you can disable color with the `--no-color` flag.
-Also, the `--no-summary` flag is applied when the `json` format is used.
-
-```text
+The `--no-summary` flag is applied when the `json` format is used.
 
 ```json
 $ go-covercheck -f json coverage.out
@@ -375,7 +372,7 @@ The `yaml` format provides a structured output that is easy to read and parse. I
 package, and total. It also includes the thresholds and the actual coverage percentages.
 
 YAML output is color-coded by default, but you can disable color with the `--no-color` flag.
-Also, the `--no-summary` flag is applied when the `yaml` format is used.
+The `--no-summary` flag is applied when the `yaml` format is used.
 ```yaml
 $ go-covercheck -f yaml coverage.out
 byFile:
@@ -412,7 +409,7 @@ byTotal:
 
 ## Color Legend
 
-By default, `go-covercheck` uses color in table format(s). The color is used to indicate severity as follows:
+By default, `go-covercheck` uses color in tabular format(s). The color is used to indicate severity as follows:
 
 - % in ${\color{red}red}$ indicates the actual is `<=` `50%` of the threshold goal
 - % in ${\color{yellow}yellow}$ indicates the actual is `>` `50%` and `<=` `99%` of the threshold goal 
