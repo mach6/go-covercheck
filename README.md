@@ -1,15 +1,15 @@
-# go-covercheck
+# 🚦 go-covercheck
 
 ![Go Version](https://img.shields.io/badge/Go-1.24%2B-blue)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Contribute](https://img.shields.io/badge/contributions-welcome-brightgreen.svg)](CONTRIBUTING.md)
 [![CI](https://github.com/mach6/go-covercheck/actions/workflows/ci.yaml/badge.svg)](https://github.com/mach6/go-covercheck/actions/workflows/ci.yaml)
 
-🚦 A fast, flexible CLI tool for enforcing test coverage thresholds in Go projects.
+A fast, flexible CLI tool for enforcing test coverage thresholds in Go projects.
 
 > Fail builds when coverage drops below acceptable thresholds — by file, statement, or block level.
 
-## Features
+## ✨ Features
 
 - Enforce minimum coverage thresholds for files, packages, and the entire project.
 - Supports statement and block coverage separately.
@@ -21,7 +21,7 @@
 - Save and compare against historical results from a commit, branch, tag, or user defined label.
 - Works seamlessly in CI/CD environments.
 
-## Not Supported
+## 🚫 Not Supported
 
 The following items are noteworthy and not (currently) supported.
 
@@ -31,7 +31,7 @@ The following items are noteworthy and not (currently) supported.
 - Color codes (see [Color Legend](#Color-Legend)) are not configurable.
 - Severity weights (see [Color Legend](#Color-Legend)) are not configurable.
 
-## Background
+## 📖 Background
 
 I had access to a similar tool in a previous job. I took it for granted. After leaving this job and continuing to work 
 in Go, I realized that I needed that tool in my life again. The closest that I was able to find online is 
@@ -44,11 +44,11 @@ access to before, and I did not want to put a lot of effort into creating it.
 So, I used generative AI as a starting point and a few dozen prompts later, `go-covercheck` was born. Many hours later,
 the first release was ready.
 
-## Installation
+## 🛠️ Installation
 
 There are several ways to install `go-covercheck`. Choose the one that best fits your needs.
 
-### Official Releases
+### 📦 Official Releases
 
 You can download official releases from the [releases page](https://github.com/mach6/go-covercheck/releases). 
 All releases are built with the latest Go version and include build information, such as the version number and commit sha.
@@ -58,7 +58,7 @@ don't forget to make it executable:
 ```shell
 chmod +x go-covercheck
 ```
-### Via `go install`
+### 🐹 Via `go install`
 
 You can install `go-covercheck` using the `go install` command, if you don't care about official releases. Versions installed
 this way are not stamped with build information, such as the version number or commit sha.
@@ -67,7 +67,7 @@ this way are not stamped with build information, such as the version number or c
 go install github.com/mach6/go-covercheck/cmd/go-covercheck@latest
 ```
 
-### Docker Image
+### 🐳 Docker Image
 
 Docker images are available on the github container registry. You can pull the latest image with:
 
@@ -81,9 +81,9 @@ Or you can use a tag which maps to a specific version:
 docker pull ghcr.io/mach6/go-covercheck:0.4.1
 ```
 
-## Usage
+## 📋 Usage
 
-### Configure
+### ⚙️ Configure
 
 Create a `.go-coverheck.yml` which defines the threshold requirements.  
 
@@ -101,7 +101,7 @@ total:
   blocks: 70.0
 ```
 
-### Run Tests
+### 🧪 Run Tests
 
 Run the tests for a go project and produce a `coverage.out`.
 
@@ -109,7 +109,7 @@ Run the tests for a go project and produce a `coverage.out`.
 go test ./... --coverprofile coverage.out
 ```
 
-### Run `go-covercheck`
+### 🚀 Run `go-covercheck`
 
 Use the `go-covercheck` CLI to check the coverage against the thresholds defined in the config file or CLI flags.
 
@@ -148,7 +148,7 @@ $ go-covercheck coverage.out
 Note: if the file `coverage.out` is not specified, `go-covercheck` will look for a file named `coverage.out` in the current directory.
 You can also specify a different file name and path.
 
-### CLI Flags
+### 🎛️ CLI Flags
 
 You can also use CLI flags to configure `go-covercheck` without a config file. 
 
@@ -183,11 +183,11 @@ Flags:
   -v, --version                           version for go-covercheck
 ```
 
-## History
+## 🕰️ History
 
 History is a feature that allows you to save and compare coverage results against previous runs.
 
-### Save History
+### 💾 Save History
 
 Save the current coverage result to history with the `--save-history` flag. This will create or update a history file 
 (`.go-covercheck.history.json` by default) with the current coverage results. Check this file into your version control 
@@ -202,7 +202,7 @@ Optionally, specify a label for the history entry with the `--label` flag. This 
 go-covercheck --save-history --label "my-label"  
 ```
 
-### Compare Against History
+### 🔍 Compare Against History
 
 Compare the current coverage against saved history with the `--compare-history` flag.
 History integrates with git to compare against a ref—a `commit`, a `branch`, or a `tag`.
@@ -221,7 +221,7 @@ A label can also be used to compare against a specific history entry.
 ```shell
 go-covercheck --compare-history my-label
 ```
-### Show History
+### 📊 Show History
 
 Display saved history entries in a tabular format with the `--show-history` flag. This will show all saved history entries sorted by timestamp..
 
@@ -245,7 +245,7 @@ $ go-covercheck --show-history
 ≡ Showing last 4 history entries
 ```
 
-### Limit History
+### ⏳ Limit History
 
 You can limit the number of history entries displayed or saved with the `--limit-history` flag. This is useful to avoid
 overloading the output with too many entries. Set it to `0` (the default) to disable any limit.
@@ -267,7 +267,7 @@ $ go-covercheck --show-history --limit-history 2
 ≡ Showing last 2 history entries
 ```
 
-## Output Formats
+## 📤 Output Formats
 `go-covercheck` supports multiple output formats. The default is `table`, but you can specify other formats using the 
 `--format` flag (short form `-f`) or through the `format:` field of the config file.
 
@@ -282,7 +282,7 @@ The available formats are:
 - `table`: Outputs the coverage details in a human-readable table format (default).
 
 
-### Table
+### 📊 Table
 The `table` format provides a human-readable output with color coding to indicate coverage status. It shows coverage
 details by file, package, and total. The table is sorted by file name by default, but you can change the sort order and 
 field using the `--sort-by` and `--sort-order` flags.
@@ -309,14 +309,14 @@ $ go-covercheck -f table coverage.out -u
 Note: Here the `-u` flag was used to suppress the summary lines.
 
 
-### Other Tabular Formats
+### 📑 Other Tabular Formats
 
 `go-covercheck` supports other tabular formats such as `csv`, `tsv`, and `md`. These formats are useful for
 exporting coverage data to other tools or visualizations. The flag `-u` (or `--no-summary`) can be used to suppress the
 summary lines in these formats, as well, which is necessary for generating clean output for further processing.
 
 
-### JSON
+### 📜 JSON
 The `json` format provides a structured output that is easy to read and parse. It includes coverage details by file, 
 package, and total. It also includes the thresholds and the actual coverage percentages.
 
@@ -367,7 +367,7 @@ $ go-covercheck -f json coverage.out
 }
 ```
 
-### YAML
+### 📜 YAML
 The `yaml` format provides a structured output that is easy to read and parse. It includes coverage details by file, 
 package, and total. It also includes the thresholds and the actual coverage percentages.
 
@@ -407,7 +407,7 @@ byTotal:
 ```
 
 
-## Color Legend
+## 🎨 Color Legend
 
 By default, `go-covercheck` uses color in tabular format(s). The color is used to indicate severity as follows:
 
@@ -417,10 +417,10 @@ By default, `go-covercheck` uses color in tabular format(s). The color is used t
 - % in no color indicates the goal and actual are `0` or the goal is `0`
 
 
-## License
+## 📜 License
 
 [MIT](LICENSE)
 
-## Contributing
+## 🤝 Contributing
 
 Contributions are welcome. Please see [CONTRIBUTING](CONTRIBUTING.md).

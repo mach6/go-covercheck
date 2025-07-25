@@ -1,12 +1,6 @@
 blockThreshold: 50
 statementThreshold: 65
 
-perFile:
-  statements:
-    pkg/output/color.go: 22.0
-  blocks:
-    pkg/output/color.go: 21.0
-
 skip:
   - pkg/test/*
 
