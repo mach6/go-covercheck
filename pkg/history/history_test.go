@@ -372,7 +372,7 @@ func TestHistory_DeleteByRef(t *testing.T) {
 	// Test delete by commit
 	deleted := h.DeleteByRef("commit123")
 	require.True(t, deleted)
-	require.Len(t, h.Entries, 0)
+	require.Empty(t, h.Entries)
 
 	// Add entry back and test delete by branch
 	h.AddResults(compute.Results{
@@ -384,7 +384,7 @@ func TestHistory_DeleteByRef(t *testing.T) {
 	
 	deleted = h.DeleteByRef("feature")
 	require.True(t, deleted)
-	require.Len(t, h.Entries, 0)
+	require.Empty(t, h.Entries)
 
 	// Add entry back and test delete by tag
 	h.AddResults(compute.Results{
@@ -396,7 +396,7 @@ func TestHistory_DeleteByRef(t *testing.T) {
 
 	deleted = h.DeleteByRef("v2.0.0")
 	require.True(t, deleted)
-	require.Len(t, h.Entries, 0)
+	require.Empty(t, h.Entries)
 
 	// Add entry back and test delete by label
 	h.AddResults(compute.Results{
@@ -407,7 +407,7 @@ func TestHistory_DeleteByRef(t *testing.T) {
 
 	deleted = h.DeleteByRef("label4")
 	require.True(t, deleted)
-	require.Len(t, h.Entries, 0)
+	require.Empty(t, h.Entries)
 }
 
 func TestHistory_DeleteByRef_ShortCommit(t *testing.T) {
@@ -420,7 +420,7 @@ func TestHistory_DeleteByRef_ShortCommit(t *testing.T) {
 	// Test delete by short commit (7 chars)
 	deleted := h.DeleteByRef("commit1")
 	require.True(t, deleted)
-	require.Len(t, h.Entries, 0)
+	require.Empty(t, h.Entries)
 }
 
 func TestHistory_DeleteByRef_NonExistent(t *testing.T) {

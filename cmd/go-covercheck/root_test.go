@@ -317,7 +317,7 @@ func Test_run_DeleteHistory(t *testing.T) {
 	// Verify the entry was actually deleted
 	h, err := history.Load(path)
 	require.NoError(t, err)
-	require.Len(t, h.Entries, 0)
+	require.Empty(t, h.Entries)
 }
 
 func Test_run_DeleteHistoryFails_BadRef(t *testing.T) {
