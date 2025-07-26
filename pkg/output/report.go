@@ -27,6 +27,10 @@ func FormatAndReport(results compute.Results, cfg *config.Config, hasFailure boo
 		renderTable(results, cfg)
 		_ = os.Stdout.Sync()
 		renderSummary(hasFailure, results, cfg)
+		// Display comparison for table format if available
+		if results.Comparison != nil {
+			displayComparisonFromData(results.Comparison)
+		}
 	case config.FormatJSON:
 		if cfg.NoColor {
 			enc := json.NewEncoder(os.Stdout)

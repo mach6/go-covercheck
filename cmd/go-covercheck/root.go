@@ -190,7 +190,7 @@ func run(cmd *cobra.Command, args []string) error {
 	}
 
 	// showCoverage and get the results.
-	results, failed, err := showCoverage(args, cfg)
+	results, failed, err := collectCoverage(args, cfg)
 	if err != nil {
 		return err
 	}
@@ -198,10 +198,15 @@ func run(cmd *cobra.Command, args []string) error {
 	// compare results against history, when requested
 	compareRef, _ := cmd.Flags().GetString(CompareHistoryFlag)
 	if compareRef != "" {
-		if err := compareHistory(cmd, compareRef, results); err != nil {
+		if err := compareHistory(cmd, compareRef, &results, cfg); err != nil {
+			// For comparison errors, still output the coverage results but then return the error
+			output.FormatAndReport(results, cfg, failed)
 			return err
 		}
 	}
+
+	// Now output the results (with any comparison data)
+	output.FormatAndReport(results, cfg, failed)
 
 	// save results to history, when requested.
 	bSaveHistory, _ := cmd.Flags().GetBool(SaveHistoryFlag)
@@ -217,7 +222,7 @@ func run(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-func showCoverage(args []string, cfg *config.Config) (compute.Results, bool, error) {
+func collectCoverage(args []string, cfg *config.Config) (compute.Results, bool, error) {
 	// we need coverage profile input from here on.
 	profiles, err := getCoverProfileData(args)
 	if err != nil {
@@ -226,7 +231,6 @@ func showCoverage(args []string, cfg *config.Config) (compute.Results, bool, err
 	filtered := filter(profiles, cfg)
 
 	results, failed := compute.CollectResults(filtered, cfg)
-	output.FormatAndReport(results, cfg, failed)
 	return results, failed, nil
 }
 
@@ -260,7 +264,78 @@ func saveHistory(cmd *cobra.Command, results compute.Results, historyLimit int) 
 	return nil
 }
 
-func compareHistory(cmd *cobra.Command, compareRef string, results compute.Results) error {
+func buildComparisonData(ref string, refEntry *history.Entry, results compute.Results) *compute.ComparisonData {
+	comparison := &compute.ComparisonData{
+		Ref:     ref,
+		Commit:  refEntry.Commit[:7],
+		Results: make([]compute.ComparisonResult, 0),
+	}
+
+	// Compare by file
+	for _, curr := range results.ByFile {
+		for _, prev := range refEntry.Results.ByFile {
+			if curr.File == prev.File {
+				statementsDelta := curr.StatementPercentage - prev.StatementPercentage 
+				blocksDelta := curr.BlockPercentage - prev.BlockPercentage
+				if statementsDelta != 0 || blocksDelta != 0 {
+					comparison.Results = append(comparison.Results, compute.ComparisonResult{
+						Name: curr.File,
+						Type: "file",
+						Delta: compute.ComparisonDelta{
+							StatementsDelta: statementsDelta,
+							BlocksDelta:     blocksDelta,
+						},
+					})
+				}
+				break
+			}
+		}
+	}
+
+	// Compare by package
+	for _, curr := range results.ByPackage {
+		for _, prev := range refEntry.Results.ByPackage {
+			if curr.Package == prev.Package {
+				statementsDelta := curr.StatementPercentage - prev.StatementPercentage
+				blocksDelta := curr.BlockPercentage - prev.BlockPercentage
+				if statementsDelta != 0 || blocksDelta != 0 {
+					comparison.Results = append(comparison.Results, compute.ComparisonResult{
+						Name: curr.Package,
+						Type: "package",
+						Delta: compute.ComparisonDelta{
+							StatementsDelta: statementsDelta,
+							BlocksDelta:     blocksDelta,
+						},
+					})
+				}
+				break
+			}
+		}
+	}
+
+	// Compare totals
+	statementsDelta := results.ByTotal.Statements.Percentage - refEntry.Results.ByTotal.Statements.Percentage
+	blocksDelta := results.ByTotal.Blocks.Percentage - refEntry.Results.ByTotal.Blocks.Percentage
+	if statementsDelta != 0 || blocksDelta != 0 {
+		comparison.Results = append(comparison.Results, compute.ComparisonResult{
+			Name: "total",
+			Type: "total",
+			Delta: compute.ComparisonDelta{
+				StatementsDelta: statementsDelta,
+				BlocksDelta:     blocksDelta,
+			},
+		})
+	}
+
+	// Only return comparison data if there are actual differences
+	if len(comparison.Results) == 0 {
+		return nil
+	}
+
+	return comparison
+}
+
+func compareHistory(cmd *cobra.Command, compareRef string, results *compute.Results, cfg *config.Config) error {
 	h, err := getHistory(cmd)
 	if err != nil {
 		return fmt.Errorf("failed to load history: %w", err)
@@ -270,7 +345,9 @@ func compareHistory(cmd *cobra.Command, compareRef string, results compute.Resul
 	if refEntry == nil {
 		return fmt.Errorf("no history entry found for ref: %s", compareRef)
 	}
-	output.CompareHistory(compareRef, refEntry, results)
+
+	// Always populate comparison data - different formats will handle it differently
+	results.Comparison = buildComparisonData(compareRef, refEntry, *results)
 	return nil
 }
 

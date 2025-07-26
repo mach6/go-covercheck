@@ -229,6 +229,88 @@ func wrapText(text string, width int) string {
 	return strings.Join(wrapped, "\n")
 }
 
+// displayComparisonFromData displays comparison results from structured comparison data.
+func displayComparisonFromData(comparison *compute.ComparisonData) {
+	fmt.Printf("\n≡ Comparing against ref: %s [commit %s]\n",
+		color.New(color.FgBlue).Sprint(comparison.Ref),
+		color.New(color.FgHiBlack).Sprint(comparison.Commit),
+	)
+
+	if len(comparison.Results) == 0 {
+		fmt.Println(" → No change")
+		return
+	}
+
+	// Group results by type for organized display
+	fileResults := make([]compute.ComparisonResult, 0)
+	packageResults := make([]compute.ComparisonResult, 0)
+	totalResults := make([]compute.ComparisonResult, 0)
+
+	for _, result := range comparison.Results {
+		switch result.Type {
+		case "file":
+			fileResults = append(fileResults, result)
+		case "package":
+			packageResults = append(packageResults, result)
+		case "total":
+			totalResults = append(totalResults, result)
+		}
+	}
+
+	// Display file comparisons
+	if len(fileResults) > 0 {
+		fmt.Printf(" → By File\n")
+		for _, result := range fileResults {
+			if result.Delta.StatementsDelta != 0 {
+				compareShowS()
+				delta, _ := formatDelta(result.Delta.StatementsDelta)
+				fmt.Printf("%s [%s]\n", result.Name, delta)
+			}
+			if result.Delta.BlocksDelta != 0 {
+				compareShowB()
+				delta, _ := formatDelta(result.Delta.BlocksDelta)
+				fmt.Printf("%s [%s]\n", result.Name, delta)
+			}
+			fmt.Println()
+		}
+	}
+
+	// Display package comparisons
+	if len(packageResults) > 0 {
+		fmt.Printf(" → By Package\n")
+		for _, result := range packageResults {
+			if result.Delta.StatementsDelta != 0 {
+				compareShowS()
+				delta, _ := formatDelta(result.Delta.StatementsDelta)
+				fmt.Printf("%s [%s]\n", result.Name, delta)
+			}
+			if result.Delta.BlocksDelta != 0 {
+				compareShowB()
+				delta, _ := formatDelta(result.Delta.BlocksDelta)
+				fmt.Printf("%s [%s]\n", result.Name, delta)
+			}
+			fmt.Println()
+		}
+	}
+
+	// Display total comparisons
+	if len(totalResults) > 0 {
+		fmt.Printf(" → By Total\n")
+		for _, result := range totalResults {
+			if result.Delta.StatementsDelta != 0 {
+				compareShowS()
+				delta, _ := formatDelta(result.Delta.StatementsDelta)
+				fmt.Printf("%s [%s]\n", result.Name, delta)
+			}
+			if result.Delta.BlocksDelta != 0 {
+				compareShowB()
+				delta, _ := formatDelta(result.Delta.BlocksDelta)
+				fmt.Printf("%s [%s]\n", result.Name, delta)
+			}
+		}
+	}
+}
+
 func compareShowS() {
 	fmt.Printf("    [%s] ", color.New(color.FgCyan).Sprint("S"))
 }

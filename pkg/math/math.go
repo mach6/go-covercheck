@@ -13,3 +13,4 @@ func PercentFloat(count, total float64) float64 {
 func Percent(count, total int) float64 {
 	return PercentFloat(float64(count), float64(total))
 }
+// test comment
