@@ -4,6 +4,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/mach6/go-covercheck/pkg/config"
 	"golang.org/x/tools/cover"
 )
 
@@ -37,7 +38,18 @@ func longestCommonPrefix(strs []string) string {
 	return commonPrefix
 }
 
-func findModuleName(profiles []*cover.Profile) string {
+func findModuleName(profiles []*cover.Profile, cfg *config.Config) string {
+	// Use configured module name if provided
+	if cfg != nil && cfg.ModuleName != "" {
+		moduleName := cfg.ModuleName
+		// Ensure module name ends with "/" for proper prefix replacement
+		if !strings.HasSuffix(moduleName, "/") {
+			moduleName += "/"
+		}
+		return moduleName
+	}
+	
+	// Fallback to longest common prefix logic
 	names := make([]string, 0, len(profiles))
 	for _, profile := range profiles {
 		names = append(names, profile.FileName)
@@ -45,8 +57,8 @@ func findModuleName(profiles []*cover.Profile) string {
 	return longestCommonPrefix(names)
 }
 
-func normalizeNames(profiles []*cover.Profile) {
-	moduleName := findModuleName(profiles)
+func normalizeNames(profiles []*cover.Profile, cfg *config.Config) {
+	moduleName := findModuleName(profiles, cfg)
 	for _, profile := range profiles {
 		profile.FileName = strings.Replace(profile.FileName, moduleName, "", 1)
 	}

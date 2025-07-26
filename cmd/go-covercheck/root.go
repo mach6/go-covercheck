@@ -89,6 +89,10 @@ const (
 	HistoryLimitFlag      = "limit-history"
 	HistoryLimitFlagShort = "L"
 	HistoryLimitFlagUsage = "limit number of historical entries to save or display [0=no limit]"
+
+	ModuleNameFlag      = "module-name"
+	ModuleNameFlagShort = "m"
+	ModuleNameFlagUsage = "explicitly set module name for path normalization (overrides module inference)"
 )
 
 // Execute the CLI application.
@@ -501,6 +505,10 @@ func applyConfigOverrides(cfg *config.Config, cmd *cobra.Command, noConfigFile b
 		noConfigFile {
 		cfg.TerminalWidth = v
 	}
+	if v, _ := cmd.Flags().GetString(ModuleNameFlag); cmd.Flags().Changed(ModuleNameFlag) ||
+		noConfigFile {
+		cfg.ModuleName = v
+	}
 
 	// set cfg.Total thresholds to the global values, iff no override was specified for each.
 	if v, _ := cmd.Flags().GetFloat64(StatementThresholdFlag); !cmd.Flags().Changed(TotalStatementThresholdFlag) &&
@@ -658,6 +666,13 @@ func initFlags(cmd *cobra.Command) {
 		HistoryLimitFlagShort,
 		0,
 		HistoryLimitFlagUsage,
+	)
+
+	cmd.Flags().StringP(
+		ModuleNameFlag,
+		ModuleNameFlagShort,
+		"",
+		ModuleNameFlagUsage,
 	)
 }
 
