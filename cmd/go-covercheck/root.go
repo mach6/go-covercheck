@@ -264,77 +264,6 @@ func saveHistory(cmd *cobra.Command, results compute.Results, historyLimit int) 
 	return nil
 }
 
-func buildComparisonData(ref string, refEntry *history.Entry, results compute.Results) *compute.ComparisonData {
-	comparison := &compute.ComparisonData{
-		Ref:     ref,
-		Commit:  refEntry.Commit[:7],
-		Results: make([]compute.ComparisonResult, 0),
-	}
-
-	// Compare by file
-	for _, curr := range results.ByFile {
-		for _, prev := range refEntry.Results.ByFile {
-			if curr.File == prev.File {
-				statementsDelta := curr.StatementPercentage - prev.StatementPercentage 
-				blocksDelta := curr.BlockPercentage - prev.BlockPercentage
-				if statementsDelta != 0 || blocksDelta != 0 {
-					comparison.Results = append(comparison.Results, compute.ComparisonResult{
-						Name: curr.File,
-						Type: "file",
-						Delta: compute.ComparisonDelta{
-							StatementsDelta: statementsDelta,
-							BlocksDelta:     blocksDelta,
-						},
-					})
-				}
-				break
-			}
-		}
-	}
-
-	// Compare by package
-	for _, curr := range results.ByPackage {
-		for _, prev := range refEntry.Results.ByPackage {
-			if curr.Package == prev.Package {
-				statementsDelta := curr.StatementPercentage - prev.StatementPercentage
-				blocksDelta := curr.BlockPercentage - prev.BlockPercentage
-				if statementsDelta != 0 || blocksDelta != 0 {
-					comparison.Results = append(comparison.Results, compute.ComparisonResult{
-						Name: curr.Package,
-						Type: "package",
-						Delta: compute.ComparisonDelta{
-							StatementsDelta: statementsDelta,
-							BlocksDelta:     blocksDelta,
-						},
-					})
-				}
-				break
-			}
-		}
-	}
-
-	// Compare totals
-	statementsDelta := results.ByTotal.Statements.Percentage - refEntry.Results.ByTotal.Statements.Percentage
-	blocksDelta := results.ByTotal.Blocks.Percentage - refEntry.Results.ByTotal.Blocks.Percentage
-	if statementsDelta != 0 || blocksDelta != 0 {
-		comparison.Results = append(comparison.Results, compute.ComparisonResult{
-			Name: "total",
-			Type: "total",
-			Delta: compute.ComparisonDelta{
-				StatementsDelta: statementsDelta,
-				BlocksDelta:     blocksDelta,
-			},
-		})
-	}
-
-	// Only return comparison data if there are actual differences
-	if len(comparison.Results) == 0 {
-		return nil
-	}
-
-	return comparison
-}
-
 func compareHistory(cmd *cobra.Command, compareRef string, results *compute.Results, cfg *config.Config) error {
 	h, err := getHistory(cmd)
 	if err != nil {
@@ -347,7 +276,7 @@ func compareHistory(cmd *cobra.Command, compareRef string, results *compute.Resu
 	}
 
 	// Always populate comparison data - different formats will handle it differently
-	results.Comparison = buildComparisonData(compareRef, refEntry, *results)
+	results.Comparison = compute.BuildComparisonData(compareRef, refEntry.Commit[:7], refEntry.Results, *results)
 	return nil
 }
 

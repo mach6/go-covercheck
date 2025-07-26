@@ -28,7 +28,7 @@ func longestCommonPrefix(strs []string) string {
 	minLength := min(len(first), len(last))
 
 	// Compare characters until mismatch or reaching the end of shorter string
-	for i := 0; i < minLength; i++ {
+	for i := range minLength {
 		if first[i] != last[i] {
 			break
 		}

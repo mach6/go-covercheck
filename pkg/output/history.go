@@ -168,7 +168,7 @@ func ShowHistory(h *history.History, limit int, cfg *config.Config) {
 		{Name: "Coverage", Align: text.AlignLeft},
 	})
 
-	for i := 0; i < count; i++ {
+	for i := range count {
 		entry := h.Entries[i]
 
 		stmtColor := severityColor(entry.Results.ByTotal.Statements.Percentage,

@@ -71,7 +71,7 @@ func renderByPackage(results compute.Results) {
 			bPrinted = true
 		}
 
-		renderBy[compute.ByPackage](r, r.Package)
+		renderBy(r, r.Package)
 	}
 }
 
@@ -87,11 +87,11 @@ func renderByFile(results compute.Results) {
 			bPrinted = true
 		}
 
-		renderBy[compute.ByFile](r, r.File)
+		renderBy(r, r.File)
 	}
 }
 
-func renderBy[T interface{ GetBy() compute.By }](by T, item string) {
+func renderBy[T compute.HasBy](by T, item string) {
 	r := by.GetBy()
 
 	if r.StatementPercentage < r.StatementThreshold {
