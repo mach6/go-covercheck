@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"errors"
 	"fmt"
 	"io"
@@ -250,6 +251,14 @@ func getHistory(cmd *cobra.Command) (*history.History, error) {
 	return history.Load(historyFile)
 }
 
+func getHistoryPath(cmd *cobra.Command) (string, error) {
+	historyFile, _ := cmd.Flags().GetString(HistoryFileFlag)
+	if historyFile == "" {
+		return "", errors.New("no history file specified")
+	}
+	return historyFile, nil
+}
+
 func saveHistory(cmd *cobra.Command, results compute.Results, historyLimit int, cfg *config.Config) error {
 	h, err := getHistory(cmd)
 	if err != nil {
@@ -319,6 +328,44 @@ func deleteHistory(cmd *cobra.Command, deleteRef string, historyLimit int) error
 	}
 
 	fmt.Printf("✓ Deleted history entry for ref: %s\n", deleteRef)
+
+	// Check if history is now empty and prompt for file removal in interactive mode
+	if len(h.Entries) == 0 {
+		return promptForHistoryFileRemoval(cmd)
+	}
+	
+	return nil
+}
+
+func promptForHistoryFileRemoval(cmd *cobra.Command) error {
+	// Only prompt if stdin is a terminal (interactive mode)
+	if !term.IsTerminal(int(os.Stdin.Fd())) {
+		return nil
+	}
+	
+	fmt.Print("History file is now empty. Remove the history file? (y/N): ")
+	
+	reader := bufio.NewReader(os.Stdin)
+	response, err := reader.ReadString('\n')
+	if err != nil {
+		return fmt.Errorf("failed to read user input: %w", err)
+	}
+	
+	response = strings.TrimSpace(strings.ToLower(response))
+	if response != "y" && response != "yes" {
+		return nil
+	}
+	
+	historyPath, err := getHistoryPath(cmd)
+	if err != nil {
+		return fmt.Errorf("failed to get history path: %w", err)
+	}
+	
+	if err := os.Remove(historyPath); err != nil {
+		return fmt.Errorf("failed to remove history file: %w", err)
+	}
+	
+	fmt.Println("✓ History file removed")
 	return nil
 }
 
