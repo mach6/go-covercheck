@@ -120,7 +120,7 @@ func (h *History) FindByRef(ref string) *Entry {
 // DeleteByRef deletes a History Entry that matches the ref string and returns true if found and deleted.
 func (h *History) DeleteByRef(ref string) bool {
 	for i, entry := range h.Entries {
-		if entry.Commit == ref || entry.Commit[:7] == ref ||
+		if entry.Commit == ref || (len(entry.Commit) >= 7 && entry.Commit[:7] == ref) ||
 			entry.Branch == ref || entry.Label == ref {
 			// Remove the entry at index i
 			h.Entries = append(h.Entries[:i], h.Entries[i+1:]...)
