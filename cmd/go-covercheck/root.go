@@ -190,7 +190,7 @@ func run(cmd *cobra.Command, args []string) error {
 	// delete history entry and exit when requested.
 	deleteRef, _ := cmd.Flags().GetString(DeleteHistoryFlag)
 	if deleteRef != "" {
-		return deleteHistory(cmd, deleteRef)
+		return deleteHistory(cmd, deleteRef, historyLimit)
 	}
 
 	// show history and exit when requested.
@@ -294,7 +294,7 @@ func showHistory(cmd *cobra.Command, historyLimit int, cfg *config.Config) error
 	return nil
 }
 
-func deleteHistory(cmd *cobra.Command, deleteRef string) error {
+func deleteHistory(cmd *cobra.Command, deleteRef string, historyLimit int) error {
 	h, err := getHistory(cmd)
 	if err != nil {
 		return fmt.Errorf("failed to load history: %w", err)
@@ -305,7 +305,7 @@ func deleteHistory(cmd *cobra.Command, deleteRef string) error {
 		return fmt.Errorf("no history entry found for ref: %s", deleteRef)
 	}
 
-	if err := h.Save(0); err != nil {
+	if err := h.Save(historyLimit); err != nil {
 		return fmt.Errorf("failed to save history after deletion: %w", err)
 	}
 
