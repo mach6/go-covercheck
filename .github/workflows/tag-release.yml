@@ -56,12 +56,24 @@ jobs:
           go install github.com/git-chglog/git-chglog/cmd/git-chglog@latest
           git-chglog -o CHANGELOG.md
 
+      - name: Update Homebrew Formula
+        run: |
+          TAG=${GITHUB_REF#refs/tags/}
+          VERSION=${TAG#v}
+          
+          # Get SHA256 of the new release tarball
+          SHA256=$(curl -sL https://github.com/mach6/go-covercheck/archive/refs/tags/${TAG}.tar.gz | sha256sum | cut -d' ' -f1)
+          
+          # Update the formula
+          sed -i "s|url \".*\"|url \"https://github.com/mach6/go-covercheck/archive/refs/tags/${TAG}.tar.gz\"|" homebrew/go-covercheck.rb
+          sed -i "s|sha256 \".*\"|sha256 \"${SHA256}\"|" homebrew/go-covercheck.rb
+
       - name: Commit and Push Changelog As Branch
         run: |
           TAG=${GITHUB_REF#refs/tags/}
           git config --global user.name "GitHub Actions"
           git config --global user.email "actions@github.com"
-          git add CHANGELOG.md
-          git commit -m "chore: update changelog"
+          git add CHANGELOG.md homebrew/go-covercheck.rb
+          git commit -m "chore: update changelog and homebrew formula for ${TAG}"
           git checkout -b update_changelog_${TAG#v}
           git push origin update_changelog_${TAG#v}
