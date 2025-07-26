@@ -351,3 +351,86 @@ func TestCreateEntryWithTags(t *testing.T) {
 	require.Contains(t, entry.Tags, "v1.0.0")
 	require.Equal(t, head.Hash().String(), entry.Commit)
 }
+
+func TestHistory_DeleteByRef(t *testing.T) {
+	h := New("")
+	require.NotNil(t, h)
+
+	// Add a single test entry
+	h.AddResults(compute.Results{
+		ByTotal: compute.Totals{
+			Statements: compute.TotalStatements{Coverage: "1/1"},
+		},
+	}, "label1")
+
+	h.Entries[0].Commit = "commit123"
+	h.Entries[0].Branch = "main" 
+	h.Entries[0].Tags = []string{"v1.0.0"}
+
+	require.Len(t, h.Entries, 1)
+
+	// Test delete by commit
+	deleted := h.DeleteByRef("commit123")
+	require.True(t, deleted)
+	require.Len(t, h.Entries, 0)
+
+	// Add entry back and test delete by branch
+	h.AddResults(compute.Results{
+		ByTotal: compute.Totals{
+			Statements: compute.TotalStatements{Coverage: "2/2"},
+		},
+	}, "label2")
+	h.Entries[0].Branch = "feature"
+	
+	deleted = h.DeleteByRef("feature")
+	require.True(t, deleted)
+	require.Len(t, h.Entries, 0)
+
+	// Add entry back and test delete by tag
+	h.AddResults(compute.Results{
+		ByTotal: compute.Totals{
+			Statements: compute.TotalStatements{Coverage: "3/3"},
+		},
+	}, "label3")
+	h.Entries[0].Tags = []string{"v2.0.0"}
+
+	deleted = h.DeleteByRef("v2.0.0")
+	require.True(t, deleted)
+	require.Len(t, h.Entries, 0)
+
+	// Add entry back and test delete by label
+	h.AddResults(compute.Results{
+		ByTotal: compute.Totals{
+			Statements: compute.TotalStatements{Coverage: "4/4"},
+		},
+	}, "label4")
+
+	deleted = h.DeleteByRef("label4")
+	require.True(t, deleted)
+	require.Len(t, h.Entries, 0)
+}
+
+func TestHistory_DeleteByRef_ShortCommit(t *testing.T) {
+	h := New("")
+	require.NotNil(t, h)
+
+	h.AddResults(compute.Results{}, "label1")
+	h.Entries[0].Commit = "commit123456789"
+
+	// Test delete by short commit (7 chars)
+	deleted := h.DeleteByRef("commit1")
+	require.True(t, deleted)
+	require.Len(t, h.Entries, 0)
+}
+
+func TestHistory_DeleteByRef_NonExistent(t *testing.T) {
+	h := New("")
+	require.NotNil(t, h)
+
+	h.AddResults(compute.Results{}, "label1")
+
+	// Test delete by non-existent ref
+	deleted := h.DeleteByRef("nonexistent")
+	require.False(t, deleted)
+	require.Len(t, h.Entries, 1)
+}

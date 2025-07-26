@@ -117,6 +117,26 @@ func (h *History) FindByRef(ref string) *Entry {
 	return nil
 }
 
+// DeleteByRef deletes a History Entry that matches the ref string and returns true if found and deleted.
+func (h *History) DeleteByRef(ref string) bool {
+	for i, entry := range h.Entries {
+		if entry.Commit == ref || entry.Commit[:7] == ref ||
+			entry.Branch == ref || entry.Label == ref {
+			// Remove the entry at index i
+			h.Entries = append(h.Entries[:i], h.Entries[i+1:]...)
+			return true
+		}
+		for _, t := range entry.Tags {
+			if t == ref {
+				// Remove the entry at index i
+				h.Entries = append(h.Entries[:i], h.Entries[i+1:]...)
+				return true
+			}
+		}
+	}
+	return false
+}
+
 func startEntry(label, repoPath string) Entry {
 	var commit = "unknown"
 	var branch = "unknown"
