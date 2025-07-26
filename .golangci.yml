@@ -1,8 +1,4 @@
-version: 2
-
-run:
-  timeout: 10m
-
+version: "2"
 linters:
   # Default set of linters.
   # The value can be: `standard`, `all`, `none`, or `fast`.
@@ -15,7 +11,9 @@ linters:
     - asciicheck
     - bidichk
     - bodyclose
-    - containedctx  
+    - canonicalheader
+    - containedctx
+    - copyloopvar
     - cyclop
     - decorder
     - dogsled
@@ -27,7 +25,10 @@ linters:
     - errname
     - errorlint
     - exhaustive
+    - exptostd
+    - fatcontext
     - forcetypeassert
+    - funcorder
     - ginkgolinter
     - gocheckcompilerdirectives
     - gochecksumtype
@@ -44,19 +45,24 @@ linters:
     - gosmopolitan
     - govet
     - grouper
+    - iface
     - importas
+    - inamedparam
     - ineffassign
     - interfacebloat
+    - intrange
     - lll
     - loggercheck
     - maintidx
     - makezero
     - mirror
     - misspell
+    - mnd
     - musttag
     - nakedret
     - nestif
     - nilerr
+    - nilnesserr
     - nilnil
     - noctx
     - nolintlint
@@ -68,9 +74,11 @@ linters:
     - promlinter
     - protogetter
     - reassign
+    - recvcheck
     - revive
     - rowserrcheck
     - sloglint
+    - spancheck
     - sqlclosecheck
     - staticcheck
     - tagalign
@@ -84,12 +92,12 @@ linters:
     - unparam
     - unused
     - usestdlibvars
+    - usetesting
     - wastedassign
     - whitespace
     - zerologlint
-
-issues:
-  exclude-rules:
-    - path: '(.+)_test\.go'
-      linters:
-        - goconst
+  exclusions:
+    rules:
+      - path: '(.+)_test\.go'
+        linters:
+          - goconst
