@@ -267,6 +267,12 @@ func saveHistory(cmd *cobra.Command, results compute.Results, historyLimit int) 
 	if err := h.Save(historyLimit); err != nil {
 		return err
 	}
+
+	if label != "" {
+		fmt.Printf("✓ Saved history entry with label: %s\n", label)
+	} else {
+		fmt.Printf("✓ Saved history entry\n")
+	}
 	return nil
 }
 
