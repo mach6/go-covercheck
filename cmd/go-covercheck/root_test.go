@@ -297,3 +297,61 @@ func Test_getVersion(t *testing.T) {
 	require.Contains(t, getVersion(), config.AppRevision)
 	require.Contains(t, getVersion(), "built by test on 0400")
 }
+
+func Test_run_DeleteHistory(t *testing.T) {
+	// Create a history file with test data
+	path := test.CreateTempHistoryFile(t, test.TestCoverageHistory)
+
+	cmd := setupTestCmd()
+	cmd.SetArgs([]string{
+		"--history-file", path,
+		"--delete-history", "main", "-w",
+		test.CreateTempCoverageFile(t, test.TestCoverageOut)},
+	)
+
+	stdOut, stdErr, err := runCmdForTest(t, cmd)
+	require.NoError(t, err)
+	require.Empty(t, stdErr)
+	require.Contains(t, stdOut, "✓ Deleted history entry for ref: main")
+
+	// Verify the entry was actually deleted
+	h, err := history.Load(path)
+	require.NoError(t, err)
+	require.Len(t, h.Entries, 0)
+}
+
+func Test_run_DeleteHistoryFails_BadRef(t *testing.T) {
+	path := test.CreateTempHistoryFile(t, test.TestCoverageHistory)
+
+	cmd := setupTestCmd()
+	cmd.SetArgs([]string{
+		"--history-file", path,
+		"--delete-history", "nonexistent", "-w",
+		test.CreateTempCoverageFile(t, test.TestCoverageOut)},
+	)
+
+	stdOut, stdErr, err := runCmdForTest(t, cmd)
+	require.Error(t, err)
+	require.Empty(t, stdOut)
+	require.NotEmpty(t, stdErr)
+	require.ErrorContains(t, err, "no history entry found for ref: nonexistent")
+	require.Contains(t, stdErr, "no history entry found for ref: nonexistent")
+}
+
+func Test_run_DeleteHistoryFails_BadFile(t *testing.T) {
+	path := test.CreateTempHistoryFile(t, test.InvalidTestCoverageHistory)
+
+	cmd := setupTestCmd()
+	cmd.SetArgs([]string{
+		"--history-file", path,
+		"--delete-history", "main", "-w",
+		test.CreateTempCoverageFile(t, test.TestCoverageOut)},
+	)
+
+	stdOut, stdErr, err := runCmdForTest(t, cmd)
+	require.Error(t, err)
+	require.Empty(t, stdOut)
+	require.NotEmpty(t, stdErr)
+	require.ErrorContains(t, err, "failed to load history")
+	require.Contains(t, stdErr, "failed to load history")
+}

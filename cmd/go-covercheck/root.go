@@ -87,6 +87,10 @@ const (
 	ShowHistoryFlagShort = "I"
 	ShowHistoryFlagUsage = "show historical entries in tabular format"
 
+	DeleteHistoryFlag      = "delete-history"
+	DeleteHistoryFlagShort = "D"
+	DeleteHistoryFlagUsage = "delete historical entry by ref [commit|branch|tag|label]"
+
 	HistoryLimitFlag      = "limit-history"
 	HistoryLimitFlagShort = "L"
 	HistoryLimitFlagUsage = "limit number of historical entries to save or display [0=no limit]"
@@ -182,6 +186,12 @@ func run(cmd *cobra.Command, args []string) error {
 	setupTerminalWidth(cfg)
 
 	historyLimit, _ := cmd.Flags().GetInt(HistoryLimitFlag)
+
+	// delete history entry and exit when requested.
+	deleteRef, _ := cmd.Flags().GetString(DeleteHistoryFlag)
+	if deleteRef != "" {
+		return deleteHistory(cmd, deleteRef)
+	}
 
 	// show history and exit when requested.
 	bShowHistory, _ := cmd.Flags().GetBool(ShowHistoryFlag)
@@ -281,6 +291,25 @@ func showHistory(cmd *cobra.Command, historyLimit int, cfg *config.Config) error
 	}
 
 	output.ShowHistory(h, historyLimit, cfg)
+	return nil
+}
+
+func deleteHistory(cmd *cobra.Command, deleteRef string) error {
+	h, err := getHistory(cmd)
+	if err != nil {
+		return fmt.Errorf("failed to load history: %w", err)
+	}
+
+	deleted := h.DeleteByRef(deleteRef)
+	if !deleted {
+		return fmt.Errorf("no history entry found for ref: %s", deleteRef)
+	}
+
+	if err := h.Save(0); err != nil {
+		return fmt.Errorf("failed to save history after deletion: %w", err)
+	}
+
+	fmt.Printf("✓ Deleted history entry for ref: %s\n", deleteRef)
 	return nil
 }
 
@@ -672,6 +701,13 @@ func initFlags(cmd *cobra.Command) {
 		ShowHistoryFlagShort,
 		false,
 		ShowHistoryFlagUsage,
+	)
+
+	cmd.Flags().StringP(
+		DeleteHistoryFlag,
+		DeleteHistoryFlagShort,
+		"",
+		DeleteHistoryFlagUsage,
 	)
 
 	cmd.Flags().IntP(
