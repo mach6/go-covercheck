@@ -89,3 +89,279 @@ func TestCollectResults(t *testing.T) {
 	require.InEpsilon(t, 100.0, r.ByTotal.Blocks.Percentage, 0)
 	require.InEpsilon(t, 100.0, r.ByTotal.Statements.Percentage, 0)
 }
+
+func TestCollectResults_WithFailures(t *testing.T) {
+	profiles := []*cover.Profile{
+		{
+			FileName: "pkg/low-coverage.go",
+			Mode:     "set",
+			Blocks: []cover.ProfileBlock{
+				{StartLine: 1, StartCol: 1, EndLine: 1, EndCol: 10, NumStmt: 1, Count: 0}, // uncovered
+				{StartLine: 2, StartCol: 1, EndLine: 2, EndCol: 10, NumStmt: 1, Count: 1}, // covered
+			},
+		},
+	}
+	
+	cfg := &config.Config{
+		StatementThreshold: 75.0, // 50% coverage will fail this
+		BlockThreshold:     75.0, // 50% coverage will fail this
+	}
+	cfg.ApplyDefaults()
+	
+	r, failed := CollectResults(profiles, cfg)
+	require.True(t, failed)
+	require.True(t, r.ByFile[0].Failed)
+	require.Equal(t, 50.0, r.ByFile[0].StatementPercentage)
+	require.Equal(t, 50.0, r.ByFile[0].BlockPercentage)
+}
+
+func TestCollectResults_WithPerFileThresholds(t *testing.T) {
+	profiles := []*cover.Profile{
+		{
+			FileName: "pkg/special.go",
+			Mode:     "set",
+			Blocks: []cover.ProfileBlock{
+				{StartLine: 1, StartCol: 1, EndLine: 1, EndCol: 10, NumStmt: 1, Count: 1}, // covered
+				{StartLine: 2, StartCol: 1, EndLine: 2, EndCol: 10, NumStmt: 1, Count: 0}, // uncovered
+			},
+		},
+	}
+	
+	cfg := &config.Config{
+		StatementThreshold: 10.0, // default low threshold
+		BlockThreshold:     10.0, // default low threshold
+		PerFile: config.PerThresholdOverride{
+			Statements: map[string]float64{"pkg/special.go": 75.0}, // higher threshold for this file
+			Blocks:     map[string]float64{"pkg/special.go": 75.0}, // higher threshold for this file
+		},
+	}
+	cfg.ApplyDefaults()
+	
+	r, failed := CollectResults(profiles, cfg)
+	require.True(t, failed)
+	require.True(t, r.ByFile[0].Failed)
+	require.Equal(t, 75.0, r.ByFile[0].StatementThreshold) // should use per-file threshold
+	require.Equal(t, 75.0, r.ByFile[0].BlockThreshold)     // should use per-file threshold
+}
+
+func TestCollectResults_WithPerPackageThresholds(t *testing.T) {
+	profiles := []*cover.Profile{
+		{
+			FileName: "pkg/special/file1.go",
+			Mode:     "set",
+			Blocks: []cover.ProfileBlock{
+				{StartLine: 1, StartCol: 1, EndLine: 1, EndCol: 10, NumStmt: 1, Count: 1}, // covered
+				{StartLine: 2, StartCol: 1, EndLine: 2, EndCol: 10, NumStmt: 1, Count: 0}, // uncovered
+			},
+		},
+		{
+			FileName: "pkg/other/file.go", // different package to avoid common prefix normalization
+			Mode:     "set",
+			Blocks: []cover.ProfileBlock{
+				{StartLine: 1, StartCol: 1, EndLine: 1, EndCol: 10, NumStmt: 1, Count: 1}, // covered
+				{StartLine: 2, StartCol: 1, EndLine: 2, EndCol: 10, NumStmt: 1, Count: 1}, // covered - this package will pass
+			},
+		},
+	}
+	
+	cfg := &config.Config{}
+	cfg.ApplyDefaults()
+	cfg.StatementThreshold = 10.0 // set after applying defaults
+	cfg.BlockThreshold = 10.0     // set after applying defaults
+	cfg.PerPackage.Statements["special"] = 75.0 // higher threshold for special package only
+	cfg.PerPackage.Blocks["special"] = 75.0     // higher threshold for special package only
+	
+	r, failed := CollectResults(profiles, cfg)
+	require.True(t, failed)
+	
+	// Should have results for both packages
+	require.Len(t, r.ByPackage, 2)
+	
+	// Find the special package result
+	var specialPkg, otherPkg *ByPackage
+	for i := range r.ByPackage {
+		if r.ByPackage[i].Package == "special" {
+			specialPkg = &r.ByPackage[i]
+		} else if r.ByPackage[i].Package == "other" {
+			otherPkg = &r.ByPackage[i]
+		}
+	}
+	
+	require.NotNil(t, specialPkg)
+	require.NotNil(t, otherPkg)
+	
+	// Special package should fail due to higher threshold
+	require.True(t, specialPkg.Failed)
+	require.Equal(t, 75.0, specialPkg.StatementThreshold) // should use per-package threshold
+	require.Equal(t, 75.0, specialPkg.BlockThreshold)     // should use per-package threshold
+	
+	// Other package should pass with default threshold
+	require.False(t, otherPkg.Failed)
+	require.Equal(t, 10.0, otherPkg.StatementThreshold) // should use default threshold
+	require.Equal(t, 10.0, otherPkg.BlockThreshold)     // should use default threshold
+}
+
+func TestCollectResults_WithMultiplePackages(t *testing.T) {
+	profiles := []*cover.Profile{
+		{
+			FileName: "pkg/a/file.go",
+			Mode:     "set",
+			Blocks: []cover.ProfileBlock{
+				{StartLine: 1, StartCol: 1, EndLine: 1, EndCol: 10, NumStmt: 2, Count: 1},
+				{StartLine: 2, StartCol: 1, EndLine: 2, EndCol: 10, NumStmt: 3, Count: 1},
+			},
+		},
+		{
+			FileName: "pkg/b/file.go",
+			Mode:     "set",
+			Blocks: []cover.ProfileBlock{
+				{StartLine: 1, StartCol: 1, EndLine: 1, EndCol: 10, NumStmt: 1, Count: 0},
+				{StartLine: 2, StartCol: 1, EndLine: 2, EndCol: 10, NumStmt: 4, Count: 1},
+			},
+		},
+	}
+	
+	cfg := &config.Config{}
+	cfg.ApplyDefaults()
+	
+	r, failed := CollectResults(profiles, cfg)
+	require.False(t, failed)
+	require.Len(t, r.ByPackage, 2)
+	require.Len(t, r.ByFile, 2)
+	
+	// Verify totals are aggregated correctly
+	require.Equal(t, "9/10", r.ByTotal.Statements.Coverage) // 2+3+1+4 = 10 statements, but 1 statement not covered so 9/10
+	require.Equal(t, "3/4", r.ByTotal.Blocks.Coverage)       // 4 blocks, 3 covered
+}
+
+func TestSortResults_ByStatementPercent(t *testing.T) {
+	results := []ByFile{
+		{File: "high.go", By: By{StatementPercentage: 90.0, stmtHits: 9}},
+		{File: "low.go", By: By{StatementPercentage: 10.0, stmtHits: 1}},
+		{File: "medium.go", By: By{StatementPercentage: 50.0, stmtHits: 5}},
+	}
+	
+	// Test ascending
+	cfg := &config.Config{SortBy: config.SortByStatementPercent, SortOrder: config.SortOrderAsc}
+	sortFileResults(results, cfg)
+	require.Equal(t, "low.go", results[0].File)
+	require.Equal(t, "medium.go", results[1].File)
+	require.Equal(t, "high.go", results[2].File)
+	
+	// Test descending
+	cfg.SortOrder = config.SortOrderDesc
+	sortFileResults(results, cfg)
+	require.Equal(t, "high.go", results[0].File)
+	require.Equal(t, "medium.go", results[1].File)
+	require.Equal(t, "low.go", results[2].File)
+}
+
+func TestSortResults_ByBlockPercent(t *testing.T) {
+	results := []ByFile{
+		{File: "high.go", By: By{BlockPercentage: 90.0, blockHits: 9}},
+		{File: "low.go", By: By{BlockPercentage: 10.0, blockHits: 1}},
+		{File: "medium.go", By: By{BlockPercentage: 50.0, blockHits: 5}},
+	}
+	
+	// Test ascending
+	cfg := &config.Config{SortBy: config.SortByBlockPercent, SortOrder: config.SortOrderAsc}
+	sortFileResults(results, cfg)
+	require.Equal(t, "low.go", results[0].File)
+	require.Equal(t, "medium.go", results[1].File)
+	require.Equal(t, "high.go", results[2].File)
+	
+	// Test descending
+	cfg.SortOrder = config.SortOrderDesc
+	sortFileResults(results, cfg)
+	require.Equal(t, "high.go", results[0].File)
+	require.Equal(t, "medium.go", results[1].File)
+	require.Equal(t, "low.go", results[2].File)
+}
+
+func TestSortResults_ByStatements(t *testing.T) {
+	results := []ByFile{
+		{File: "high.go", By: By{stmtHits: 90}},
+		{File: "low.go", By: By{stmtHits: 10}},
+		{File: "medium.go", By: By{stmtHits: 50}},
+	}
+	
+	// Test ascending
+	cfg := &config.Config{SortBy: config.SortByStatements, SortOrder: config.SortOrderAsc}
+	sortFileResults(results, cfg)
+	require.Equal(t, "low.go", results[0].File)
+	require.Equal(t, "medium.go", results[1].File)
+	require.Equal(t, "high.go", results[2].File)
+	
+	// Test descending
+	cfg.SortOrder = config.SortOrderDesc
+	sortFileResults(results, cfg)
+	require.Equal(t, "high.go", results[0].File)
+	require.Equal(t, "medium.go", results[1].File)
+	require.Equal(t, "low.go", results[2].File)
+}
+
+func TestSortResults_ByBlocks(t *testing.T) {
+	results := []ByFile{
+		{File: "high.go", By: By{blockHits: 90}},
+		{File: "low.go", By: By{blockHits: 10}},
+		{File: "medium.go", By: By{blockHits: 50}},
+	}
+	
+	// Test ascending
+	cfg := &config.Config{SortBy: config.SortByBlocks, SortOrder: config.SortOrderAsc}
+	sortFileResults(results, cfg)
+	require.Equal(t, "low.go", results[0].File)
+	require.Equal(t, "medium.go", results[1].File)
+	require.Equal(t, "high.go", results[2].File)
+	
+	// Test descending
+	cfg.SortOrder = config.SortOrderDesc
+	sortFileResults(results, cfg)
+	require.Equal(t, "high.go", results[0].File)
+	require.Equal(t, "medium.go", results[1].File)
+	require.Equal(t, "low.go", results[2].File)
+}
+
+func TestSortPackageResults_ByStatementPercent(t *testing.T) {
+	results := []ByPackage{
+		{Package: "pkg/high", By: By{StatementPercentage: 90.0, stmtHits: 9}},
+		{Package: "pkg/low", By: By{StatementPercentage: 10.0, stmtHits: 1}},
+		{Package: "pkg/medium", By: By{StatementPercentage: 50.0, stmtHits: 5}},
+	}
+	
+	// Test ascending
+	cfg := &config.Config{SortBy: config.SortByStatementPercent, SortOrder: config.SortOrderAsc}
+	sortPackageResults(results, cfg)
+	require.Equal(t, "pkg/low", results[0].Package)
+	require.Equal(t, "pkg/medium", results[1].Package)
+	require.Equal(t, "pkg/high", results[2].Package)
+	
+	// Test descending
+	cfg.SortOrder = config.SortOrderDesc
+	sortPackageResults(results, cfg)
+	require.Equal(t, "pkg/high", results[0].Package)
+	require.Equal(t, "pkg/medium", results[1].Package)
+	require.Equal(t, "pkg/low", results[2].Package)
+}
+
+func TestSortPackageResults_ByPackageName(t *testing.T) {
+	results := []ByPackage{
+		{Package: "pkg/z"},
+		{Package: "pkg/a"},
+		{Package: "pkg/m"},
+	}
+	
+	// Test ascending (default sort by package name)
+	cfg := &config.Config{SortBy: config.SortByFile, SortOrder: config.SortOrderAsc}
+	sortPackageResults(results, cfg)
+	require.Equal(t, "pkg/a", results[0].Package)
+	require.Equal(t, "pkg/m", results[1].Package)
+	require.Equal(t, "pkg/z", results[2].Package)
+	
+	// Test descending
+	cfg.SortOrder = config.SortOrderDesc
+	sortPackageResults(results, cfg)
+	require.Equal(t, "pkg/z", results[0].Package)
+	require.Equal(t, "pkg/m", results[1].Package)
+	require.Equal(t, "pkg/a", results[2].Package)
+}
