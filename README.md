@@ -163,6 +163,7 @@ Flags:
   -b, --block-threshold float             global block threshold to enforce [0=disabled] (default 50)
   -C, --compare-history string            compare current coverage against historical ref [commit|branch|tag|label]
   -c, --config string                     path to YAML config file (default ".go-covercheck.yml")
+  -D, --delete-history string             delete historical entry by ref [commit|branch|tag|label]
   -f, --format string                     output format [table|json|yaml|md|html|csv|tsv] (default "table")
   -h, --help                              help for go-covercheck
       --history-file string               path to go-covercheck history file (default ".go-covercheck.history.json")
@@ -266,6 +267,38 @@ $ go-covercheck --show-history --limit-history 2
 │            │         │                           │                 │                 │ 278/413 [B] │
 └────────────┴─────────┴───────────────────────────┴─────────────────┴─────────────────┴─────────────┘
 ≡ Showing last 2 history entries
+```
+
+### 🗑️ Delete History
+
+You can delete specific history entries using the `--delete-history` flag. This allows you to remove outdated or unwanted entries from your history file. The deletion uses the same reference matching as compare and show operations.
+
+```shell
+# Delete by commit hash (full or short)
+go-covercheck --delete-history e402629
+
+# Delete by branch name
+go-covercheck --delete-history main
+
+# Delete by tag
+go-covercheck --delete-history v1.0.0
+
+# Delete by label
+go-covercheck --delete-history my-label
+```
+
+When a history entry is successfully deleted, you'll see a confirmation message:
+
+```text
+$ go-covercheck --delete-history main
+✓ Deleted history entry for ref: main
+```
+
+If the reference is not found, an error message will be displayed:
+
+```text
+$ go-covercheck --delete-history nonexistent
+Error: no history entry found for ref: nonexistent
 ```
 
 ## 📤 Output Formats

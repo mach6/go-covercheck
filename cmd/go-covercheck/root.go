@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"errors"
 	"fmt"
 	"io"
@@ -86,6 +87,10 @@ const (
 	ShowHistoryFlag      = "show-history"
 	ShowHistoryFlagShort = "I"
 	ShowHistoryFlagUsage = "show historical entries in tabular format"
+
+	DeleteHistoryFlag      = "delete-history"
+	DeleteHistoryFlagShort = "D"
+	DeleteHistoryFlagUsage = "delete historical entry by ref [commit|branch|tag|label]"
 
 	HistoryLimitFlag      = "limit-history"
 	HistoryLimitFlagShort = "L"
@@ -183,6 +188,12 @@ func run(cmd *cobra.Command, args []string) error {
 
 	historyLimit, _ := cmd.Flags().GetInt(HistoryLimitFlag)
 
+	// delete history entry and exit when requested.
+	deleteRef, _ := cmd.Flags().GetString(DeleteHistoryFlag)
+	if deleteRef != "" {
+		return deleteHistory(cmd, deleteRef, historyLimit)
+	}
+
 	// show history and exit when requested.
 	bShowHistory, _ := cmd.Flags().GetBool(ShowHistoryFlag)
 	if bShowHistory {
@@ -195,6 +206,18 @@ func run(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
+	// handle history operations (compare and save)
+	if err := handleHistoryOperations(cmd, results, historyLimit, cfg); err != nil {
+		return err
+	}
+
+	if failed {
+		os.Exit(1)
+	}
+	return nil
+}
+
+func handleHistoryOperations(cmd *cobra.Command, results compute.Results, historyLimit int, cfg *config.Config) error {
 	// compare results against history, when requested
 	compareRef, _ := cmd.Flags().GetString(CompareHistoryFlag)
 	if compareRef != "" {
@@ -206,14 +229,11 @@ func run(cmd *cobra.Command, args []string) error {
 	// save results to history, when requested.
 	bSaveHistory, _ := cmd.Flags().GetBool(SaveHistoryFlag)
 	if bSaveHistory {
-		if err := saveHistory(cmd, results, historyLimit); err != nil {
+		if err := saveHistory(cmd, results, historyLimit, cfg); err != nil {
 			return err
 		}
 	}
 
-	if failed {
-		os.Exit(1)
-	}
 	return nil
 }
 
@@ -240,7 +260,15 @@ func getHistory(cmd *cobra.Command) (*history.History, error) {
 	return history.Load(historyFile)
 }
 
-func saveHistory(cmd *cobra.Command, results compute.Results, historyLimit int) error {
+func getHistoryPath(cmd *cobra.Command) (string, error) {
+	historyFile, _ := cmd.Flags().GetString(HistoryFileFlag)
+	if historyFile == "" {
+		return "", errors.New("no history file specified")
+	}
+	return historyFile, nil
+}
+
+func saveHistory(cmd *cobra.Command, results compute.Results, historyLimit int, cfg *config.Config) error {
 	h, err := getHistory(cmd)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
@@ -256,6 +284,15 @@ func saveHistory(cmd *cobra.Command, results compute.Results, historyLimit int) 
 
 	if err := h.Save(historyLimit); err != nil {
 		return err
+	}
+
+	// Only show success messages for non-JSON/YAML formats
+	if cfg.Format != config.FormatJSON && cfg.Format != config.FormatYAML {
+		if label != "" {
+			fmt.Printf("✓ Saved history entry with label: %s\n", label)
+		} else {
+			fmt.Printf("✓ Saved history entry\n")
+		}
 	}
 	return nil
 }
@@ -281,6 +318,63 @@ func showHistory(cmd *cobra.Command, historyLimit int, cfg *config.Config) error
 	}
 
 	output.ShowHistory(h, historyLimit, cfg)
+	return nil
+}
+
+func deleteHistory(cmd *cobra.Command, deleteRef string, historyLimit int) error {
+	h, err := getHistory(cmd)
+	if err != nil {
+		return fmt.Errorf("failed to load history: %w", err)
+	}
+
+	deleted := h.DeleteByRef(deleteRef)
+	if !deleted {
+		return fmt.Errorf("no history entry found for ref: %s", deleteRef)
+	}
+
+	if err := h.Save(historyLimit); err != nil {
+		return fmt.Errorf("failed to save history after deletion: %w", err)
+	}
+
+	fmt.Printf("✓ Deleted history entry for ref: %s\n", deleteRef)
+
+	// Check if history is now empty and prompt for file removal in interactive mode
+	if len(h.Entries) == 0 {
+		return promptForHistoryFileRemoval(cmd)
+	}
+	
+	return nil
+}
+
+func promptForHistoryFileRemoval(cmd *cobra.Command) error {
+	// Only prompt if stdin is a terminal (interactive mode)
+	if !term.IsTerminal(int(os.Stdin.Fd())) {
+		return nil
+	}
+	
+	fmt.Print("History file is now empty. Remove the history file? (y/N): ")
+	
+	reader := bufio.NewReader(os.Stdin)
+	response, err := reader.ReadString('\n')
+	if err != nil {
+		return fmt.Errorf("failed to read user input: %w", err)
+	}
+	
+	response = strings.TrimSpace(strings.ToLower(response))
+	if response != "y" && response != "yes" {
+		return nil
+	}
+	
+	historyPath, err := getHistoryPath(cmd)
+	if err != nil {
+		return fmt.Errorf("failed to get history path: %w", err)
+	}
+	
+	if err := os.Remove(historyPath); err != nil {
+		return fmt.Errorf("failed to remove history file: %w", err)
+	}
+	
+	fmt.Println("✓ History file removed")
 	return nil
 }
 
@@ -672,6 +766,13 @@ func initFlags(cmd *cobra.Command) {
 		ShowHistoryFlagShort,
 		false,
 		ShowHistoryFlagUsage,
+	)
+
+	cmd.Flags().StringP(
+		DeleteHistoryFlag,
+		DeleteHistoryFlagShort,
+		"",
+		DeleteHistoryFlagUsage,
 	)
 
 	cmd.Flags().IntP(
