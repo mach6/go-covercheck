@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/go-git/go-git/v6"
+	git "github.com/go-git/go-git/v6"
 	"github.com/go-git/go-git/v6/plumbing/object"
 	"github.com/mach6/go-covercheck/pkg/compute"
 	"github.com/mach6/go-covercheck/pkg/test"

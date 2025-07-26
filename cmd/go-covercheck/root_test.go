@@ -2,7 +2,7 @@ package main
 
 import (
 	"encoding/json"
-	"gopkg.in/yaml.v3"
+	yaml "gopkg.in/yaml.v3"
 	"testing"
 
 	"github.com/mach6/go-covercheck/pkg/compute"

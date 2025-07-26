@@ -7,10 +7,10 @@ import (
 	"os"
 
 	"github.com/fatih/color"
-	"github.com/hokaccha/go-prettyjson"
+	prettyjson "github.com/hokaccha/go-prettyjson"
 	"github.com/mach6/go-covercheck/pkg/compute"
 	"github.com/mach6/go-covercheck/pkg/config"
-	"gopkg.in/yaml.v3"
+	yaml "gopkg.in/yaml.v3"
 )
 
 func bailOnError(err error) {
@@ -27,6 +27,10 @@ func FormatAndReport(results compute.Results, cfg *config.Config, hasFailure boo
 		renderTable(results, cfg)
 		_ = os.Stdout.Sync()
 		renderSummary(hasFailure, results, cfg)
+		// Display comparison for table format if available
+		if results.Comparison != nil {
+			displayComparisonFromData(results.Comparison)
+		}
 	case config.FormatJSON:
 		if cfg.NoColor {
 			enc := json.NewEncoder(os.Stdout)

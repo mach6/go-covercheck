@@ -65,9 +65,30 @@ type TotalStatements struct {
 	totalStatements        int
 }
 
+// ComparisonDelta represents the comparison between current and historical results.
+type ComparisonDelta struct {
+	StatementsDelta float64 `json:"statementsDelta" yaml:"statementsDelta"`
+	BlocksDelta     float64 `json:"blocksDelta"     yaml:"blocksDelta"`
+}
+
+// ComparisonResult represents comparison results for a specific item.
+type ComparisonResult struct {
+	Name   string          `json:"name"   yaml:"name"`
+	Delta  ComparisonDelta `json:"delta"  yaml:"delta"`
+	Type   string          `json:"type"   yaml:"type"` // "file", "package", or "total"
+}
+
+// ComparisonData holds all comparison information.
+type ComparisonData struct {
+	Ref     string             `json:"ref"     yaml:"ref"`
+	Commit  string             `json:"commit"  yaml:"commit"`
+	Results []ComparisonResult `json:"results" yaml:"results"`
+}
+
 // Results holds information for all stats collected form the cover.Profile data.
 type Results struct {
-	ByFile    []ByFile    `json:"byFile"    yaml:"byFile"`
-	ByPackage []ByPackage `json:"byPackage" yaml:"byPackage"`
-	ByTotal   Totals      `json:"byTotal"   yaml:"byTotal"`
+	ByFile     []ByFile        `json:"byFile"              yaml:"byFile"`
+	ByPackage  []ByPackage     `json:"byPackage"           yaml:"byPackage"`
+	ByTotal    Totals          `json:"byTotal"             yaml:"byTotal"`
+	Comparison *ComparisonData `json:"comparison,omitempty" yaml:"comparison,omitempty"`
 }

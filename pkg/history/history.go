@@ -7,7 +7,7 @@ import (
 	"sort"
 	"time"
 
-	"github.com/go-git/go-git/v6"
+	git "github.com/go-git/go-git/v6"
 	"github.com/go-git/go-git/v6/plumbing"
 	"github.com/mach6/go-covercheck/pkg/compute"
 )
