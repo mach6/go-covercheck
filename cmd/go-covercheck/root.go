@@ -206,6 +206,18 @@ func run(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
+	// handle history operations (compare and save)
+	if err := handleHistoryOperations(cmd, results, historyLimit, cfg); err != nil {
+		return err
+	}
+
+	if failed {
+		os.Exit(1)
+	}
+	return nil
+}
+
+func handleHistoryOperations(cmd *cobra.Command, results compute.Results, historyLimit int, cfg *config.Config) error {
 	// compare results against history, when requested
 	compareRef, _ := cmd.Flags().GetString(CompareHistoryFlag)
 	if compareRef != "" {
@@ -222,9 +234,6 @@ func run(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	if failed {
-		os.Exit(1)
-	}
 	return nil
 }
 
