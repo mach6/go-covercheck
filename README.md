@@ -168,6 +168,7 @@ Flags:
       --history-file string               path to go-covercheck history file (default ".go-covercheck.history.json")
   -l, --label string                      optional label name for history entry
   -L, --limit-history int                 limit number of historical entries to save or display [0=no limit]
+  -m, --module-name string                explicitly set module name for path normalization (overrides module inference)
   -w, --no-color                          disable color output
   -u, --no-summary                        suppress failure summary and only show tabular output [disabled for json|yaml]
   -t, --no-table                          suppress tabular output and only show failure summary [disabled for json|yaml]

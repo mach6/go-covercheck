@@ -1,3 +1,8 @@
+# module name for path normalization (overrides automatic module inference)
+# useful when all packages share a common parent directory
+# default "" (uses automatic inference via longest common prefix)
+# moduleName: "github.com/mach6/go-covercheck"
+
 # global threshold % for statement coverage.
 # global default for per file %, per package %, and total %.
 # default 70.

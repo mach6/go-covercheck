@@ -13,7 +13,7 @@ import (
 
 // CollectResults collects all the details from a []*cover.Profile and returns Results.
 func CollectResults(profiles []*cover.Profile, cfg *config.Config) (Results, bool) {
-	normalizeNames(profiles)
+	normalizeNames(profiles, cfg)
 	return collect(profiles, cfg)
 }
 
