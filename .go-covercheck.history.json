@@ -1,6 +1,222 @@
 {
   "entries": [
     {
+      "commit": "090c40ceae66cbfacfc4134858b4602139fc71de",
+      "branch": "copilot/fix-11",
+      "label": "test-run",
+      "timestamp": "2025-07-26T02:14:39.115734997Z",
+      "results": {
+        "byFile": [
+          {
+            "statementCoverage": "1/1",
+            "blockCoverage": "1/1",
+            "statementPercentage": 100,
+            "blockPercentage": 100,
+            "statementThreshold": 65,
+            "blockThreshold": 50,
+            "failed": false,
+            "file": "cmd/go-covercheck/main.go"
+          },
+          {
+            "statementCoverage": "155/194",
+            "blockCoverage": "98/131",
+            "statementPercentage": 79.89690721649485,
+            "blockPercentage": 74.80916030534351,
+            "statementThreshold": 65,
+            "blockThreshold": 50,
+            "failed": false,
+            "file": "cmd/go-covercheck/root.go"
+          },
+          {
+            "statementCoverage": "71/104",
+            "blockCoverage": "28/55",
+            "statementPercentage": 68.26923076923077,
+            "blockPercentage": 50.90909090909091,
+            "statementThreshold": 65,
+            "blockThreshold": 50,
+            "failed": false,
+            "file": "pkg/compute/compute.go"
+          },
+          {
+            "statementCoverage": "2/2",
+            "blockCoverage": "2/2",
+            "statementPercentage": 100,
+            "blockPercentage": 100,
+            "statementThreshold": 65,
+            "blockThreshold": 50,
+            "failed": false,
+            "file": "pkg/compute/model.go"
+          },
+          {
+            "statementCoverage": "19/19",
+            "blockCoverage": "12/12",
+            "statementPercentage": 100,
+            "blockPercentage": 100,
+            "statementThreshold": 65,
+            "blockThreshold": 50,
+            "failed": false,
+            "file": "pkg/compute/module.go"
+          },
+          {
+            "statementCoverage": "47/55",
+            "blockCoverage": "32/40",
+            "statementPercentage": 85.45454545454545,
+            "blockPercentage": 80,
+            "statementThreshold": 65,
+            "blockThreshold": 50,
+            "failed": false,
+            "file": "pkg/config/config.go"
+          },
+          {
+            "statementCoverage": "50/52",
+            "blockCoverage": "32/34",
+            "statementPercentage": 96.15384615384616,
+            "blockPercentage": 94.11764705882352,
+            "statementThreshold": 65,
+            "blockThreshold": 50,
+            "failed": false,
+            "file": "pkg/history/history.go"
+          },
+          {
+            "statementCoverage": "4/4",
+            "blockCoverage": "4/4",
+            "statementPercentage": 100,
+            "blockPercentage": 100,
+            "statementThreshold": 65,
+            "blockThreshold": 50,
+            "failed": false,
+            "file": "pkg/math/math.go"
+          },
+          {
+            "statementCoverage": "22/27",
+            "blockCoverage": "18/23",
+            "statementPercentage": 81.48148148148148,
+            "blockPercentage": 78.26086956521739,
+            "statementThreshold": 65,
+            "blockThreshold": 50,
+            "failed": false,
+            "file": "pkg/output/color.go"
+          },
+          {
+            "statementCoverage": "78/96",
+            "blockCoverage": "44/57",
+            "statementPercentage": 81.25,
+            "blockPercentage": 77.19298245614034,
+            "statementThreshold": 65,
+            "blockThreshold": 50,
+            "failed": false,
+            "file": "pkg/output/history.go"
+          },
+          {
+            "statementCoverage": "19/22",
+            "blockCoverage": "9/11",
+            "statementPercentage": 86.36363636363636,
+            "blockPercentage": 81.81818181818183,
+            "statementThreshold": 65,
+            "blockThreshold": 50,
+            "failed": false,
+            "file": "pkg/output/report.go"
+          },
+          {
+            "statementCoverage": "37/45",
+            "blockCoverage": "21/27",
+            "statementPercentage": 82.22222222222221,
+            "blockPercentage": 77.77777777777779,
+            "statementThreshold": 65,
+            "blockThreshold": 50,
+            "failed": false,
+            "file": "pkg/output/summary.go"
+          },
+          {
+            "statementCoverage": "30/35",
+            "blockCoverage": "7/12",
+            "statementPercentage": 85.71428571428571,
+            "blockPercentage": 58.333333333333336,
+            "statementThreshold": 65,
+            "blockThreshold": 50,
+            "failed": false,
+            "file": "pkg/output/table.go"
+          }
+        ],
+        "byPackage": [
+          {
+            "statementCoverage": "156/195",
+            "blockCoverage": "99/132",
+            "statementPercentage": 80,
+            "blockPercentage": 75,
+            "statementThreshold": 65,
+            "blockThreshold": 50,
+            "failed": false,
+            "package": "cmd/go-covercheck"
+          },
+          {
+            "statementCoverage": "92/125",
+            "blockCoverage": "42/69",
+            "statementPercentage": 73.6,
+            "blockPercentage": 60.86956521739131,
+            "statementThreshold": 65,
+            "blockThreshold": 50,
+            "failed": false,
+            "package": "pkg/compute"
+          },
+          {
+            "statementCoverage": "47/55",
+            "blockCoverage": "32/40",
+            "statementPercentage": 85.45454545454545,
+            "blockPercentage": 80,
+            "statementThreshold": 65,
+            "blockThreshold": 50,
+            "failed": false,
+            "package": "pkg/config"
+          },
+          {
+            "statementCoverage": "50/52",
+            "blockCoverage": "32/34",
+            "statementPercentage": 96.15384615384616,
+            "blockPercentage": 94.11764705882352,
+            "statementThreshold": 65,
+            "blockThreshold": 50,
+            "failed": false,
+            "package": "pkg/history"
+          },
+          {
+            "statementCoverage": "4/4",
+            "blockCoverage": "4/4",
+            "statementPercentage": 100,
+            "blockPercentage": 100,
+            "statementThreshold": 65,
+            "blockThreshold": 50,
+            "failed": false,
+            "package": "pkg/math"
+          },
+          {
+            "statementCoverage": "186/225",
+            "blockCoverage": "99/130",
+            "statementPercentage": 82.66666666666667,
+            "blockPercentage": 76.15384615384615,
+            "statementThreshold": 65,
+            "blockThreshold": 50,
+            "failed": false,
+            "package": "pkg/output"
+          }
+        ],
+        "byTotal": {
+          "statements": {
+            "coverage": "535/656",
+            "threshold": 80,
+            "percentage": 81.5548780487805,
+            "failed": false
+          },
+          "blocks": {
+            "coverage": "308/409",
+            "threshold": 75,
+            "percentage": 75.30562347188264,
+            "failed": false
+          }
+        }
+      }
+    },
+    {
       "commit": "e7c7d91a1d6f5193c026c6af6f63af383f0846ce",
       "branch": "mach6_bugfix_feat_history",
       "label": "my-label",
