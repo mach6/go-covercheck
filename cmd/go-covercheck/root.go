@@ -216,7 +216,7 @@ func run(cmd *cobra.Command, args []string) error {
 	// save results to history, when requested.
 	bSaveHistory, _ := cmd.Flags().GetBool(SaveHistoryFlag)
 	if bSaveHistory {
-		if err := saveHistory(cmd, results, historyLimit); err != nil {
+		if err := saveHistory(cmd, results, historyLimit, cfg); err != nil {
 			return err
 		}
 	}
@@ -250,7 +250,7 @@ func getHistory(cmd *cobra.Command) (*history.History, error) {
 	return history.Load(historyFile)
 }
 
-func saveHistory(cmd *cobra.Command, results compute.Results, historyLimit int) error {
+func saveHistory(cmd *cobra.Command, results compute.Results, historyLimit int, cfg *config.Config) error {
 	h, err := getHistory(cmd)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
@@ -268,10 +268,13 @@ func saveHistory(cmd *cobra.Command, results compute.Results, historyLimit int) 
 		return err
 	}
 
-	if label != "" {
-		fmt.Printf("✓ Saved history entry with label: %s\n", label)
-	} else {
-		fmt.Printf("✓ Saved history entry\n")
+	// Only show success messages for non-JSON/YAML formats
+	if cfg.Format != config.FormatJSON && cfg.Format != config.FormatYAML {
+		if label != "" {
+			fmt.Printf("✓ Saved history entry with label: %s\n", label)
+		} else {
+			fmt.Printf("✓ Saved history entry\n")
+		}
 	}
 	return nil
 }

@@ -127,10 +127,10 @@ func Test_run_SaveHistory(t *testing.T) {
 	require.NoError(t, err)
 	require.Empty(t, stdErr)
 	
-	// Check that the success message is present
-	require.Contains(t, stdOut, "✓ Saved history entry")
+	// For JSON format, success message should NOT be present
+	require.NotContains(t, stdOut, "✓ Saved history entry")
 
-	// Extract JSON part from the mixed output for parsing
+	// Extract JSON part from the output for parsing
 	jsonOutput := extractJSONFromOutput(stdOut)
 
 	// unmarshal the json output and confirm it used the block and statement coverage thresholds specified in the command
@@ -162,10 +162,10 @@ func Test_run_SaveHistory_NoPreviousFile(t *testing.T) {
 	require.NoError(t, err)
 	require.Empty(t, stdErr)
 	
-	// Check that the success message is present
-	require.Contains(t, stdOut, "✓ Saved history entry")
+	// For JSON format, success message should NOT be present
+	require.NotContains(t, stdOut, "✓ Saved history entry")
 
-	// Extract JSON part from the mixed output for parsing
+	// Extract JSON part from the output for parsing
 	jsonOutput := extractJSONFromOutput(stdOut)
 
 	// unmarshal the json output and confirm it used the block and statement coverage thresholds specified in the command
@@ -180,6 +180,30 @@ func Test_run_SaveHistory_NoPreviousFile(t *testing.T) {
 	h, err := history.Load(path)
 	require.NoError(t, err)
 	require.Len(t, h.Entries, 1)
+}
+
+func Test_run_SaveHistory_TableFormat(t *testing.T) {
+	path := test.CreateTempHistoryFile(t, test.TestCoverageHistory)
+
+	cmd := setupTestCmd()
+	cmd.SetArgs([]string{
+		"--history-file", path,
+		"--save-history", "-w",
+		"-s", "1", "-b", "1", "-B", "2", "-f", "table",
+		test.CreateTempCoverageFile(t, test.TestCoverageOut)},
+	)
+
+	stdOut, stdErr, err := runCmdForTest(t, cmd)
+	require.NoError(t, err)
+	require.Empty(t, stdErr)
+	
+	// For table format, success message SHOULD be present
+	require.Contains(t, stdOut, "✓ Saved history entry")
+
+	// open the history file and confirm it has new content
+	h, err := history.Load(path)
+	require.NoError(t, err)
+	require.Len(t, h.Entries, 2)
 }
 
 func Test_run_SaveHistoryFails(t *testing.T) {
