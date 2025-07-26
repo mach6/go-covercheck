@@ -2,7 +2,7 @@ package main
 
 import (
 	"encoding/json"
-	"gopkg.in/yaml.v3"
+	"strings"
 	"testing"
 
 	"github.com/mach6/go-covercheck/pkg/compute"
@@ -11,6 +11,7 @@ import (
 	"github.com/mach6/go-covercheck/pkg/test"
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/require"
+	"gopkg.in/yaml.v3"
 )
 
 func runCmdForTest(t *testing.T, cmd *cobra.Command) (string, string, error) {
@@ -94,6 +95,23 @@ func Test_run_ShowHistoryFails(t *testing.T) {
 	require.Contains(t, stdErr, "failed to load history")
 }
 
+func extractJSONFromOutput(output string) string {
+	// The output format is: JSON + success message
+	// We need to find where the JSON ends and extract just that part
+	lines := strings.Split(output, "\n")
+	jsonLines := []string{}
+	
+	for _, line := range lines {
+		// Stop when we hit the success message (starts with ✓)
+		if strings.HasPrefix(strings.TrimSpace(line), "✓") {
+			break
+		}
+		jsonLines = append(jsonLines, line)
+	}
+	
+	return strings.Join(jsonLines, "\n")
+}
+
 func Test_run_SaveHistory(t *testing.T) {
 	path := test.CreateTempHistoryFile(t, test.TestCoverageHistory)
 
@@ -108,11 +126,17 @@ func Test_run_SaveHistory(t *testing.T) {
 	stdOut, stdErr, err := runCmdForTest(t, cmd)
 	require.NoError(t, err)
 	require.Empty(t, stdErr)
+	
+	// Check that the success message is present
+	require.Contains(t, stdOut, "✓ Saved history entry")
+
+	// Extract JSON part from the mixed output for parsing
+	jsonOutput := extractJSONFromOutput(stdOut)
 
 	// unmarshal the json output and confirm it used the block and statement coverage thresholds specified in the command
 	// flags.
 	r := new(compute.Results)
-	err = json.Unmarshal([]byte(stdOut), &r)
+	err = json.Unmarshal([]byte(jsonOutput), &r)
 	require.NoError(t, err)
 	require.InEpsilon(t, 2.0, r.ByTotal.Blocks.Threshold, 0)
 	require.InEpsilon(t, 1.0, r.ByTotal.Statements.Threshold, 0)
@@ -137,11 +161,17 @@ func Test_run_SaveHistory_NoPreviousFile(t *testing.T) {
 	stdOut, stdErr, err := runCmdForTest(t, cmd)
 	require.NoError(t, err)
 	require.Empty(t, stdErr)
+	
+	// Check that the success message is present
+	require.Contains(t, stdOut, "✓ Saved history entry")
+
+	// Extract JSON part from the mixed output for parsing
+	jsonOutput := extractJSONFromOutput(stdOut)
 
 	// unmarshal the json output and confirm it used the block and statement coverage thresholds specified in the command
 	// flags.
 	r := new(compute.Results)
-	err = json.Unmarshal([]byte(stdOut), &r)
+	err = json.Unmarshal([]byte(jsonOutput), &r)
 	require.NoError(t, err)
 	require.InEpsilon(t, 2.0, r.ByTotal.Blocks.Threshold, 0)
 	require.InEpsilon(t, 1.0, r.ByTotal.Statements.Threshold, 0)
