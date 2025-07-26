@@ -48,8 +48,8 @@ func findModuleName(profiles []*cover.Profile, cfg *config.Config) string {
 		}
 		return moduleName
 	}
-	
-	// Fallback to longest common prefix logic
+
+	// Fallback to the longest common prefix logic
 	names := make([]string, 0, len(profiles))
 	for _, profile := range profiles {
 		names = append(names, profile.FileName)
