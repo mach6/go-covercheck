@@ -8,7 +8,7 @@ import (
 	"github.com/mach6/go-covercheck/pkg/config"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/tools/cover"
-	"gopkg.in/yaml.v3"
+	yaml "gopkg.in/yaml.v3"
 )
 
 const (

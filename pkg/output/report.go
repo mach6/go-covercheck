@@ -7,10 +7,10 @@ import (
 	"os"
 
 	"github.com/fatih/color"
-	"github.com/hokaccha/go-prettyjson"
+	prettyjson "github.com/hokaccha/go-prettyjson"
 	"github.com/mach6/go-covercheck/pkg/compute"
 	"github.com/mach6/go-covercheck/pkg/config"
-	"gopkg.in/yaml.v3"
+	yaml "gopkg.in/yaml.v3"
 )
 
 func bailOnError(err error) {
