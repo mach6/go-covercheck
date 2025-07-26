@@ -1,6 +1,7 @@
 package main
 
 import (
+	_ "embed"
 	"errors"
 	"fmt"
 	"io"
@@ -19,6 +20,9 @@ import (
 	"golang.org/x/term"
 	"golang.org/x/tools/cover"
 )
+
+//go:embed sample-config.yml
+var sampleConfigYAML string
 
 // Constants for this application.
 const (
@@ -93,6 +97,9 @@ const (
 	ModuleNameFlag      = "module-name"
 	ModuleNameFlagShort = "m"
 	ModuleNameFlagUsage = "explicitly set module name for path normalization (overrides module inference)"
+
+	InitFlag      = "init"
+	InitFlagUsage = "create a sample .go-covercheck.yml config file in the current directory"
 )
 
 // Execute the CLI application.
@@ -160,6 +167,12 @@ var (
 )
 
 func run(cmd *cobra.Command, args []string) error {
+	// check if init flag is specified and handle it
+	bInit, _ := cmd.Flags().GetBool(InitFlag)
+	if bInit {
+		return initConfigFile()
+	}
+
 	cfg, err := getConfig(cmd)
 	if err != nil {
 		return err
@@ -674,6 +687,12 @@ func initFlags(cmd *cobra.Command) {
 		"",
 		ModuleNameFlagUsage,
 	)
+
+	cmd.Flags().Bool(
+		InitFlag,
+		false,
+		InitFlagUsage,
+	)
 }
 
 func shouldSkip(filename string, skip []string) bool {
@@ -684,4 +703,22 @@ func shouldSkip(filename string, skip []string) bool {
 		}
 	}
 	return false
+}
+
+func initConfigFile() error {
+	configPath := ConfigFlagDefault
+	
+	// check if config file already exists
+	if _, err := os.Stat(configPath); err == nil {
+		return fmt.Errorf("config file %s already exists", configPath)
+	}
+	
+	// write the embedded sample config to the current directory
+	err := os.WriteFile(configPath, []byte(sampleConfigYAML), 0644)
+	if err != nil {
+		return fmt.Errorf("failed to create config file %s: %w", configPath, err)
+	}
+	
+	fmt.Printf("Created sample config file: %s\n", configPath)
+	return nil
 }
