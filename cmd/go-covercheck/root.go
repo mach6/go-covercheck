@@ -1,7 +1,6 @@
 package main
 
 import (
-	_ "embed"
 	"errors"
 	"fmt"
 	"io"
@@ -16,13 +15,11 @@ import (
 	"github.com/mach6/go-covercheck/pkg/config"
 	"github.com/mach6/go-covercheck/pkg/history"
 	"github.com/mach6/go-covercheck/pkg/output"
+	"github.com/mach6/go-covercheck/samples"
 	"github.com/spf13/cobra"
 	"golang.org/x/term"
 	"golang.org/x/tools/cover"
 )
-
-//go:embed sample-config.yml
-var sampleConfigYAML string
 
 // Constants for this application.
 const (
@@ -714,7 +711,7 @@ func initConfigFile() error {
 	}
 	
 	// write the embedded sample config to the current directory
-	err := os.WriteFile(configPath, []byte(sampleConfigYAML), 0644)
+	err := os.WriteFile(configPath, []byte(samples.SampleConfigYAML), 0644)
 	if err != nil {
 		return fmt.Errorf("failed to create config file %s: %w", configPath, err)
 	}
