@@ -33,11 +33,7 @@ func TestExecute_Help(t *testing.T) {
 func TestExecute_Init(t *testing.T) {
 	// Use a temporary directory for this test
 	tempDir := t.TempDir()
-	originalDir, _ := os.Getwd()
-	defer os.Chdir(originalDir)
-	
-	err := os.Chdir(tempDir)
-	require.NoError(t, err)
+	t.Chdir(tempDir)
 	
 	cmd := setupTestCmd()
 	cmd.SetArgs([]string{"--init"})
@@ -62,15 +58,11 @@ func TestExecute_Init(t *testing.T) {
 func TestExecute_Init_FileExists(t *testing.T) {
 	// Use a temporary directory for this test
 	tempDir := t.TempDir()
-	originalDir, _ := os.Getwd()
-	defer os.Chdir(originalDir)
-	
-	err := os.Chdir(tempDir)
-	require.NoError(t, err)
+	t.Chdir(tempDir)
 	
 	// Create an existing config file
 	configPath := ".go-covercheck.yml"
-	err = os.WriteFile(configPath, []byte("existing content"), 0644)
+	err := os.WriteFile(configPath, []byte("existing content"), ConfigFilePermissions)
 	require.NoError(t, err)
 	
 	cmd := setupTestCmd()

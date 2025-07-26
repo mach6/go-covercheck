@@ -97,6 +97,9 @@ const (
 
 	InitFlag      = "init"
 	InitFlagUsage = "create a sample .go-covercheck.yml config file in the current directory"
+
+	// File permissions.
+	ConfigFilePermissions = 0600
 )
 
 // Execute the CLI application.
@@ -711,7 +714,7 @@ func initConfigFile() error {
 	}
 	
 	// write the embedded sample config to the current directory
-	err := os.WriteFile(configPath, []byte(samples.SampleConfigYAML), 0644)
+	err := os.WriteFile(configPath, []byte(samples.SampleConfigYAML), ConfigFilePermissions)
 	if err != nil {
 		return fmt.Errorf("failed to create config file %s: %w", configPath, err)
 	}
