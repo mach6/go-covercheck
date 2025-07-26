@@ -48,6 +48,20 @@ the first release was ready.
 
 There are several ways to install `go-covercheck`. Choose the one that best fits your needs.
 
+### 🍺 Homebrew (macOS/Linux)
+
+You can install `go-covercheck` using Homebrew:
+
+```shell
+brew install mach6/tap/go-covercheck
+```
+
+Or install directly from this repository:
+
+```shell
+brew install https://raw.githubusercontent.com/mach6/go-covercheck/main/homebrew/go-covercheck.rb
+```
+
 ### 📦 Official Releases
 
 You can download official releases from the [releases page](https://github.com/mach6/go-covercheck/releases). 
