@@ -32,8 +32,8 @@ jobs:
 
       - name: Coverage Check
         run: |
-          go install github.com/mach6/go-covercheck/cmd/go-covercheck@v0.4.1
-          go-covercheck coverage.out
+          go install github.com/mach6/go-covercheck/cmd/go-covercheck@v0.5.0
+          go-covercheck -C v0.4.1
 
       - name: Build Docker Image
         run: docker build -t go-covercheck .

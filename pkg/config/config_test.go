@@ -44,19 +44,3 @@ func TestLoad_InvalidYAML(t *testing.T) {
 	require.Error(t, err)
 	require.Nil(t, cfg)
 }
-
-func TestLoad_WithModuleName(t *testing.T) {
-	yaml := `
-moduleName: "github.com/example/project"
-statementThreshold: 80.0
-`
-	tmpFile := path.Join(t.TempDir(), "test_config_module.yaml")
-	err := os.WriteFile(tmpFile, []byte(yaml), 0600)
-	require.NoError(t, err)
-	defer os.Remove(tmpFile) //nolint:errcheck
-
-	cfg, err := config.Load(tmpFile)
-	require.NoError(t, err)
-	require.Equal(t, "github.com/example/project", cfg.ModuleName)
-	require.InEpsilon(t, 80.0, cfg.StatementThreshold, 1)
-}

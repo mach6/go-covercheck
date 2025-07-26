@@ -38,9 +38,8 @@ func Test_normalizeNames(t *testing.T) {
 	}
 }
 
+// Test longestCommonPrefix function and the findModuleName function cannot infer a correct module name.
 func Test_findModuleName_withCommonParent(t *testing.T) {
-	// This test demonstrates the issue described in the problem statement
-	// When all packages share a common parent, the module inference is incorrect
 	names := []string{
 		"github.com/mach6/go-covercheck/pkg/foo/foo.go",
 		"github.com/mach6/go-covercheck/pkg/bar/bar.go",
@@ -53,23 +52,16 @@ func Test_findModuleName_withCommonParent(t *testing.T) {
 		}
 	}
 
-	// Current behavior: incorrectly infers "github.com/mach6/go-covercheck/pkg/"
 	cfg := &config.Config{}
 	moduleName := findModuleName(profiles, cfg)
 	require.Equal(t, "github.com/mach6/go-covercheck/pkg/", moduleName)
 
-	// After normalizing with the current logic, we get wrong results
 	normalizeNames(profiles, cfg)
 	require.Equal(t, "foo/foo.go", profiles[0].FileName)
 	require.Equal(t, "bar/bar.go", profiles[1].FileName)
-
-	// What we want instead is:
-	// Module name should be "github.com/mach6/go-covercheck" 
-	// And files should be "pkg/foo/foo.go" and "pkg/bar/bar.go"
 }
 
 func Test_findModuleName_withConfiguredModuleName(t *testing.T) {
-	// Test the fix: when ModuleName is configured, use it instead of inferring
 	names := []string{
 		"github.com/mach6/go-covercheck/pkg/foo/foo.go",
 		"github.com/mach6/go-covercheck/pkg/bar/bar.go",
@@ -86,11 +78,10 @@ func Test_findModuleName_withConfiguredModuleName(t *testing.T) {
 	cfg := &config.Config{
 		ModuleName: "github.com/mach6/go-covercheck",
 	}
-	
+
 	moduleName := findModuleName(profiles, cfg)
 	require.Equal(t, "github.com/mach6/go-covercheck/", moduleName)
 
-	// After normalizing with the configured module name, we get correct results
 	normalizeNames(profiles, cfg)
 	require.Equal(t, "pkg/foo/foo.go", profiles[0].FileName)
 	require.Equal(t, "pkg/bar/bar.go", profiles[1].FileName)
