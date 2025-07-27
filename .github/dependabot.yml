@@ -17,8 +17,6 @@ updates:
     labels:
       - "dependencies"
       - "go"
-    reviewers:
-      - "mach6"
     open-pull-requests-limit: 10
 
   # Update GitHub Actions
@@ -34,8 +32,6 @@ updates:
     labels:
       - "dependencies"
       - "github-actions"
-    reviewers:
-      - "mach6"
     open-pull-requests-limit: 5
 
   # Update Docker base images
@@ -51,6 +47,4 @@ updates:
     labels:
       - "dependencies"
       - "docker"
-    reviewers:
-      - "mach6"
     open-pull-requests-limit: 3
