@@ -111,8 +111,8 @@ func TestCollectResults_WithFailures(t *testing.T) {
 	r, failed := CollectResults(profiles, cfg)
 	require.True(t, failed)
 	require.True(t, r.ByFile[0].Failed)
-	require.Equal(t, 50.0, r.ByFile[0].StatementPercentage)
-	require.Equal(t, 50.0, r.ByFile[0].BlockPercentage)
+	require.InEpsilon(t, 50.0, r.ByFile[0].StatementPercentage, 0.01)
+	require.InEpsilon(t, 50.0, r.ByFile[0].BlockPercentage, 0.01)
 }
 
 func TestCollectResults_WithPerFileThresholds(t *testing.T) {
@@ -140,8 +140,8 @@ func TestCollectResults_WithPerFileThresholds(t *testing.T) {
 	r, failed := CollectResults(profiles, cfg)
 	require.True(t, failed)
 	require.True(t, r.ByFile[0].Failed)
-	require.Equal(t, 75.0, r.ByFile[0].StatementThreshold) // should use per-file threshold
-	require.Equal(t, 75.0, r.ByFile[0].BlockThreshold)     // should use per-file threshold
+	require.InEpsilon(t, 75.0, r.ByFile[0].StatementThreshold, 0.01) // should use per-file threshold
+	require.InEpsilon(t, 75.0, r.ByFile[0].BlockThreshold, 0.01)     // should use per-file threshold
 }
 
 func TestCollectResults_WithPerPackageThresholds(t *testing.T) {
@@ -180,9 +180,10 @@ func TestCollectResults_WithPerPackageThresholds(t *testing.T) {
 	// Find the special package result
 	var specialPkg, otherPkg *ByPackage
 	for i := range r.ByPackage {
-		if r.ByPackage[i].Package == "special" {
+		switch r.ByPackage[i].Package {
+		case "special":
 			specialPkg = &r.ByPackage[i]
-		} else if r.ByPackage[i].Package == "other" {
+		case "other":
 			otherPkg = &r.ByPackage[i]
 		}
 	}
@@ -192,13 +193,13 @@ func TestCollectResults_WithPerPackageThresholds(t *testing.T) {
 	
 	// Special package should fail due to higher threshold
 	require.True(t, specialPkg.Failed)
-	require.Equal(t, 75.0, specialPkg.StatementThreshold) // should use per-package threshold
-	require.Equal(t, 75.0, specialPkg.BlockThreshold)     // should use per-package threshold
+	require.InEpsilon(t, 75.0, specialPkg.StatementThreshold, 0.01) // should use per-package threshold
+	require.InEpsilon(t, 75.0, specialPkg.BlockThreshold, 0.01)     // should use per-package threshold
 	
 	// Other package should pass with default threshold
 	require.False(t, otherPkg.Failed)
-	require.Equal(t, 10.0, otherPkg.StatementThreshold) // should use default threshold
-	require.Equal(t, 10.0, otherPkg.BlockThreshold)     // should use default threshold
+	require.InEpsilon(t, 10.0, otherPkg.StatementThreshold, 0.01) // should use default threshold
+	require.InEpsilon(t, 10.0, otherPkg.BlockThreshold, 0.01)     // should use default threshold
 }
 
 func TestCollectResults_WithMultiplePackages(t *testing.T) {
@@ -234,6 +235,25 @@ func TestCollectResults_WithMultiplePackages(t *testing.T) {
 	require.Equal(t, "3/4", r.ByTotal.Blocks.Coverage)       // 4 blocks, 3 covered
 }
 
+// Helper function to test sorting of file results.
+func testFileSorting(t *testing.T, sortBy string, results []ByFile, expectedAsc, expectedDesc []string) {
+	t.Helper()
+	
+	// Test ascending
+	cfg := &config.Config{SortBy: sortBy, SortOrder: config.SortOrderAsc}
+	sortFileResults(results, cfg)
+	for i, expected := range expectedAsc {
+		require.Equal(t, expected, results[i].File)
+	}
+	
+	// Test descending
+	cfg.SortOrder = config.SortOrderDesc
+	sortFileResults(results, cfg)
+	for i, expected := range expectedDesc {
+		require.Equal(t, expected, results[i].File)
+	}
+}
+
 func TestSortResults_ByStatementPercent(t *testing.T) {
 	results := []ByFile{
 		{File: "high.go", By: By{StatementPercentage: 90.0, stmtHits: 9}},
@@ -241,19 +261,9 @@ func TestSortResults_ByStatementPercent(t *testing.T) {
 		{File: "medium.go", By: By{StatementPercentage: 50.0, stmtHits: 5}},
 	}
 	
-	// Test ascending
-	cfg := &config.Config{SortBy: config.SortByStatementPercent, SortOrder: config.SortOrderAsc}
-	sortFileResults(results, cfg)
-	require.Equal(t, "low.go", results[0].File)
-	require.Equal(t, "medium.go", results[1].File)
-	require.Equal(t, "high.go", results[2].File)
-	
-	// Test descending
-	cfg.SortOrder = config.SortOrderDesc
-	sortFileResults(results, cfg)
-	require.Equal(t, "high.go", results[0].File)
-	require.Equal(t, "medium.go", results[1].File)
-	require.Equal(t, "low.go", results[2].File)
+	testFileSorting(t, config.SortByStatementPercent, results, 
+		[]string{"low.go", "medium.go", "high.go"}, 
+		[]string{"high.go", "medium.go", "low.go"})
 }
 
 func TestSortResults_ByBlockPercent(t *testing.T) {
@@ -263,19 +273,9 @@ func TestSortResults_ByBlockPercent(t *testing.T) {
 		{File: "medium.go", By: By{BlockPercentage: 50.0, blockHits: 5}},
 	}
 	
-	// Test ascending
-	cfg := &config.Config{SortBy: config.SortByBlockPercent, SortOrder: config.SortOrderAsc}
-	sortFileResults(results, cfg)
-	require.Equal(t, "low.go", results[0].File)
-	require.Equal(t, "medium.go", results[1].File)
-	require.Equal(t, "high.go", results[2].File)
-	
-	// Test descending
-	cfg.SortOrder = config.SortOrderDesc
-	sortFileResults(results, cfg)
-	require.Equal(t, "high.go", results[0].File)
-	require.Equal(t, "medium.go", results[1].File)
-	require.Equal(t, "low.go", results[2].File)
+	testFileSorting(t, config.SortByBlockPercent, results, 
+		[]string{"low.go", "medium.go", "high.go"}, 
+		[]string{"high.go", "medium.go", "low.go"})
 }
 
 func TestSortResults_ByStatements(t *testing.T) {
@@ -285,19 +285,9 @@ func TestSortResults_ByStatements(t *testing.T) {
 		{File: "medium.go", By: By{stmtHits: 50}},
 	}
 	
-	// Test ascending
-	cfg := &config.Config{SortBy: config.SortByStatements, SortOrder: config.SortOrderAsc}
-	sortFileResults(results, cfg)
-	require.Equal(t, "low.go", results[0].File)
-	require.Equal(t, "medium.go", results[1].File)
-	require.Equal(t, "high.go", results[2].File)
-	
-	// Test descending
-	cfg.SortOrder = config.SortOrderDesc
-	sortFileResults(results, cfg)
-	require.Equal(t, "high.go", results[0].File)
-	require.Equal(t, "medium.go", results[1].File)
-	require.Equal(t, "low.go", results[2].File)
+	testFileSorting(t, config.SortByStatements, results, 
+		[]string{"low.go", "medium.go", "high.go"}, 
+		[]string{"high.go", "medium.go", "low.go"})
 }
 
 func TestSortResults_ByBlocks(t *testing.T) {
@@ -307,19 +297,28 @@ func TestSortResults_ByBlocks(t *testing.T) {
 		{File: "medium.go", By: By{blockHits: 50}},
 	}
 	
+	testFileSorting(t, config.SortByBlocks, results, 
+		[]string{"low.go", "medium.go", "high.go"}, 
+		[]string{"high.go", "medium.go", "low.go"})
+}
+
+// Helper function to test sorting of package results.
+func testPackageSorting(t *testing.T, sortBy string, results []ByPackage, expectedAsc, expectedDesc []string) {
+	t.Helper()
+	
 	// Test ascending
-	cfg := &config.Config{SortBy: config.SortByBlocks, SortOrder: config.SortOrderAsc}
-	sortFileResults(results, cfg)
-	require.Equal(t, "low.go", results[0].File)
-	require.Equal(t, "medium.go", results[1].File)
-	require.Equal(t, "high.go", results[2].File)
+	cfg := &config.Config{SortBy: sortBy, SortOrder: config.SortOrderAsc}
+	sortPackageResults(results, cfg)
+	for i, expected := range expectedAsc {
+		require.Equal(t, expected, results[i].Package)
+	}
 	
 	// Test descending
 	cfg.SortOrder = config.SortOrderDesc
-	sortFileResults(results, cfg)
-	require.Equal(t, "high.go", results[0].File)
-	require.Equal(t, "medium.go", results[1].File)
-	require.Equal(t, "low.go", results[2].File)
+	sortPackageResults(results, cfg)
+	for i, expected := range expectedDesc {
+		require.Equal(t, expected, results[i].Package)
+	}
 }
 
 func TestSortPackageResults_ByStatementPercent(t *testing.T) {
@@ -329,19 +328,9 @@ func TestSortPackageResults_ByStatementPercent(t *testing.T) {
 		{Package: "pkg/medium", By: By{StatementPercentage: 50.0, stmtHits: 5}},
 	}
 	
-	// Test ascending
-	cfg := &config.Config{SortBy: config.SortByStatementPercent, SortOrder: config.SortOrderAsc}
-	sortPackageResults(results, cfg)
-	require.Equal(t, "pkg/low", results[0].Package)
-	require.Equal(t, "pkg/medium", results[1].Package)
-	require.Equal(t, "pkg/high", results[2].Package)
-	
-	// Test descending
-	cfg.SortOrder = config.SortOrderDesc
-	sortPackageResults(results, cfg)
-	require.Equal(t, "pkg/high", results[0].Package)
-	require.Equal(t, "pkg/medium", results[1].Package)
-	require.Equal(t, "pkg/low", results[2].Package)
+	testPackageSorting(t, config.SortByStatementPercent, results, 
+		[]string{"pkg/low", "pkg/medium", "pkg/high"}, 
+		[]string{"pkg/high", "pkg/medium", "pkg/low"})
 }
 
 func TestSortPackageResults_ByPackageName(t *testing.T) {
