@@ -1,0 +1,14 @@
+# CODEOWNERS file for go-covercheck repository
+# This file defines code ownership for the repository
+# Users specified here will be automatically requested for review when
+# pull requests modify the associated files/directories
+
+# Global ownership - mach6 owns the entire repository
+* @mach6
+
+# Dependency files - for Dependabot PRs
+go.mod @mach6
+go.sum @mach6
+Dockerfile @mach6
+.github/workflows/ @mach6
+.github/dependabot.yml @mach6
