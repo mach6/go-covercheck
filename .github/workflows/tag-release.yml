@@ -28,7 +28,7 @@ jobs:
         run: make dist
 
       - name: Upload Dist Binaries to GitHub Release
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@v2
         with:
           files: dist/*
 
