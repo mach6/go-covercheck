@@ -28,8 +28,8 @@ The following items are noteworthy and not (currently) supported.
 - Does not support configurable profile block count (how many times a section of code was hit) thresholds. The assumption 
   is any value `>=1` is enough.
 - Table style is not configurable.
-- Color codes (see [Color Legend](#Color-Legend)) are not configurable.
-- Severity weights (see [Color Legend](#Color-Legend)) are not configurable.
+- Color codes (see [Color Legend](#🎨-color-legend)) are not configurable.
+- Severity weights (see [Color Legend](#🎨-color-legend)) are not configurable.
 
 ## 📖 Background
 
@@ -78,17 +78,24 @@ docker pull ghcr.io/mach6/go-covercheck:latest
 Or you can use a tag which maps to a specific version:
 
 ```shell
-docker pull ghcr.io/mach6/go-covercheck:0.4.1
+docker pull ghcr.io/mach6/go-covercheck:0.5.0
 ```
 
 ## 📋 Usage
 
 ### ⚙️ Configure
 
-Create a `.go-coverheck.yml` which defines the threshold requirements.  
+Create a `.go-coverheck.yml` which defines the threshold requirements. You can create this file manually or use the 
+`--init` flag to generate a sample config file in the current directory.
 
 - This step is optional but _recommended_.
 - See [full sample](samples/.go-covercheck.yml).
+
+```shell
+go-covercheck --init
+```
+
+Here is a sample `.go-covercheck.yml` configuration file:
 
 ```yaml
 # Optional, global thresholds overriding the default (70 statements, 50 blocks)
@@ -163,9 +170,11 @@ Flags:
   -b, --block-threshold float             global block threshold to enforce [0=disabled] (default 50)
   -C, --compare-history string            compare current coverage against historical ref [commit|branch|tag|label]
   -c, --config string                     path to YAML config file (default ".go-covercheck.yml")
+  -D, --delete-history string             delete historical entry by ref [commit|branch|tag|label]
   -f, --format string                     output format [table|json|yaml|md|html|csv|tsv] (default "table")
   -h, --help                              help for go-covercheck
       --history-file string               path to go-covercheck history file (default ".go-covercheck.history.json")
+      --init                              create a sample .go-covercheck.yml config file in the current directory      
   -l, --label string                      optional label name for history entry
   -L, --limit-history int                 limit number of historical entries to save or display [0=no limit]
   -m, --module-name string                explicitly set module name for path normalization (overrides module inference)
@@ -266,6 +275,38 @@ $ go-covercheck --show-history --limit-history 2
 │            │         │                           │                 │                 │ 278/413 [B] │
 └────────────┴─────────┴───────────────────────────┴─────────────────┴─────────────────┴─────────────┘
 ≡ Showing last 2 history entries
+```
+
+### 🗑️ Delete History
+
+You can delete specific history entries using the `--delete-history` flag. This allows you to remove outdated or unwanted entries from your history file. The deletion uses the same reference matching as compare and show operations.
+
+```shell
+# Delete by commit hash (full or short)
+go-covercheck --delete-history e402629
+
+# Delete by branch name
+go-covercheck --delete-history main
+
+# Delete by tag
+go-covercheck --delete-history v1.0.0
+
+# Delete by label
+go-covercheck --delete-history my-label
+```
+
+When a history entry is successfully deleted, you'll see a confirmation message:
+
+```text
+$ go-covercheck --delete-history main
+✓ Deleted history entry for ref: main
+```
+
+If the reference is not found, an error message will be displayed:
+
+```text
+$ go-covercheck --delete-history nonexistent
+Error: no history entry found for ref: nonexistent
 ```
 
 ## 📤 Output Formats

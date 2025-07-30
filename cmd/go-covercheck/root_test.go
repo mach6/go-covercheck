@@ -2,7 +2,7 @@ package main
 
 import (
 	"encoding/json"
-	"gopkg.in/yaml.v3"
+	"strings"
 	"testing"
 
 	"github.com/mach6/go-covercheck/pkg/compute"
@@ -11,6 +11,7 @@ import (
 	"github.com/mach6/go-covercheck/pkg/test"
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/require"
+	"gopkg.in/yaml.v3"
 )
 
 func runCmdForTest(t *testing.T, cmd *cobra.Command) (string, string, error) {
@@ -94,6 +95,22 @@ func Test_run_ShowHistoryFails(t *testing.T) {
 	require.Contains(t, stdErr, "failed to load history")
 }
 
+func extractJSONFromOutput(output string) string {
+	// The output format is: JSON + success message
+	// We need to find where the JSON ends and extract just that part
+	lines := strings.Split(output, "\n")
+	jsonLines := make([]string, 0)
+
+	for _, line := range lines {
+		if strings.HasPrefix(strings.TrimSpace(line), "✓") {
+			break
+		}
+		jsonLines = append(jsonLines, line)
+	}
+
+	return strings.Join(jsonLines, "\n")
+}
+
 func Test_run_SaveHistory(t *testing.T) {
 	path := test.CreateTempHistoryFile(t, test.TestCoverageHistory)
 
@@ -101,7 +118,7 @@ func Test_run_SaveHistory(t *testing.T) {
 	cmd.SetArgs([]string{
 		"--history-file", path,
 		"--save-history", "-w",
-		"-s", "1", "-b", "1", "-B", "2", "-f", "json",
+		"-s", "50", "-b", "50", "-B", "2", "-S", "1", "-f", "json",
 		test.CreateTempCoverageFile(t, test.TestCoverageOut)},
 	)
 
@@ -109,10 +126,16 @@ func Test_run_SaveHistory(t *testing.T) {
 	require.NoError(t, err)
 	require.Empty(t, stdErr)
 
+	// For JSON format, a success message should NOT be present
+	require.NotContains(t, stdOut, "✓ Saved history entry")
+
+	// Extract JSON part from the output for parsing
+	jsonOutput := extractJSONFromOutput(stdOut)
+
 	// unmarshal the json output and confirm it used the block and statement coverage thresholds specified in the command
 	// flags.
 	r := new(compute.Results)
-	err = json.Unmarshal([]byte(stdOut), &r)
+	err = json.Unmarshal([]byte(jsonOutput), &r)
 	require.NoError(t, err)
 	require.InEpsilon(t, 2.0, r.ByTotal.Blocks.Threshold, 0)
 	require.InEpsilon(t, 1.0, r.ByTotal.Statements.Threshold, 0)
@@ -130,7 +153,7 @@ func Test_run_SaveHistory_NoPreviousFile(t *testing.T) {
 	cmd.SetArgs([]string{
 		"--history-file", path,
 		"--save-history", "-w",
-		"-s", "1", "-b", "1", "-B", "2", "-f", "json",
+		"-s", "50", "-b", "50", "-B", "2", "-S", "1", "-f", "json",
 		test.CreateTempCoverageFile(t, test.TestCoverageOut)},
 	)
 
@@ -138,10 +161,16 @@ func Test_run_SaveHistory_NoPreviousFile(t *testing.T) {
 	require.NoError(t, err)
 	require.Empty(t, stdErr)
 
+	// For JSON format, a success message should NOT be present
+	require.NotContains(t, stdOut, "✓ Saved history entry")
+
+	// Extract JSON part from the output for parsing
+	jsonOutput := extractJSONFromOutput(stdOut)
+
 	// unmarshal the json output and confirm it used the block and statement coverage thresholds specified in the command
 	// flags.
 	r := new(compute.Results)
-	err = json.Unmarshal([]byte(stdOut), &r)
+	err = json.Unmarshal([]byte(jsonOutput), &r)
 	require.NoError(t, err)
 	require.InEpsilon(t, 2.0, r.ByTotal.Blocks.Threshold, 0)
 	require.InEpsilon(t, 1.0, r.ByTotal.Statements.Threshold, 0)
@@ -150,6 +179,30 @@ func Test_run_SaveHistory_NoPreviousFile(t *testing.T) {
 	h, err := history.Load(path)
 	require.NoError(t, err)
 	require.Len(t, h.Entries, 1)
+}
+
+func Test_run_SaveHistory_TableFormat(t *testing.T) {
+	path := test.CreateTempHistoryFile(t, test.TestCoverageHistory)
+
+	cmd := setupTestCmd()
+	cmd.SetArgs([]string{
+		"--history-file", path,
+		"--save-history", "-w",
+		"-s", "1", "-b", "1", "-B", "2", "-S", "2", "-f", "table",
+		test.CreateTempCoverageFile(t, test.TestCoverageOut)},
+	)
+
+	stdOut, stdErr, err := runCmdForTest(t, cmd)
+	require.NoError(t, err)
+	require.Empty(t, stdErr)
+
+	// For table format, success message SHOULD be present
+	require.Contains(t, stdOut, "✓ Saved history entry")
+
+	// open the history file and confirm it has new content
+	h, err := history.Load(path)
+	require.NoError(t, err)
+	require.Len(t, h.Entries, 2)
 }
 
 func Test_run_SaveHistoryFails(t *testing.T) {
@@ -296,4 +349,62 @@ func Test_getVersion(t *testing.T) {
 	require.Contains(t, getVersion(), config.AppVersion)
 	require.Contains(t, getVersion(), config.AppRevision)
 	require.Contains(t, getVersion(), "built by test on 0400")
+}
+
+func Test_run_DeleteHistory(t *testing.T) {
+	// Create a history file with test data
+	path := test.CreateTempHistoryFile(t, test.TestCoverageHistory)
+
+	cmd := setupTestCmd()
+	cmd.SetArgs([]string{
+		"--history-file", path,
+		"--delete-history", "main", "-w",
+		test.CreateTempCoverageFile(t, test.TestCoverageOut)},
+	)
+
+	stdOut, stdErr, err := runCmdForTest(t, cmd)
+	require.NoError(t, err)
+	require.Empty(t, stdErr)
+	require.Contains(t, stdOut, "✓ Deleted history entry for ref: main")
+
+	// Verify the entry was actually deleted
+	h, err := history.Load(path)
+	require.NoError(t, err)
+	require.Empty(t, h.Entries)
+}
+
+func Test_run_DeleteHistoryFails_BadRef(t *testing.T) {
+	path := test.CreateTempHistoryFile(t, test.TestCoverageHistory)
+
+	cmd := setupTestCmd()
+	cmd.SetArgs([]string{
+		"--history-file", path,
+		"--delete-history", "nonexistent", "-w",
+		test.CreateTempCoverageFile(t, test.TestCoverageOut)},
+	)
+
+	stdOut, stdErr, err := runCmdForTest(t, cmd)
+	require.Error(t, err)
+	require.Empty(t, stdOut)
+	require.NotEmpty(t, stdErr)
+	require.ErrorContains(t, err, "no history entry found for ref: nonexistent")
+	require.Contains(t, stdErr, "no history entry found for ref: nonexistent")
+}
+
+func Test_run_DeleteHistoryFails_BadFile(t *testing.T) {
+	path := test.CreateTempHistoryFile(t, test.InvalidTestCoverageHistory)
+
+	cmd := setupTestCmd()
+	cmd.SetArgs([]string{
+		"--history-file", path,
+		"--delete-history", "main", "-w",
+		test.CreateTempCoverageFile(t, test.TestCoverageOut)},
+	)
+
+	stdOut, stdErr, err := runCmdForTest(t, cmd)
+	require.Error(t, err)
+	require.Empty(t, stdOut)
+	require.NotEmpty(t, stdErr)
+	require.ErrorContains(t, err, "failed to load history")
+	require.Contains(t, stdErr, "failed to load history")
 }

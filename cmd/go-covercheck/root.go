@@ -13,7 +13,6 @@ import (
 	"github.com/jedib0t/go-pretty/v6/text"
 	"github.com/mach6/go-covercheck/pkg/compute"
 	"github.com/mach6/go-covercheck/pkg/config"
-	"github.com/mach6/go-covercheck/pkg/history"
 	"github.com/mach6/go-covercheck/pkg/output"
 	"github.com/mach6/go-covercheck/samples"
 	"github.com/spf13/cobra"
@@ -87,6 +86,10 @@ const (
 	ShowHistoryFlagShort = "I"
 	ShowHistoryFlagUsage = "show historical entries in tabular format"
 
+	DeleteHistoryFlag      = "delete-history"
+	DeleteHistoryFlagShort = "D"
+	DeleteHistoryFlagUsage = "delete historical entry by ref [commit|branch|tag|label]"
+
 	HistoryLimitFlag      = "limit-history"
 	HistoryLimitFlagShort = "L"
 	HistoryLimitFlagUsage = "limit number of historical entries to save or display [0=no limit]"
@@ -98,7 +101,7 @@ const (
 	InitFlag      = "init"
 	InitFlagUsage = "create a sample .go-covercheck.yml config file in the current directory"
 
-	// File permissions.
+	// ConfigFilePermissions permissions.
 	ConfigFilePermissions = 0600
 )
 
@@ -167,12 +170,6 @@ var (
 )
 
 func run(cmd *cobra.Command, args []string) error {
-	// check if init flag is specified and handle it
-	bInit, _ := cmd.Flags().GetBool(InitFlag)
-	if bInit {
-		return initConfigFile()
-	}
-
 	cfg, err := getConfig(cmd)
 	if err != nil {
 		return err
@@ -181,12 +178,8 @@ func run(cmd *cobra.Command, args []string) error {
 	setupColor(cfg)
 	setupTerminalWidth(cfg)
 
-	historyLimit, _ := cmd.Flags().GetInt(HistoryLimitFlag)
-
-	// show history and exit when requested.
-	bShowHistory, _ := cmd.Flags().GetBool(ShowHistoryFlag)
-	if bShowHistory {
-		return showHistory(cmd, historyLimit, cfg)
+	if handled, err := handleNonCoverageOperationsWhichShouldExit(cmd, cfg); handled || err != nil {
+		return err
 	}
 
 	// showCoverage and get the results.
@@ -195,26 +188,38 @@ func run(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	// compare results against history, when requested
-	compareRef, _ := cmd.Flags().GetString(CompareHistoryFlag)
-	if compareRef != "" {
-		if err := compareHistory(cmd, compareRef, results); err != nil {
-			return err
-		}
-	}
-
-	// save results to history, when requested.
-	bSaveHistory, _ := cmd.Flags().GetBool(SaveHistoryFlag)
-	if bSaveHistory {
-		if err := saveHistory(cmd, results, historyLimit); err != nil {
-			return err
-		}
+	// handle history operations (compare and save)
+	if err := handleHistoryOperations(cmd, results, cfg); err != nil {
+		return err
 	}
 
 	if failed {
 		os.Exit(1)
 	}
 	return nil
+}
+
+func handleNonCoverageOperationsWhichShouldExit(cmd *cobra.Command, cfg *config.Config) (bool, error) {
+	// check if --init flag is specified and handle it
+	bInit, _ := cmd.Flags().GetBool(InitFlag)
+	if bInit {
+		return true, initConfigFile(cmd)
+	}
+
+	historyLimit, _ := cmd.Flags().GetInt(HistoryLimitFlag)
+
+	// delete history entry and exit when requested.
+	deleteRef, _ := cmd.Flags().GetString(DeleteHistoryFlag)
+	if deleteRef != "" {
+		return true, deleteHistory(cmd, deleteRef, historyLimit)
+	}
+
+	// show history and exit when requested.
+	bShowHistory, _ := cmd.Flags().GetBool(ShowHistoryFlag)
+	if bShowHistory {
+		return true, showHistory(cmd, historyLimit, cfg)
+	}
+	return false, nil
 }
 
 func showCoverage(args []string, cfg *config.Config) (compute.Results, bool, error) {
@@ -228,60 +233,6 @@ func showCoverage(args []string, cfg *config.Config) (compute.Results, bool, err
 	results, failed := compute.CollectResults(filtered, cfg)
 	output.FormatAndReport(results, cfg, failed)
 	return results, failed, nil
-}
-
-func getHistory(cmd *cobra.Command) (*history.History, error) {
-	historyFile, _ := cmd.Flags().GetString(HistoryFileFlag)
-	if historyFile == "" {
-		return nil, errors.New("no history file specified")
-	}
-
-	// loads previous history if it exists
-	return history.Load(historyFile)
-}
-
-func saveHistory(cmd *cobra.Command, results compute.Results, historyLimit int) error {
-	h, err := getHistory(cmd)
-	if err != nil {
-		if errors.Is(err, os.ErrNotExist) {
-			path, _ := cmd.Flags().GetString(HistoryFileFlag)
-			h = history.New(path)
-		} else {
-			return fmt.Errorf("failed to load history: %w", err)
-		}
-	}
-
-	label, _ := cmd.Flags().GetString(HistoryLabelFlag)
-	h.AddResults(results, label)
-
-	if err := h.Save(historyLimit); err != nil {
-		return err
-	}
-	return nil
-}
-
-func compareHistory(cmd *cobra.Command, compareRef string, results compute.Results) error {
-	h, err := getHistory(cmd)
-	if err != nil {
-		return fmt.Errorf("failed to load history: %w", err)
-	}
-
-	refEntry := h.FindByRef(compareRef)
-	if refEntry == nil {
-		return fmt.Errorf("no history entry found for ref: %s", compareRef)
-	}
-	output.CompareHistory(compareRef, refEntry, results)
-	return nil
-}
-
-func showHistory(cmd *cobra.Command, historyLimit int, cfg *config.Config) error {
-	h, err := getHistory(cmd)
-	if err != nil {
-		return fmt.Errorf("failed to load history: %w", err)
-	}
-
-	output.ShowHistory(h, historyLimit, cfg)
-	return nil
 }
 
 // filter profiles.
@@ -674,6 +625,13 @@ func initFlags(cmd *cobra.Command) {
 		ShowHistoryFlagUsage,
 	)
 
+	cmd.Flags().StringP(
+		DeleteHistoryFlag,
+		DeleteHistoryFlagShort,
+		"",
+		DeleteHistoryFlagUsage,
+	)
+
 	cmd.Flags().IntP(
 		HistoryLimitFlag,
 		HistoryLimitFlagShort,
@@ -705,20 +663,20 @@ func shouldSkip(filename string, skip []string) bool {
 	return false
 }
 
-func initConfigFile() error {
-	configPath := ConfigFlagDefault
-	
+func initConfigFile(cmd *cobra.Command) error {
+	configPath, _ := cmd.Flags().GetString(ConfigFlag)
+
 	// check if config file already exists
 	if _, err := os.Stat(configPath); err == nil {
 		return fmt.Errorf("config file %s already exists", configPath)
 	}
-	
+
 	// write the embedded sample config to the current directory
 	err := os.WriteFile(configPath, []byte(samples.SampleConfigYAML), ConfigFilePermissions)
 	if err != nil {
 		return fmt.Errorf("failed to create config file %s: %w", configPath, err)
 	}
-	
+
 	fmt.Printf("Created sample config file: %s\n", configPath)
 	return nil
 }

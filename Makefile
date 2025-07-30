@@ -11,7 +11,7 @@ LD_FLAGS := " -X $(APP_MODULE_PATH)$(APP_NAME)/pkg/config.AppVersion=$(APP_VERSI
 			  -X $(APP_MODULE_PATH)$(APP_NAME)/pkg/config.BuildTimeStamp=$(BUILD_TIME_STAMP) \
 			  -X $(APP_MODULE_PATH)$(APP_NAME)/pkg/config.BuiltBy=$(BUILT_BY)"
 
-all: lint test build covercheck dist docker
+all: lint test covercheck build dist docker
 
 lint:
 	golangci-lint run ./...
