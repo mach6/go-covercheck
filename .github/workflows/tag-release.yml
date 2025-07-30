@@ -97,7 +97,7 @@ jobs:
       - name: Commit and Push Changelog As Branch
         run: |
           TAG=${GITHUB_REF#refs/tags/}
-          git add CHANGELOG.md homebrew/go-covercheck.rb
+          git add CHANGELOG.md
           git commit -m "chore: update changelog for ${TAG}"
           git checkout -b update_changelog_${TAG#v}
           git push origin update_changelog_${TAG#v}
