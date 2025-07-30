@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [0.5.0] - 2025-07-25
+## [v0.5.0] - 2025-07-25
 
 ### Added
 - History tracking feature to compare coverage over time
@@ -28,12 +28,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Various bug fixes and code improvements
 - Enhanced test coverage across all packages
 
-## [0.4.1] - 2025-07-14
+## [v0.4.1] - 2025-07-14
 
 ### Fixed
 - Fixed typo in GitHub Actions tag-release workflow file that prevented proper branch creation
 
-## [0.4.0] - 2025-07-14
+## [v0.4.0] - 2025-07-14
 
 ### Added
 - Support for per-package coverage thresholds
@@ -53,7 +53,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - Bug fix for `--sort-by blocks` functionality that was not working correctly
 
-## [0.3.0] - 2025-07-12
+## [v0.3.0] - 2025-07-12
 
 ### Added
 - New `--term-width` flag to force output to specified column width
@@ -73,7 +73,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Improved error handling for terminal size detection
 - Better fallback handling for terminal width in non-TTY environments
 
-## [0.2.0] - 2025-07-02
+## [v0.2.0] - 2025-07-02
 
 ### Changed
 - Updated version handling to separate application version from git revision
@@ -84,7 +84,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - Better handling of version information during development vs production builds
 
-## [0.1.0] - 2025-07-02
+## [v0.1.0] - 2025-07-02
 
 ### Added
 - Initial release of go-covercheck tool
@@ -107,9 +107,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Summary reporting for failed coverage checks
 
 [Unreleased]: https://github.com/mach6/go-covercheck/compare/v0.5.0...HEAD
-[0.5.0]: https://github.com/mach6/go-covercheck/compare/v0.4.1...v0.5.0
-[0.4.1]: https://github.com/mach6/go-covercheck/compare/v0.4.0...v0.4.1
-[0.4.0]: https://github.com/mach6/go-covercheck/compare/v0.3.0...v0.4.0
-[0.3.0]: https://github.com/mach6/go-covercheck/compare/v0.2.0...v0.3.0
-[0.2.0]: https://github.com/mach6/go-covercheck/compare/v0.1.0...v0.2.0
-[0.1.0]: https://github.com/mach6/go-covercheck/releases/tag/v0.1.0
+[v0.5.0]: https://github.com/mach6/go-covercheck/compare/v0.4.1...v0.5.0
+[v0.4.1]: https://github.com/mach6/go-covercheck/compare/v0.4.0...v0.4.1
+[v0.4.0]: https://github.com/mach6/go-covercheck/compare/v0.3.0...v0.4.0
+[v0.3.0]: https://github.com/mach6/go-covercheck/compare/v0.2.0...v0.3.0
+[v0.2.0]: https://github.com/mach6/go-covercheck/compare/v0.1.0...v0.2.0
+[v0.1.0]: https://github.com/mach6/go-covercheck/releases/tag/v0.1.0

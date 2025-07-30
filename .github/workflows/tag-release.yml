@@ -61,10 +61,26 @@ jobs:
           docker push $IMAGE_NAME:${TAG#v}
           docker push $IMAGE_NAME:latest
 
-      - name: Generate Changelog
+      - name: Update Changelog
         run: |
           go install github.com/git-chglog/git-chglog/cmd/git-chglog@latest
-          git-chglog -o CHANGELOG.md
+          APP_VERSION="${GITHUB_REF#refs/tags/}" make changelog
+
+      - name: Commit and Push Changelog As Branch
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG=${GITHUB_REF#refs/tags/}
+          git add CHANGELOG.md
+          git commit -m "chore: update changelog for ${TAG}"
+          git checkout -b update_changelog_${TAG#v}
+          git push origin update_changelog_${TAG#v}
+
+          # Create a PR using gh CLI
+          gh pr create --title "chore: update changelog for ${TAG}" \
+            --body "Automated update to changelog for ${TAG}" \
+            --head update_changelog_${TAG#v} \
+            --base main
 
       - name: Update Homebrew Formula in homebrew-tap
         env:
@@ -92,20 +108,4 @@ jobs:
           gh pr create --title "Update go-covercheck formula for ${TAG}" \
             --body "Automated update for go-covercheck ${TAG}" \
             --head update-go-covercheck-${TAG} \
-            --base main
-
-      - name: Commit and Push Changelog As Branch
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          TAG=${GITHUB_REF#refs/tags/}
-          git add CHANGELOG.md
-          git commit -m "chore: update changelog for ${TAG}"
-          git checkout -b update_changelog_${TAG#v}
-          git push origin update_changelog_${TAG#v}
-
-          # Create a PR using gh CLI
-          gh pr create --title "chore: update changelog for ${TAG}" \
-            --body "Automated update to changelog for ${TAG}" \
-            --head update_changelog_${TAG#v} \
             --base main
