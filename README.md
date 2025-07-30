@@ -87,7 +87,7 @@ docker pull ghcr.io/mach6/go-covercheck:latest
 Or you can use a tag which maps to a specific version:
 
 ```shell
-docker pull ghcr.io/mach6/go-covercheck:0.5.0
+docker pull ghcr.io/mach6/go-covercheck:0.6.0
 ```
 
 ## 📋 Usage
