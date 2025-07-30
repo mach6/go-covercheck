@@ -33,11 +33,9 @@ func TestCompareHistory(t *testing.T) {
  → By File
     [S] github.com/mach6/go-covercheck/pkg/math/math.go [−25.0%]
     [B] github.com/mach6/go-covercheck/pkg/math/math.go [−25.0%]
-
  → By Package
     [S] github.com/mach6/go-covercheck/pkg/math [−25.0%]
     [B] github.com/mach6/go-covercheck/pkg/math [−25.0%]
-
  → By Total
     [S] total [+22.2%]
     [B] total [+26.8%]

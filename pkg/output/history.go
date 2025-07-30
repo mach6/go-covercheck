@@ -51,7 +51,6 @@ func compareByPackage(results compute.Results, refEntry *history.Entry) bool {
 						compareShowB()
 						fmt.Printf("%s [%s]\n", curr.Package, b)
 					}
-					fmt.Println()
 				}
 			}
 		}
@@ -102,7 +101,6 @@ func compareByFile(results compute.Results, refEntry *history.Entry) bool {
 						compareShowB()
 						fmt.Printf("%s [%s]\n", curr.File, b)
 					}
-					fmt.Println()
 				}
 			}
 		}
