@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+
+## v0.5.1-pre - 2025-07-30
+### Feat
+- changelog update instead regen
+
+
+[Unreleased]: https://github.com/mach6/go-covercheck/compare/v0.5.1-pre...HEAD
 ## [v0.5.0] - 2025-07-25
 
 ### Added
