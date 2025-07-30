@@ -13,7 +13,7 @@ A fast, flexible CLI tool for enforcing test coverage thresholds in Go projects.
 
 - Enforce minimum coverage thresholds for files, packages, and the entire project.
 - Supports statement and block coverage separately.
-- Native `table`|`json`|`yaml`|`md`|`html`|`csv`|`tsv` output. 
+- Native `table`|`json`|`yaml`|`md`|`html`|`csv`|`tsv` output.
 - Configurable via a `.go-covercheck.yml` or CLI flags.
 - Sorting and colored table output.
 - Colored `json` and `yaml` output.
@@ -25,7 +25,7 @@ A fast, flexible CLI tool for enforcing test coverage thresholds in Go projects.
 
 The following items are noteworthy and not (currently) supported.
 
-- Does not support configurable profile block count (how many times a section of code was hit) thresholds. The assumption 
+- Does not support configurable profile block count (how many times a section of code was hit) thresholds. The assumption
   is any value `>=1` is enough.
 - Table style is not configurable.
 - Color codes (see [Color Legend](#🎨-color-legend)) are not configurable.
@@ -33,10 +33,10 @@ The following items are noteworthy and not (currently) supported.
 
 ## 📖 Background
 
-I had access to a similar tool in a previous job. I took it for granted. After leaving this job and continuing to work 
-in Go, I realized that I needed that tool in my life again. The closest that I was able to find online is 
+I had access to a similar tool in a previous job. I took it for granted. After leaving this job and continuing to work
+in Go, I realized that I needed that tool in my life again. The closest that I was able to find online is
 [gocovergate](https://github.com/patrickhoefler/gocovergate). I [forked](https://github.com/mach6/gocovergate) it to
-make it configurable. 
+make it configurable.
 
 This held me over for a little while. However, I still wanted the functionality that I had
 access to before, and I did not want to put a lot of effort into creating it.
@@ -50,14 +50,23 @@ There are several ways to install `go-covercheck`. Choose the one that best fits
 
 ### 📦 Official Releases
 
-You can download official releases from the [releases page](https://github.com/mach6/go-covercheck/releases). 
+You can download official releases from the [releases page](https://github.com/mach6/go-covercheck/releases).
 All releases are built with the latest Go version and include build information, such as the version number and commit sha.
-After downloading, you can place the binary in your `PATH` to use it globally. If you are on Linux, Freebsd or Mac OS, 
+After downloading, you can place the binary in your `PATH` to use it globally. If you are on Linux, Freebsd or Mac OS,
 don't forget to make it executable:
 
 ```shell
 chmod +x go-covercheck
 ```
+
+### 🍺 Homebrew (macOS/Linux)
+
+You can install `go-covercheck` using Homebrew:
+
+```shell
+brew install mach6/tap/go-covercheck
+```
+
 ### 🐹 Via `go install`
 
 You can install `go-covercheck` using the `go install` command, if you don't care about official releases. Versions installed
@@ -85,7 +94,7 @@ docker pull ghcr.io/mach6/go-covercheck:0.5.0
 
 ### ⚙️ Configure
 
-Create a `.go-coverheck.yml` which defines the threshold requirements. You can create this file manually or use the 
+Create a `.go-coverheck.yml` which defines the threshold requirements. You can create this file manually or use the
 `--init` flag to generate a sample config file in the current directory.
 
 - This step is optional but _recommended_.
@@ -157,7 +166,7 @@ You can also specify a different file name and path.
 
 ### 🎛️ CLI Flags
 
-You can also use CLI flags to configure `go-covercheck` without a config file. 
+You can also use CLI flags to configure `go-covercheck` without a config file.
 
 ```text
 $ go-covercheck -h
@@ -174,7 +183,7 @@ Flags:
   -f, --format string                     output format [table|json|yaml|md|html|csv|tsv] (default "table")
   -h, --help                              help for go-covercheck
       --history-file string               path to go-covercheck history file (default ".go-covercheck.history.json")
-      --init                              create a sample .go-covercheck.yml config file in the current directory      
+      --init                              create a sample .go-covercheck.yml config file in the current directory
   -l, --label string                      optional label name for history entry
   -L, --limit-history int                 limit number of historical entries to save or display [0=no limit]
   -m, --module-name string                explicitly set module name for path normalization (overrides module inference)
@@ -199,8 +208,8 @@ History is a feature that allows you to save and compare coverage results agains
 
 ### 💾 Save History
 
-Save the current coverage result to history with the `--save-history` flag. This will create or update a history file 
-(`.go-covercheck.history.json` by default) with the current coverage results. Check this file into your version control 
+Save the current coverage result to history with the `--save-history` flag. This will create or update a history file
+(`.go-covercheck.history.json` by default) with the current coverage results. Check this file into your version control
  system (or other) to keep a shared record of coverage over time.
 
 ```shell
@@ -209,7 +218,7 @@ go-covercheck --save-history
 
 Optionally, specify a label for the history entry with the `--label` flag. This is useful when the project is not in git.
 ```shell
-go-covercheck --save-history --label "my-label"  
+go-covercheck --save-history --label "my-label"
 ```
 
 ### 🔍 Compare Against History
@@ -310,7 +319,7 @@ Error: no history entry found for ref: nonexistent
 ```
 
 ## 📤 Output Formats
-`go-covercheck` supports multiple output formats. The default is `table`, but you can specify other formats using the 
+`go-covercheck` supports multiple output formats. The default is `table`, but you can specify other formats using the
 `--format` flag (short form `-f`) or through the `format:` field of the config file.
 
 The available formats are:
@@ -326,7 +335,7 @@ The available formats are:
 
 ### 📊 Table
 The `table` format provides a human-readable output with color coding to indicate coverage status. It shows coverage
-details by file, package, and total. The table is sorted by file name by default, but you can change the sort order and 
+details by file, package, and total. The table is sorted by file name by default, but you can change the sort order and
 field using the `--sort-by` and `--sort-order` flags.
 
 ```text
@@ -347,7 +356,7 @@ $ go-covercheck -f table coverage.out -u
 ├───────────────┼────────────┼───────────┼─────────────┼───────────┤
 │               │     20/111 │      7/81 │        18.0 │      8.6  │
 └───────────────┴────────────┴───────────┴─────────────┴───────────┘
-```    
+```
 Note: Here the `-u` flag was used to suppress the summary lines.
 
 
@@ -359,7 +368,7 @@ summary lines in these formats, as well, which is necessary for generating clean
 
 
 ### 📜 JSON
-The `json` format provides a structured output that is easy to read and parse. It includes coverage details by file, 
+The `json` format provides a structured output that is easy to read and parse. It includes coverage details by file,
 package, and total. It also includes the thresholds and the actual coverage percentages.
 
 JSON output is color-coded by default, but you can disable color with the `--no-color` flag.
@@ -410,7 +419,7 @@ $ go-covercheck -f json coverage.out
 ```
 
 ### 📜 YAML
-The `yaml` format provides a structured output that is easy to read and parse. It includes coverage details by file, 
+The `yaml` format provides a structured output that is easy to read and parse. It includes coverage details by file,
 package, and total. It also includes the thresholds and the actual coverage percentages.
 
 YAML output is color-coded by default, but you can disable color with the `--no-color` flag.
@@ -454,7 +463,7 @@ byTotal:
 By default, `go-covercheck` uses color in tabular format(s). The color is used to indicate severity as follows:
 
 - % in ${\color{red}red}$ indicates the actual is `<=` `50%` of the threshold goal
-- % in ${\color{yellow}yellow}$ indicates the actual is `>` `50%` and `<=` `99%` of the threshold goal 
+- % in ${\color{yellow}yellow}$ indicates the actual is `>` `50%` and `<=` `99%` of the threshold goal
 - % in ${\color{green}green}$ indicates the actual is `>` `99%` of the threshold goal or the goal was met
 - % in no color indicates the goal and actual are `0` or the goal is `0`
 
