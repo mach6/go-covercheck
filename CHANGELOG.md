@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [v0.6.0] - 2025-07-30
+
+### Changed
+
+* Add CHANGELOG.md in Keep a Changelog format by @Copilot and @mach6 in https://github.com/mach6/go-covercheck/pull/18
+* Add `moduleName` configuration option to fix module inference issue by @Copilot and @mach6 in https://github.com/mach6/go-covercheck/pull/10
+* Add `--init` flag to create sample `.go-covercheck.yml` config file by @Copilot and @mach6 in https://github.com/mach6/go-covercheck/pull/20
+* Add dependabot configuration for automated dependency updates by @Copilot in https://github.com/mach6/go-covercheck/pull/22
+* ci(deps): bump softprops/action-gh-release from 1 to 2 by @dependabot[bot] in https://github.com/mach6/go-covercheck/pull/23
+* Remove reviewers from dependabot.yml and add CODEOWNERS file by @Copilot and @mach6 in https://github.com/mach6/go-covercheck/pull/25
+* deps(deps): bump github.com/jedib0t/go-pretty/v6 from 6.6.7 to 6.6.8 by @dependabot[bot] in https://github.com/mach6/go-covercheck/pull/26
+* Add support to delete history entries by reference by @Copilot and @mach6 in https://github.com/mach6/go-covercheck/pull/8
+* Add Homebrew support for go-covercheck installation by @Copilot and @mach6 in https://github.com/mach6/go-covercheck/pull/14
+
 ## [v0.5.0] - 2025-07-25
 
 ### Added
@@ -106,7 +120,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Color-coded results with severity indicators
 - Summary reporting for failed coverage checks
 
-[Unreleased]: https://github.com/mach6/go-covercheck/compare/v0.5.0...HEAD
+[Unreleased]: https://github.com/mach6/go-covercheck/compare/v0.6.0...HEAD
+[v0.6.0]: https://github.com/mach6/go-covercheck/compare/v0.5.0...v0.6.0
 [v0.5.0]: https://github.com/mach6/go-covercheck/compare/v0.4.1...v0.5.0
 [v0.4.1]: https://github.com/mach6/go-covercheck/compare/v0.4.0...v0.4.1
 [v0.4.0]: https://github.com/mach6/go-covercheck/compare/v0.3.0...v0.4.0
