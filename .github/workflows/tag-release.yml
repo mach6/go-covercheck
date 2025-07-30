@@ -74,8 +74,8 @@ jobs:
           VERSION=${TAG#v}
           SHA256=$(curl -sL https://github.com/mach6/go-covercheck/archive/refs/tags/${TAG}.tar.gz | sha256sum | cut -d' ' -f1)
 
-          # Clone the tap repo
-          git clone https://github.com/mach6/homebrew-tap.git
+          # Clone the tap repo using the token for authentication
+          git clone https://mach6:${GH_TOKEN}@github.com/mach6/homebrew-tap.git
           cd homebrew-tap
 
           # Update the formula
