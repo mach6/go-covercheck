@@ -99,16 +99,15 @@ func extractJSONFromOutput(output string) string {
 	// The output format is: JSON + success message
 	// We need to find where the JSON ends and extract just that part
 	lines := strings.Split(output, "\n")
-	jsonLines := []string{}
-	
+	jsonLines := make([]string, 0)
+
 	for _, line := range lines {
-		// Stop when we hit the success message (starts with ✓)
 		if strings.HasPrefix(strings.TrimSpace(line), "✓") {
 			break
 		}
 		jsonLines = append(jsonLines, line)
 	}
-	
+
 	return strings.Join(jsonLines, "\n")
 }
 
@@ -119,15 +118,15 @@ func Test_run_SaveHistory(t *testing.T) {
 	cmd.SetArgs([]string{
 		"--history-file", path,
 		"--save-history", "-w",
-		"-s", "1", "-b", "1", "-B", "2", "-f", "json",
+		"-s", "50", "-b", "50", "-B", "2", "-S", "1", "-f", "json",
 		test.CreateTempCoverageFile(t, test.TestCoverageOut)},
 	)
 
 	stdOut, stdErr, err := runCmdForTest(t, cmd)
 	require.NoError(t, err)
 	require.Empty(t, stdErr)
-	
-	// For JSON format, success message should NOT be present
+
+	// For JSON format, a success message should NOT be present
 	require.NotContains(t, stdOut, "✓ Saved history entry")
 
 	// Extract JSON part from the output for parsing
@@ -154,15 +153,15 @@ func Test_run_SaveHistory_NoPreviousFile(t *testing.T) {
 	cmd.SetArgs([]string{
 		"--history-file", path,
 		"--save-history", "-w",
-		"-s", "1", "-b", "1", "-B", "2", "-f", "json",
+		"-s", "50", "-b", "50", "-B", "2", "-S", "1", "-f", "json",
 		test.CreateTempCoverageFile(t, test.TestCoverageOut)},
 	)
 
 	stdOut, stdErr, err := runCmdForTest(t, cmd)
 	require.NoError(t, err)
 	require.Empty(t, stdErr)
-	
-	// For JSON format, success message should NOT be present
+
+	// For JSON format, a success message should NOT be present
 	require.NotContains(t, stdOut, "✓ Saved history entry")
 
 	// Extract JSON part from the output for parsing
@@ -189,14 +188,14 @@ func Test_run_SaveHistory_TableFormat(t *testing.T) {
 	cmd.SetArgs([]string{
 		"--history-file", path,
 		"--save-history", "-w",
-		"-s", "1", "-b", "1", "-B", "2", "-f", "table",
+		"-s", "1", "-b", "1", "-B", "2", "-S", "2", "-f", "table",
 		test.CreateTempCoverageFile(t, test.TestCoverageOut)},
 	)
 
 	stdOut, stdErr, err := runCmdForTest(t, cmd)
 	require.NoError(t, err)
 	require.Empty(t, stdErr)
-	
+
 	// For table format, success message SHOULD be present
 	require.Contains(t, stdOut, "✓ Saved history entry")
 

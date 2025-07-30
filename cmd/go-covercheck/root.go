@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bufio"
 	"errors"
 	"fmt"
 	"io"
@@ -14,7 +13,6 @@ import (
 	"github.com/jedib0t/go-pretty/v6/text"
 	"github.com/mach6/go-covercheck/pkg/compute"
 	"github.com/mach6/go-covercheck/pkg/config"
-	"github.com/mach6/go-covercheck/pkg/history"
 	"github.com/mach6/go-covercheck/pkg/output"
 	"github.com/mach6/go-covercheck/samples"
 	"github.com/spf13/cobra"
@@ -103,7 +101,7 @@ const (
 	InitFlag      = "init"
 	InitFlagUsage = "create a sample .go-covercheck.yml config file in the current directory"
 
-	// File permissions.
+	// ConfigFilePermissions permissions.
 	ConfigFilePermissions = 0600
 )
 
@@ -172,12 +170,6 @@ var (
 )
 
 func run(cmd *cobra.Command, args []string) error {
-	// check if init flag is specified and handle it
-	bInit, _ := cmd.Flags().GetBool(InitFlag)
-	if bInit {
-		return initConfigFile()
-	}
-
 	cfg, err := getConfig(cmd)
 	if err != nil {
 		return err
@@ -186,18 +178,8 @@ func run(cmd *cobra.Command, args []string) error {
 	setupColor(cfg)
 	setupTerminalWidth(cfg)
 
-	historyLimit, _ := cmd.Flags().GetInt(HistoryLimitFlag)
-
-	// delete history entry and exit when requested.
-	deleteRef, _ := cmd.Flags().GetString(DeleteHistoryFlag)
-	if deleteRef != "" {
-		return deleteHistory(cmd, deleteRef, historyLimit)
-	}
-
-	// show history and exit when requested.
-	bShowHistory, _ := cmd.Flags().GetBool(ShowHistoryFlag)
-	if bShowHistory {
-		return showHistory(cmd, historyLimit, cfg)
+	if handled, err := handleNonCoverageOperationsWhichShouldExit(cmd, cfg); handled || err != nil {
+		return err
 	}
 
 	// showCoverage and get the results.
@@ -207,7 +189,7 @@ func run(cmd *cobra.Command, args []string) error {
 	}
 
 	// handle history operations (compare and save)
-	if err := handleHistoryOperations(cmd, results, historyLimit, cfg); err != nil {
+	if err := handleHistoryOperations(cmd, results, cfg); err != nil {
 		return err
 	}
 
@@ -217,24 +199,27 @@ func run(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-func handleHistoryOperations(cmd *cobra.Command, results compute.Results, historyLimit int, cfg *config.Config) error {
-	// compare results against history, when requested
-	compareRef, _ := cmd.Flags().GetString(CompareHistoryFlag)
-	if compareRef != "" {
-		if err := compareHistory(cmd, compareRef, results); err != nil {
-			return err
-		}
+func handleNonCoverageOperationsWhichShouldExit(cmd *cobra.Command, cfg *config.Config) (bool, error) {
+	// check if --init flag is specified and handle it
+	bInit, _ := cmd.Flags().GetBool(InitFlag)
+	if bInit {
+		return true, initConfigFile(cmd)
 	}
 
-	// save results to history, when requested.
-	bSaveHistory, _ := cmd.Flags().GetBool(SaveHistoryFlag)
-	if bSaveHistory {
-		if err := saveHistory(cmd, results, historyLimit, cfg); err != nil {
-			return err
-		}
+	historyLimit, _ := cmd.Flags().GetInt(HistoryLimitFlag)
+
+	// delete history entry and exit when requested.
+	deleteRef, _ := cmd.Flags().GetString(DeleteHistoryFlag)
+	if deleteRef != "" {
+		return true, deleteHistory(cmd, deleteRef, historyLimit)
 	}
 
-	return nil
+	// show history and exit when requested.
+	bShowHistory, _ := cmd.Flags().GetBool(ShowHistoryFlag)
+	if bShowHistory {
+		return true, showHistory(cmd, historyLimit, cfg)
+	}
+	return false, nil
 }
 
 func showCoverage(args []string, cfg *config.Config) (compute.Results, bool, error) {
@@ -248,134 +233,6 @@ func showCoverage(args []string, cfg *config.Config) (compute.Results, bool, err
 	results, failed := compute.CollectResults(filtered, cfg)
 	output.FormatAndReport(results, cfg, failed)
 	return results, failed, nil
-}
-
-func getHistory(cmd *cobra.Command) (*history.History, error) {
-	historyFile, _ := cmd.Flags().GetString(HistoryFileFlag)
-	if historyFile == "" {
-		return nil, errors.New("no history file specified")
-	}
-
-	// loads previous history if it exists
-	return history.Load(historyFile)
-}
-
-func getHistoryPath(cmd *cobra.Command) (string, error) {
-	historyFile, _ := cmd.Flags().GetString(HistoryFileFlag)
-	if historyFile == "" {
-		return "", errors.New("no history file specified")
-	}
-	return historyFile, nil
-}
-
-func saveHistory(cmd *cobra.Command, results compute.Results, historyLimit int, cfg *config.Config) error {
-	h, err := getHistory(cmd)
-	if err != nil {
-		if errors.Is(err, os.ErrNotExist) {
-			path, _ := cmd.Flags().GetString(HistoryFileFlag)
-			h = history.New(path)
-		} else {
-			return fmt.Errorf("failed to load history: %w", err)
-		}
-	}
-
-	label, _ := cmd.Flags().GetString(HistoryLabelFlag)
-	h.AddResults(results, label)
-
-	if err := h.Save(historyLimit); err != nil {
-		return err
-	}
-
-	// Only show success messages for non-JSON/YAML formats
-	if cfg.Format != config.FormatJSON && cfg.Format != config.FormatYAML {
-		if label != "" {
-			fmt.Printf("✓ Saved history entry with label: %s\n", label)
-		} else {
-			fmt.Printf("✓ Saved history entry\n")
-		}
-	}
-	return nil
-}
-
-func compareHistory(cmd *cobra.Command, compareRef string, results compute.Results) error {
-	h, err := getHistory(cmd)
-	if err != nil {
-		return fmt.Errorf("failed to load history: %w", err)
-	}
-
-	refEntry := h.FindByRef(compareRef)
-	if refEntry == nil {
-		return fmt.Errorf("no history entry found for ref: %s", compareRef)
-	}
-	output.CompareHistory(compareRef, refEntry, results)
-	return nil
-}
-
-func showHistory(cmd *cobra.Command, historyLimit int, cfg *config.Config) error {
-	h, err := getHistory(cmd)
-	if err != nil {
-		return fmt.Errorf("failed to load history: %w", err)
-	}
-
-	output.ShowHistory(h, historyLimit, cfg)
-	return nil
-}
-
-func deleteHistory(cmd *cobra.Command, deleteRef string, historyLimit int) error {
-	h, err := getHistory(cmd)
-	if err != nil {
-		return fmt.Errorf("failed to load history: %w", err)
-	}
-
-	deleted := h.DeleteByRef(deleteRef)
-	if !deleted {
-		return fmt.Errorf("no history entry found for ref: %s", deleteRef)
-	}
-
-	if err := h.Save(historyLimit); err != nil {
-		return fmt.Errorf("failed to save history after deletion: %w", err)
-	}
-
-	fmt.Printf("✓ Deleted history entry for ref: %s\n", deleteRef)
-
-	// Check if history is now empty and prompt for file removal in interactive mode
-	if len(h.Entries) == 0 {
-		return promptForHistoryFileRemoval(cmd)
-	}
-	
-	return nil
-}
-
-func promptForHistoryFileRemoval(cmd *cobra.Command) error {
-	// Only prompt if stdin is a terminal (interactive mode)
-	if !term.IsTerminal(int(os.Stdin.Fd())) {
-		return nil
-	}
-	
-	fmt.Print("History file is now empty. Remove the history file? (y/N): ")
-	
-	reader := bufio.NewReader(os.Stdin)
-	response, err := reader.ReadString('\n')
-	if err != nil {
-		return fmt.Errorf("failed to read user input: %w", err)
-	}
-	
-	response = strings.TrimSpace(strings.ToLower(response))
-	if response != "y" && response != "yes" {
-		return nil
-	}
-	
-	historyPath, err := getHistoryPath(cmd)
-	if err != nil {
-		return fmt.Errorf("failed to get history path: %w", err)
-	}
-	
-	if err := os.Remove(historyPath); err != nil {
-		return fmt.Errorf("failed to remove history file: %w", err)
-	}
-	
-	fmt.Println("✓ History file removed")
-	return nil
 }
 
 // filter profiles.
@@ -806,20 +663,20 @@ func shouldSkip(filename string, skip []string) bool {
 	return false
 }
 
-func initConfigFile() error {
-	configPath := ConfigFlagDefault
-	
+func initConfigFile(cmd *cobra.Command) error {
+	configPath, _ := cmd.Flags().GetString(ConfigFlag)
+
 	// check if config file already exists
 	if _, err := os.Stat(configPath); err == nil {
 		return fmt.Errorf("config file %s already exists", configPath)
 	}
-	
+
 	// write the embedded sample config to the current directory
 	err := os.WriteFile(configPath, []byte(samples.SampleConfigYAML), ConfigFilePermissions)
 	if err != nil {
 		return fmt.Errorf("failed to create config file %s: %w", configPath, err)
 	}
-	
+
 	fmt.Printf("Created sample config file: %s\n", configPath)
 	return nil
 }

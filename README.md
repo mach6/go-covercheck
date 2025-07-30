@@ -28,8 +28,8 @@ The following items are noteworthy and not (currently) supported.
 - Does not support configurable profile block count (how many times a section of code was hit) thresholds. The assumption 
   is any value `>=1` is enough.
 - Table style is not configurable.
-- Color codes (see [Color Legend](#Color-Legend)) are not configurable.
-- Severity weights (see [Color Legend](#Color-Legend)) are not configurable.
+- Color codes (see [Color Legend](#🎨-color-legend)) are not configurable.
+- Severity weights (see [Color Legend](#🎨-color-legend)) are not configurable.
 
 ## 📖 Background
 
@@ -78,17 +78,24 @@ docker pull ghcr.io/mach6/go-covercheck:latest
 Or you can use a tag which maps to a specific version:
 
 ```shell
-docker pull ghcr.io/mach6/go-covercheck:0.4.1
+docker pull ghcr.io/mach6/go-covercheck:0.5.0
 ```
 
 ## 📋 Usage
 
 ### ⚙️ Configure
 
-Create a `.go-coverheck.yml` which defines the threshold requirements.  
+Create a `.go-coverheck.yml` which defines the threshold requirements. You can create this file manually or use the 
+`--init` flag to generate a sample config file in the current directory.
 
 - This step is optional but _recommended_.
 - See [full sample](samples/.go-covercheck.yml).
+
+```shell
+go-covercheck --init
+```
+
+Here is a sample `.go-covercheck.yml` configuration file:
 
 ```yaml
 # Optional, global thresholds overriding the default (70 statements, 50 blocks)
@@ -167,6 +174,7 @@ Flags:
   -f, --format string                     output format [table|json|yaml|md|html|csv|tsv] (default "table")
   -h, --help                              help for go-covercheck
       --history-file string               path to go-covercheck history file (default ".go-covercheck.history.json")
+      --init                              create a sample .go-covercheck.yml config file in the current directory      
   -l, --label string                      optional label name for history entry
   -L, --limit-history int                 limit number of historical entries to save or display [0=no limit]
   -m, --module-name string                explicitly set module name for path normalization (overrides module inference)
