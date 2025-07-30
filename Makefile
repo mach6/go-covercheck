@@ -24,7 +24,7 @@ build:
 		$(APP_MODULE_PATH)$(APP_NAME)/cmd/$(APP_NAME)
 
 covercheck:
-	./$(APP_NAME) -C v0.4.1
+	./$(APP_NAME) -C v0.5.0
 
 clean:
 	rm -rf dist/ \
