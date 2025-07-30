@@ -68,7 +68,7 @@ jobs:
 
       - name: Update Homebrew Formula in homebrew-tap
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
         run: |
           TAG=${GITHUB_REF#refs/tags/}
           VERSION=${TAG#v}
@@ -95,6 +95,8 @@ jobs:
             --base main
 
       - name: Commit and Push Changelog As Branch
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           TAG=${GITHUB_REF#refs/tags/}
           git add CHANGELOG.md
