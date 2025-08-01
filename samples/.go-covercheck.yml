@@ -79,3 +79,11 @@ total:
 # default []
 skip:
 #  - cmd/root.go
+
+# enable diff-only mode to only check coverage for changed files
+# default false
+diffOnly: false
+
+# git reference to diff against when using diff-only mode
+# default "" (uses HEAD~1)
+against: ""

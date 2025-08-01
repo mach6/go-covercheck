@@ -13,6 +13,7 @@ import (
 	"github.com/jedib0t/go-pretty/v6/text"
 	"github.com/mach6/go-covercheck/pkg/compute"
 	"github.com/mach6/go-covercheck/pkg/config"
+	"github.com/mach6/go-covercheck/pkg/gitdiff"
 	"github.com/mach6/go-covercheck/pkg/output"
 	"github.com/mach6/go-covercheck/samples"
 	"github.com/spf13/cobra"
@@ -100,6 +101,12 @@ const (
 
 	InitFlag      = "init"
 	InitFlagUsage = "create a sample .go-covercheck.yml config file in the current directory"
+
+	DiffOnlyFlag      = "diff-only"
+	DiffOnlyFlagUsage = "enforce thresholds only on files changed in git diff"
+
+	AgainstFlag      = "against"
+	AgainstFlagUsage = "git reference (commit/branch/tag) to diff against [default: HEAD~1]"
 
 	// ConfigFilePermissions permissions.
 	ConfigFilePermissions = 0600
@@ -237,6 +244,7 @@ func showCoverage(args []string, cfg *config.Config) (compute.Results, bool, err
 
 // filter profiles.
 func filter(profiles []*cover.Profile, cfg *config.Config) []*cover.Profile {
+	// First apply skip patterns
 	filtered := make([]*cover.Profile, 0)
 	for _, p := range profiles {
 		if shouldSkip(p.FileName, cfg.Skip) {
@@ -244,6 +252,29 @@ func filter(profiles []*cover.Profile, cfg *config.Config) []*cover.Profile {
 		}
 		filtered = append(filtered, p)
 	}
+
+	// Then apply diff filtering if enabled
+	if cfg.DiffOnly {
+		changedFiles, err := gitdiff.GetChangedFiles(".", cfg.Against)
+		if err != nil {
+			// Log error but don't fail - fall back to normal behavior
+			fmt.Fprintf(os.Stderr, "Warning: Failed to get changed files for diff mode: %v\n", err)
+			fmt.Fprintf(os.Stderr, "Falling back to checking all files.\n")
+			return filtered
+		}
+
+		// If no files changed, return empty result
+		if len(changedFiles) == 0 {
+			fmt.Fprintf(os.Stderr, "No files changed in diff. No coverage to check.\n")
+			return []*cover.Profile{}
+		}
+
+		diffFiltered := gitdiff.FilterProfilesByChangedFiles(filtered, changedFiles, cfg.ModuleName)
+		fmt.Fprintf(os.Stderr, "Diff mode: Checking coverage for %d changed files (out of %d total files)\n", 
+			len(diffFiltered), len(filtered))
+		return diffFiltered
+	}
+
 	return filtered
 }
 
@@ -473,6 +504,14 @@ func applyConfigOverrides(cfg *config.Config, cmd *cobra.Command, noConfigFile b
 		noConfigFile {
 		cfg.ModuleName = v
 	}
+	if v, _ := cmd.Flags().GetBool(DiffOnlyFlag); cmd.Flags().Changed(DiffOnlyFlag) ||
+		noConfigFile {
+		cfg.DiffOnly = v
+	}
+	if v, _ := cmd.Flags().GetString(AgainstFlag); cmd.Flags().Changed(AgainstFlag) ||
+		noConfigFile {
+		cfg.Against = v
+	}
 
 	// set cfg.Total thresholds to the global values, iff no override was specified for each.
 	if v, _ := cmd.Flags().GetFloat64(StatementThresholdFlag); !cmd.Flags().Changed(TotalStatementThresholdFlag) &&
@@ -650,6 +689,18 @@ func initFlags(cmd *cobra.Command) {
 		InitFlag,
 		false,
 		InitFlagUsage,
+	)
+
+	cmd.Flags().Bool(
+		DiffOnlyFlag,
+		false,
+		DiffOnlyFlagUsage,
+	)
+
+	cmd.Flags().String(
+		AgainstFlag,
+		"",
+		AgainstFlagUsage,
 	)
 }
 
