@@ -12,6 +12,7 @@ A fast, flexible CLI tool for enforcing test coverage thresholds in Go projects.
 ## ✨ Features
 
 - Enforce minimum coverage thresholds for files, packages, and the entire project.
+- **🆕 Diff-based enforcement**: Check coverage only on changed files in git diff.
 - Supports statement and block coverage separately.
 - Native `table`|`json`|`yaml`|`md`|`html`|`csv`|`tsv` output.
 - Configurable via a `.go-covercheck.yml` or CLI flags.
@@ -200,6 +201,65 @@ Flags:
   -B, --total-block-threshold float       total block threshold to enforce [0=disabled]
   -S, --total-statement-threshold float   total statement threshold to enforce [0=disabled]
   -v, --version                           version for go-covercheck
+```
+
+## 🧬 Diff Mode (Changed Files Only)
+
+**New Feature**: Enforce coverage thresholds only on files that have changed in your git diff. This is perfect for gradually improving coverage in large codebases without being penalized by legacy code.
+
+### 🎯 Use Cases
+
+- **Pull Request Validation**: Ensure new code meets coverage standards without failing on existing legacy code
+- **Incremental Coverage Improvement**: Gradually increase coverage standards for new development
+- **CI/CD Integration**: Gate deployments based on coverage of changes, not entire codebase
+
+### 🚀 Basic Usage
+
+```shell
+# Check coverage only on files changed since last commit
+go-covercheck --diff-only
+
+# Compare against a specific commit
+go-covercheck --diff-only --against HEAD~3
+
+# Compare against a branch
+go-covercheck --diff-only --against main
+
+# Compare against a tag
+go-covercheck --diff-only --against v1.0.0
+```
+
+### ⚙️ Configuration
+
+You can also configure diff mode in your `.go-covercheck.yml`:
+
+```yaml
+# Enable diff-only mode by default
+diffOnly: true
+
+# Set the default reference to compare against
+against: "main"  # or "HEAD~1", "v1.0.0", etc.
+
+# Set thresholds that only apply to changed files
+statementThreshold: 80.0
+blockThreshold: 70.0
+```
+
+### 🛡️ Fallback Behavior
+
+If git operations fail (e.g., not in a git repository, invalid reference), `go-covercheck` will automatically fall back to checking all files with a warning message.
+
+### 💡 Examples
+
+```shell
+# CI/CD: Check coverage for PR changes
+go-covercheck --diff-only --against origin/main
+
+# Local development: Check changes since last push
+go-covercheck --diff-only --against @{upstream}
+
+# Release validation: Check changes since last tag
+go-covercheck --diff-only --against $(git describe --tags --abbrev=0)
 ```
 
 ## 🕰️ History
