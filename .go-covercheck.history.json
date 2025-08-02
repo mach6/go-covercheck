@@ -1,6 +1,51 @@
 {
   "entries": [
     {
+      "commit": "a33d6daaa0cea52472df889a1e6a04490fa41151",
+      "branch": "copilot/fix-42",
+      "timestamp": "2025-08-02T06:01:01.917674791Z",
+      "results": {
+        "byFile": [
+          {
+            "statementCoverage": "1/2",
+            "blockCoverage": "1/2",
+            "statementPercentage": 50,
+            "blockPercentage": 50,
+            "statementThreshold": 65,
+            "blockThreshold": 50,
+            "failed": true,
+            "file": "github.com/mach6/go-covercheck/pkg/math/math.go"
+          }
+        ],
+        "byPackage": [
+          {
+            "statementCoverage": "1/2",
+            "blockCoverage": "1/2",
+            "statementPercentage": 50,
+            "blockPercentage": 50,
+            "statementThreshold": 65,
+            "blockThreshold": 50,
+            "failed": true,
+            "package": "github.com/mach6/go-covercheck/pkg/math"
+          }
+        ],
+        "byTotal": {
+          "statements": {
+            "coverage": "1/2",
+            "threshold": 80,
+            "percentage": 50,
+            "failed": true
+          },
+          "blocks": {
+            "coverage": "1/2",
+            "threshold": 75,
+            "percentage": 50,
+            "failed": true
+          }
+        }
+      }
+    },
+    {
       "commit": "ef613d597be47cdeaa401aebee56ef0605eb4f8b",
       "branch": "detached",
       "tags": [

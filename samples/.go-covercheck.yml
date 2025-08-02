@@ -42,6 +42,11 @@ noColor: false
 # default table
 format: table
 
+# the table style for table output format
+# default|light|bold|rounded|double
+# default light
+tableStyle: light
+
 # force output to the specified column width
 # autoselected when <= 0
 # default 0

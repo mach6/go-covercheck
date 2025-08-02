@@ -37,6 +37,9 @@ const (
 	FormatFlag      = "format"
 	FormatFlagShort = "f"
 
+	TableStyleFlag      = "table-style"
+	TableStyleFlagUsage = "table style [default|light|bold|rounded|double]"
+
 	StatementThresholdFlag      = "statement-threshold"
 	StatementThresholdFlagShort = "s"
 	StatementThresholdFlagUsage = "global statement threshold to enforce [0=disabled]"
@@ -453,6 +456,10 @@ func applyConfigOverrides(cfg *config.Config, cmd *cobra.Command, noConfigFile b
 		noConfigFile {
 		cfg.Format = v
 	}
+	if v, _ := cmd.Flags().GetString(TableStyleFlag); cmd.Flags().Changed(TableStyleFlag) ||
+		noConfigFile {
+		cfg.TableStyle = v
+	}
 	if v, _ := cmd.Flags().GetBool(NoTableFlag); cmd.Flags().Changed(NoTableFlag) ||
 		noConfigFile {
 		cfg.NoTable = v
@@ -536,6 +543,12 @@ func initFlags(cmd *cobra.Command) {
 		FormatFlagShort,
 		config.FormatDefault,
 		FormatFlagUsage,
+	)
+
+	cmd.Flags().String(
+		TableStyleFlag,
+		config.TableStyleDefValue,
+		TableStyleFlagUsage,
 	)
 
 	cmd.Flags().Float64P(
