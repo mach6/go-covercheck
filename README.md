@@ -202,6 +202,43 @@ Flags:
   -v, --version                           version for go-covercheck
 ```
 
+### 🔧 Integration with `go tool covdata`
+
+For integration tests or when collecting coverage from running binaries, you can use `go tool covdata` to work with coverage data directories and convert them to the standard coverage profile format that `go-covercheck` understands.
+
+
+#### 🏗️ Integration Testing Scenario
+
+This workflow is particularly useful for integration tests where you want to collect coverage from a running binary:
+
+```shell
+# 1. Build your binary with coverage support
+go build -cover -o myapp ./cmd/myapp
+
+# 2. Set environment variable for coverage data directory
+export GOCOVERDIR=./coverdata
+mkdir -p $GOCOVERDIR
+
+# 3. Run your binary (coverage data will be written to GOCOVERDIR)
+./myapp &
+APP_PID=$!
+
+# 4. Run your integration tests against the running binary
+curl http://localhost:8080/health
+curl http://localhost:8080/api/users
+# ... more integration test calls
+
+# 5. Stop the binary (this flushes coverage data)
+kill $APP_PID
+
+# 6. Convert coverage data to standard format
+go tool covdata textfmt -i=./coverdata -o=integration-coverage.out
+
+# 7. Check coverage with go-covercheck
+go-covercheck integration-coverage.out
+```
+
+
 ## 🕰️ History
 
 History is a feature that allows you to save and compare coverage results against previous runs.
