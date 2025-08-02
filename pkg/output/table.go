@@ -65,7 +65,7 @@ func renderTable(results compute.Results, cfg *config.Config) {
 			{Name: "Blocks", Align: text.AlignRight, AlignFooter: text.AlignRight, WidthMin: fixedWidth},
 			{Name: "Statement %", Align: text.AlignRight, AlignFooter: text.AlignRight, WidthMax: fixedWidth, WidthMin: fixedWidth},
 			{Name: "Block %", Align: text.AlignRight, AlignFooter: text.AlignRight, WidthMax: fixedWidth, WidthMin: fixedWidth},
-			{Name: "Uncovered Lines", Align: text.AlignLeft, AlignFooter: text.AlignLeft},
+			{Name: "Uncovered Lines", Align: text.AlignLeft, AlignFooter: text.AlignLeft, WidthMax: 20},
 		}
 	} else {
 		headers = table.Row{"", "Statements", "Blocks", "Statement %", "Block %"}
@@ -92,9 +92,7 @@ func renderTable(results compute.Results, cfg *config.Config) {
 		var row table.Row
 		if cfg.ShowUncoveredLines {
 			uncoveredLinesFormatted := r.UncoveredLines
-			if uncoveredLinesFormatted == "" {
-				uncoveredLinesFormatted = "-"
-			} else {
+			if uncoveredLinesFormatted != "" {
 				// Apply color to uncovered lines - use red to indicate missing coverage
 				uncoveredLinesFormatted = redColor(uncoveredLinesFormatted)
 			}
@@ -128,14 +126,14 @@ func renderTable(results compute.Results, cfg *config.Config) {
 
 		var row table.Row
 		if cfg.ShowUncoveredLines {
-			// Packages don't have individual file uncovered lines, so show "-"
+			// Packages don't have individual file uncovered lines, so show empty string
 			row = table.Row{
 				r.Package,
 				r.Statements,
 				r.Blocks,
 				stmtColor(fmt.Sprintf("%.1f", r.StatementPercentage)),
 				blockColor(fmt.Sprintf("%.1f", r.BlockPercentage)),
-				"-",
+				"",
 			}
 		} else {
 			row = table.Row{
@@ -164,7 +162,7 @@ func renderTable(results compute.Results, cfg *config.Config) {
 			text.Bold.Sprint(results.ByTotal.Blocks.Coverage),
 			stmtColor(text.Bold.Sprintf("%.1f", results.ByTotal.Statements.Percentage)),
 			blockColor(text.Bold.Sprintf("%.1f", results.ByTotal.Blocks.Percentage)),
-			"-",
+			"",
 		}
 	} else {
 		footer = table.Row{
