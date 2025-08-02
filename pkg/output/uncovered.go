@@ -20,11 +20,12 @@ type UncoveredLine struct {
 	IsCovered  bool
 }
 
-// UncoveredBlock represents a block of uncovered lines
+// UncoveredBlock represents a block of uncovered lines with context
 type UncoveredBlock struct {
-	StartLine int
-	EndLine   int
-	Lines     []UncoveredLine
+	StartLine    int
+	EndLine      int
+	Lines        []UncoveredLine
+	ContextLines []UncoveredLine // Context lines around the uncovered block
 }
 
 // FileUncoveredInfo contains uncovered information for a file
@@ -66,7 +67,7 @@ func ShowUncoveredLines(profiles []*cover.Profile, cfg *config.Config) error {
 			continue
 		}
 		
-		info, err := analyzeFileUncovered(profile)
+		info, err := analyzeFileUncovered(profile, cfg)
 		if err != nil {
 			continue // Skip files that can't be read
 		}
@@ -84,7 +85,7 @@ func ShowUncoveredLines(profiles []*cover.Profile, cfg *config.Config) error {
 }
 
 // analyzeFileUncovered analyzes a single file to find uncovered lines
-func analyzeFileUncovered(profile *cover.Profile) (FileUncoveredInfo, error) {
+func analyzeFileUncovered(profile *cover.Profile, cfg *config.Config) (FileUncoveredInfo, error) {
 	info := FileUncoveredInfo{
 		FileName: profile.FileName,
 		Blocks:   make([]UncoveredBlock, 0),
@@ -122,6 +123,8 @@ func analyzeFileUncovered(profile *cover.Profile) (FileUncoveredInfo, error) {
 					// Group consecutive uncovered lines into blocks
 					if currentBlock == nil || line != currentBlock.EndLine+1 {
 						if currentBlock != nil {
+							// Add context lines to the completed block
+							addContextLines(currentBlock, sourceLines, coveredLines, cfg.UncoveredContext)
 							info.Blocks = append(info.Blocks, *currentBlock)
 						}
 						currentBlock = &UncoveredBlock{
@@ -139,10 +142,54 @@ func analyzeFileUncovered(profile *cover.Profile) (FileUncoveredInfo, error) {
 	}
 
 	if currentBlock != nil {
+		// Add context lines to the final block
+		addContextLines(currentBlock, sourceLines, coveredLines, cfg.UncoveredContext)
 		info.Blocks = append(info.Blocks, *currentBlock)
 	}
 
 	return info, nil
+}
+
+// addContextLines adds context lines around an uncovered block
+func addContextLines(block *UncoveredBlock, sourceLines []string, coveredLines map[int]bool, contextSize int) {
+	if contextSize <= 0 {
+		return
+	}
+
+	// Add lines before the uncovered block
+	startContext := block.StartLine - contextSize
+	if startContext < 1 {
+		startContext = 1
+	}
+
+	// Add lines after the uncovered block  
+	endContext := block.EndLine + contextSize
+	if endContext > len(sourceLines) {
+		endContext = len(sourceLines)
+	}
+
+	// Collect context lines
+	for i := startContext; i < block.StartLine; i++ {
+		contextLine := UncoveredLine{
+			LineNumber: i,
+			Content:    sourceLines[i-1],
+			IsCovered:  coveredLines[i],
+		}
+		block.ContextLines = append(block.ContextLines, contextLine)
+	}
+
+	// Add the uncovered lines themselves to context
+	block.ContextLines = append(block.ContextLines, block.Lines...)
+
+	// Add trailing context
+	for i := block.EndLine + 1; i <= endContext; i++ {
+		contextLine := UncoveredLine{
+			LineNumber: i,
+			Content:    sourceLines[i-1],
+			IsCovered:  coveredLines[i],
+		}
+		block.ContextLines = append(block.ContextLines, contextLine)
+	}
 }
 
 // readSourceFile reads the content of a source file
@@ -226,8 +273,13 @@ func buildUncoveredOutput(infos []FileUncoveredInfo, cfg *config.Config) string 
 					block.StartLine, block.EndLine))
 			}
 
-			// Show the lines with syntax highlighting
-			for _, line := range block.Lines {
+			// Show the context lines if available, otherwise show just the uncovered lines
+			linesToShow := block.Lines
+			if len(block.ContextLines) > 0 {
+				linesToShow = block.ContextLines
+			}
+
+			for _, line := range linesToShow {
 				lineStr := formatSourceLine(line, cfg)
 				sb.WriteString(lineStr + "\n")
 			}
@@ -264,20 +316,89 @@ func formatSourceLine(line UncoveredLine, cfg *config.Config) string {
 
 // highlightGoSyntax provides basic Go syntax highlighting
 func highlightGoSyntax(content string) string {
-	// Basic Go keywords
-	keywords := []string{
-		"func", "var", "const", "type", "struct", "interface", "package", "import",
-		"if", "else", "for", "switch", "case", "default", "return", "break", "continue",
-		"go", "defer", "select", "chan", "map", "range",
+	if content == "" {
+		return content
+	}
+
+	// Basic Go keywords with word boundaries
+	keywords := map[string]color.Attribute{
+		"package":   color.FgMagenta,
+		"import":    color.FgMagenta,
+		"func":      color.FgBlue,
+		"var":       color.FgBlue,
+		"const":     color.FgBlue,
+		"type":      color.FgBlue,
+		"struct":    color.FgBlue,
+		"interface": color.FgBlue,
+		"if":        color.FgYellow,
+		"else":      color.FgYellow,
+		"for":       color.FgYellow,
+		"switch":    color.FgYellow,
+		"case":      color.FgYellow,
+		"default":   color.FgYellow,
+		"return":    color.FgYellow,
+		"break":     color.FgYellow,
+		"continue":  color.FgYellow,
+		"go":        color.FgYellow,
+		"defer":     color.FgYellow,
+		"select":    color.FgYellow,
+		"chan":      color.FgCyan,
+		"map":       color.FgCyan,
+		"range":     color.FgYellow,
 	}
 
 	result := content
-	for _, keyword := range keywords {
-		// Simple word boundary matching - check if keyword appears as whole word
-		if strings.Contains(result, keyword+" ") || strings.Contains(result, keyword+"\t") ||
-			strings.Contains(result, keyword+"(") || strings.Contains(result, keyword+"{") {
-			highlighted := color.New(color.FgBlue, color.Bold).Sprint(keyword)
-			result = strings.ReplaceAll(result, keyword, highlighted)
+
+	// Handle string literals first (to avoid highlighting keywords inside strings)
+	if strings.Contains(result, `"`) {
+		// Simple string highlighting - this is basic but functional
+		result = strings.ReplaceAll(result, `"`, color.New(color.FgGreen).Sprint(`"`))
+	}
+
+	// Highlight comments
+	if strings.Contains(result, "//") {
+		parts := strings.Split(result, "//")
+		if len(parts) > 1 {
+			commentPart := "//" + strings.Join(parts[1:], "//")
+			highlighted := color.New(color.FgGreen, color.Italic).Sprint(commentPart)
+			result = parts[0] + highlighted
+		}
+	}
+
+	// Highlight keywords
+	for keyword, colorAttr := range keywords {
+		// Use word boundaries to avoid partial matches
+		patterns := []string{
+			keyword + " ",
+			keyword + "\t",
+			keyword + "(",
+			keyword + "{",
+			keyword + "\n",
+			" " + keyword + " ",
+			" " + keyword + "\t",
+			" " + keyword + "(",
+			" " + keyword + "{",
+			"\t" + keyword + " ",
+			"\t" + keyword + "\t",
+			"\t" + keyword + "(",
+			"\t" + keyword + "{",
+		}
+
+		for _, pattern := range patterns {
+			if strings.Contains(result, pattern) {
+				highlighted := color.New(colorAttr, color.Bold).Sprint(keyword)
+				replacement := strings.ReplaceAll(pattern, keyword, highlighted)
+				result = strings.ReplaceAll(result, pattern, replacement)
+			}
+		}
+
+		// Handle keyword at start of line
+		if strings.HasPrefix(strings.TrimSpace(result), keyword+" ") ||
+			strings.HasPrefix(strings.TrimSpace(result), keyword+"\t") ||
+			strings.HasPrefix(strings.TrimSpace(result), keyword+"(") ||
+			strings.HasPrefix(strings.TrimSpace(result), keyword+"{") {
+			highlighted := color.New(colorAttr, color.Bold).Sprint(keyword)
+			result = strings.Replace(result, keyword, highlighted, 1)
 		}
 	}
 

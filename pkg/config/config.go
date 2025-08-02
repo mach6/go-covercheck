@@ -82,6 +82,7 @@ type Config struct {
 	ModuleName         string               `yaml:"moduleName,omitempty"`
 	ShowUncovered      bool                 `yaml:"showUncovered,omitempty"`
 	UncoveredFile      string               `yaml:"uncoveredFile,omitempty"`
+	UncoveredContext   int                  `yaml:"uncoveredContext,omitempty"`
 }
 
 // Load a Config from a path or produce an error.

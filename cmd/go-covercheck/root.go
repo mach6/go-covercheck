@@ -108,6 +108,9 @@ const (
 	UncoveredFileFlag      = "uncovered-file"
 	UncoveredFileFlagUsage = "show uncovered lines for specific file (implies --show-uncovered)"
 
+	UncoveredContextFlag      = "uncovered-context"
+	UncoveredContextFlagUsage = "number of context lines to show around uncovered blocks [default: 2]"
+
 	// ConfigFilePermissions permissions.
 	ConfigFilePermissions = 0600
 )
@@ -502,6 +505,10 @@ func applyConfigOverrides(cfg *config.Config, cmd *cobra.Command, noConfigFile b
 			cfg.ShowUncovered = true
 		}
 	}
+	if v, _ := cmd.Flags().GetInt(UncoveredContextFlag); cmd.Flags().Changed(UncoveredContextFlag) ||
+		noConfigFile {
+		cfg.UncoveredContext = v
+	}
 
 	// set cfg.Total thresholds to the global values, iff no override was specified for each.
 	if v, _ := cmd.Flags().GetFloat64(StatementThresholdFlag); !cmd.Flags().Changed(TotalStatementThresholdFlag) &&
@@ -692,6 +699,12 @@ func initFlags(cmd *cobra.Command) {
 		UncoveredFileFlag,
 		"",
 		UncoveredFileFlagUsage,
+	)
+
+	cmd.Flags().Int(
+		UncoveredContextFlag,
+		2,
+		UncoveredContextFlagUsage,
 	)
 }
 
