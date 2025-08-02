@@ -64,6 +64,39 @@ type PerThresholdOverride struct {
 	Blocks     PerOverride `yaml:"blocks"`
 }
 
+// CommentConfig holds the configuration for comment posting feature.
+type CommentConfig struct {
+	// Enabled determines whether comment posting is enabled
+	Enabled bool `yaml:"enabled,omitempty"`
+	
+	// Platform contains the platform-specific configuration
+	Platform PlatformConfig `yaml:"platform,omitempty"`
+}
+
+// PlatformConfig holds platform-specific configuration for posting comments.
+type PlatformConfig struct {
+	// Type specifies the platform type (github, gitlab, gitea, etc.)
+	Type string `yaml:"type"`
+	
+	// BaseURL is the base URL for the platform API (for self-hosted instances)
+	BaseURL string `yaml:"baseUrl,omitempty"`
+	
+	// Token is the authentication token for API access
+	Token string `yaml:"token,omitempty"`
+	
+	// Repository is the repository identifier (e.g., "owner/repo")
+	Repository string `yaml:"repository,omitempty"`
+	
+	// PullRequestID is the pull request or merge request ID
+	PullRequestID int `yaml:"pullRequestId,omitempty"`
+	
+	// IncludeColors determines whether to include color codes in comments (where supported)
+	IncludeColors bool `yaml:"includeColors,omitempty"`
+	
+	// UpdateExisting determines whether to update existing comments instead of creating new ones
+	UpdateExisting bool `yaml:"updateExisting,omitempty"`
+}
+
 // Config for application.
 type Config struct {
 	StatementThreshold float64              `yaml:"statementThreshold,omitempty"`
@@ -80,6 +113,7 @@ type Config struct {
 	Format             string               `yaml:"format,omitempty"`
 	TerminalWidth      int                  `yaml:"terminalWidth,omitempty"`
 	ModuleName         string               `yaml:"moduleName,omitempty"`
+	Comment            CommentConfig        `yaml:"comment,omitempty"`
 }
 
 // Load a Config from a path or produce an error.

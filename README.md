@@ -19,6 +19,7 @@ A fast, flexible CLI tool for enforcing test coverage thresholds in Go projects.
 - Colored `json` and `yaml` output.
 - Built-in file or package regex filtering with `--skip`.
 - Save and compare against historical results from a commit, branch, tag, or user defined label.
+- **Post coverage results as comments to GitHub, GitLab, and Gitea pull/merge requests.**
 - Works seamlessly in CI/CD environments.
 
 ## 🚫 Not Supported
@@ -317,6 +318,78 @@ If the reference is not found, an error message will be displayed:
 $ go-covercheck --delete-history nonexistent
 Error: no history entry found for ref: nonexistent
 ```
+
+## 💬 Comment Posting
+
+`go-covercheck` can post coverage results as comments to GitHub, GitLab, and Gitea pull requests or merge requests. This is particularly useful in CI/CD pipelines as a pre-merge gate.
+
+### ⚙️ Configuration
+
+Comment posting can be configured via the config file or CLI flags:
+
+```yaml
+comment:
+  enabled: true
+  platform:
+    type: github                      # github|gitlab|gitea|gogs
+    baseUrl: https://api.github.com   # optional for self-hosted instances
+    token: ghp_xxxxxxxxxxxxxxxxxxxx   # API authentication token
+    repository: owner/repo-name       # repository identifier
+    pullRequestId: 123                # PR/MR ID
+    includeColors: true               # include emojis and formatting
+    updateExisting: false             # update existing comment vs create new
+```
+
+### 🚀 CLI Usage
+
+```bash
+# Post results to GitHub PR
+go-covercheck coverage.out \
+  --comment \
+  --comment-platform github \
+  --comment-token $GITHUB_TOKEN \
+  --comment-repository owner/repo \
+  --comment-pr 123
+
+# Post results to GitLab MR
+go-covercheck coverage.out \
+  --comment \
+  --comment-platform gitlab \
+  --comment-token $GITLAB_TOKEN \
+  --comment-repository group/project \
+  --comment-pr 456
+
+# Post to self-hosted Gogs instance
+go-covercheck coverage.out \
+  --comment \
+  --comment-platform gogs \
+  --comment-base-url https://gogs.company.com \
+  --comment-token $GOGS_TOKEN \
+  --comment-repository org/repo \
+  --comment-pr 789
+```
+
+### 📝 Comment Format
+
+Comments are posted in Markdown format with:
+- Overall pass/fail status with emojis
+- Total coverage summary table
+- Detailed breakdown of failing files and packages
+- Required improvements with specific percentages
+- Color coding via emojis (✅❌) and formatting
+
+### 🔒 Authentication
+
+Each platform requires an API token:
+- **GitHub**: Personal Access Token or GitHub App token with `repo` scope
+- **GitLab**: Personal Access Token or Project Access Token with `api` scope  
+- **Gitea**: Application Token with repository permissions
+- **Gogs**: Access Token with repository permissions
+
+Tokens can be provided via:
+- CLI flag: `--comment-token`
+- Environment variable: `GITHUB_TOKEN`, `GITLAB_TOKEN`, etc.
+- Config file: `comment.platform.token`
 
 ## 📤 Output Formats
 `go-covercheck` supports multiple output formats. The default is `table`, but you can specify other formats using the
