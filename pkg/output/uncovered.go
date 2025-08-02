@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"runtime"
 	"sort"
 	"strings"
 
@@ -65,11 +66,11 @@ func ShowUncoveredLines(profiles []*cover.Profile, cfg *config.Config) error {
 				break
 			}
 		}
-		
+
 		if !hasUncovered {
 			continue
 		}
-		
+
 		info, err := analyzeFileUncovered(profile, cfg)
 		if err != nil {
 			continue // Skip files that can't be read
@@ -118,12 +119,12 @@ func analyzeFileUncovered(profile *cover.Profile, cfg *config.Config) (FileUncov
 			for line := block.StartLine; line <= block.EndLine; line++ {
 				if line <= len(sourceLines) {
 					lineContent := sourceLines[line-1] // Convert to 0-based index
-					
+
 					// Skip lines that shouldn't be considered uncovered
 					if shouldSkipLine(lineContent) {
 						continue
 					}
-					
+
 					uncoveredLine := UncoveredLine{
 						LineNumber: line,
 						Content:    lineContent,
@@ -163,27 +164,27 @@ func analyzeFileUncovered(profile *cover.Profile, cfg *config.Config) (FileUncov
 // shouldSkipLine determines if a line should be skipped when showing uncovered lines
 func shouldSkipLine(content string) bool {
 	trimmed := strings.TrimSpace(content)
-	
+
 	// Skip empty lines
 	if trimmed == "" {
 		return true
 	}
-	
+
 	// Skip lines with only closing braces
 	if trimmed == "}" {
 		return true
 	}
-	
+
 	// Skip comment-only lines
 	if strings.HasPrefix(trimmed, "//") {
 		return true
 	}
-	
+
 	// Skip block comment lines (/* ... */)
 	if strings.HasPrefix(trimmed, "/*") || strings.HasPrefix(trimmed, "*") || trimmed == "*/" {
 		return true
 	}
-	
+
 	return false
 }
 
@@ -199,7 +200,7 @@ func addContextLines(block *UncoveredBlock, sourceLines []string, coveredLines m
 		startContext = 1
 	}
 
-	// Add lines after the uncovered block  
+	// Add lines after the uncovered block
 	endContext := block.EndLine + contextSize
 	if endContext > len(sourceLines) {
 		endContext = len(sourceLines)
@@ -273,7 +274,7 @@ func displayUncoveredLines(infos []FileUncoveredInfo, cfg *config.Config) error 
 	})
 
 	output := buildUncoveredOutput(infos, cfg)
-	
+
 	// Use pager if output is large and we're in a terminal
 	if shouldUsePager(output, cfg) {
 		return displayWithPager(output)
@@ -302,11 +303,11 @@ func buildUncoveredOutput(infos []FileUncoveredInfo, cfg *config.Config) string 
 		// Show uncovered blocks
 		for _, block := range info.Blocks {
 			if !cfg.NoColor {
-				blockHeader := color.New(color.FgYellow).Sprintf("@@ Lines %d-%d (uncovered) @@", 
+				blockHeader := color.New(color.FgYellow).Sprintf("@@ Lines %d-%d (uncovered) @@",
 					block.StartLine, block.EndLine)
 				sb.WriteString(blockHeader + "\n")
 			} else {
-				sb.WriteString(fmt.Sprintf("@@ Lines %d-%d (uncovered) @@\n", 
+				sb.WriteString(fmt.Sprintf("@@ Lines %d-%d (uncovered) @@\n",
 					block.StartLine, block.EndLine))
 			}
 
@@ -330,7 +331,7 @@ func buildUncoveredOutput(infos []FileUncoveredInfo, cfg *config.Config) string 
 // formatSourceLine formats a source line with proper coloring and indicators
 func formatSourceLine(line UncoveredLine, cfg *config.Config) string {
 	lineNumStr := fmt.Sprintf("%4d", line.LineNumber)
-	
+
 	if cfg.NoColor {
 		if line.IsCovered {
 			return fmt.Sprintf("  %s: %s", lineNumStr, line.Content)
@@ -392,7 +393,7 @@ func highlightGoSyntax(content string, cfg *config.Config) string {
 	highlighted := result.String()
 	// Remove trailing newlines added by formatter
 	highlighted = strings.TrimSuffix(highlighted, "\n")
-	
+
 	return highlighted
 }
 
@@ -414,27 +415,38 @@ func isTerminal() bool {
 
 // displayWithPager displays output using a pager (less/more) with filename header
 func displayWithPager(output string) error {
-	// Try to use 'less' first, then 'more'
-	pagers := []string{"less", "more"}
-	
+	var pagers []string
+
+	// Choose pagers based on operating system
+	if runtime.GOOS == "windows" {
+		// On Windows, try more.com first (built-in), then less if available (Git Bash/WSL)
+		pagers = []string{"more.com", "more", "less"}
+	} else {
+		// On Unix-like systems, prefer less, then more
+		pagers = []string{"less", "more"}
+	}
+
 	for _, pager := range pagers {
 		if _, err := exec.LookPath(pager); err == nil {
 			cmd := exec.Command(pager)
 			cmd.Stdin = strings.NewReader(output)
 			cmd.Stdout = os.Stdout
 			cmd.Stderr = os.Stderr
-			
+
 			if pager == "less" {
 				// Add useful less options for better display
-				cmd.Env = append(os.Environ(), 
+				cmd.Env = append(os.Environ(),
 					"LESS=-R -S -F -X", // Enable color, no line wrap, quit if one screen, don't clear screen
 				)
+			} else if pager == "more.com" || pager == "more" {
+				// Windows more.com doesn't support color codes well, but we'll try anyway
+				// The color codes will be displayed as-is or filtered out
 			}
-			
+
 			return cmd.Run()
 		}
 	}
-	
+
 	// If no pager is available, just print to stdout
 	fmt.Print(output)
 	return nil
