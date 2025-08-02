@@ -29,15 +29,18 @@ func isEmptyResults(results compute.Results) bool {
 
 // FormatAndReport writes out formatted profile results.
 func FormatAndReport(results compute.Results, cfg *config.Config, hasFailure bool) {
+	isEmpty := isEmptyResults(results)
+	showedEmptyMessage := false
 	switch cfg.Format {
 	case config.FormatTable, config.FormatMD, config.FormatHTML, config.FormatCSV, config.FormatTSV:
-		if isEmptyResults(results) && !cfg.NoTable {
-			fmt.Println("No coverage results to display")
+		if isEmpty && !cfg.NoTable {
+			fmt.Println(color.New(color.FgYellow).Sprint("⚠"), "No coverage results to display")
+			showedEmptyMessage = true
 		} else {
 			renderTable(results, cfg)
 			_ = os.Stdout.Sync()
 		}
-		renderSummary(hasFailure, results, cfg)
+		renderSummary(hasFailure, results, cfg, showedEmptyMessage)
 	case config.FormatJSON:
 		if cfg.NoColor {
 			enc := json.NewEncoder(os.Stdout)

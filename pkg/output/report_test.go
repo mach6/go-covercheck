@@ -189,8 +189,8 @@ func TestFormatAndReport_EmptyResults_Table(t *testing.T) {
 	})
 
 	require.Empty(t, stderr)
-	require.Contains(t, stdout, "No coverage results to display")
-	require.Contains(t, stdout, "✔ All good")
+	require.Contains(t, stdout, "⚠ No coverage results to display")
+	require.NotContains(t, stdout, "✔ All good")
 	require.NotContains(t, stdout, "STATEMENTS")
 	require.NotContains(t, stdout, "BLOCKS")
 }
