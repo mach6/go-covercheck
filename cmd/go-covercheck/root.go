@@ -104,6 +104,19 @@ const (
 	DiffFromFlag      = "diff-from"
 	DiffFromFlagUsage = "git reference (commit/branch/tag) to diff from; enables diff-only mode"
 
+	ShowUncoveredFlag      = "show-uncovered"
+	ShowUncoveredFlagShort = "U"
+	ShowUncoveredFlagUsage = "show uncovered lines with source code"
+
+	UncoveredFileFlag      = "uncovered-file"
+	UncoveredFileFlagUsage = "show uncovered lines for specific file (implies --show-uncovered)"
+
+	UncoveredContextFlag      = "uncovered-context"
+	UncoveredContextFlagUsage = "number of context lines to show around uncovered blocks [default: 2]"
+
+	SyntaxStyleFlag      = "syntax-style"
+	SyntaxStyleFlagUsage = "syntax highlighting style for uncovered code. Available: github, github-dark, monokai, dracula, solarized-dark, solarized-light, nord, catppuccin-mocha, etc."
+
 	// ConfigFilePermissions permissions.
 	ConfigFilePermissions = 0600
 )
@@ -232,6 +245,16 @@ func showCoverage(args []string, cfg *config.Config) (compute.Results, bool, err
 		return compute.Results{}, false, err
 	}
 	filtered := filters.FilterProfiles(profiles, cfg)
+
+	// If showing uncovered lines, handle that separately
+	if cfg.ShowUncovered {
+		err := output.ShowUncoveredLines(filtered, cfg)
+		if err != nil {
+			return compute.Results{}, false, err
+		}
+		// For uncovered lines mode, we don't need to return results or failure status
+		return compute.Results{}, false, nil
+	}
 
 	results, failed := compute.CollectResults(filtered, cfg)
 	output.FormatAndReport(results, cfg, failed)
@@ -421,10 +444,14 @@ func applyConfigOverrides(cfg *config.Config, cmd *cobra.Command, noConfigFile b
 	applyStringFlagOverride(cmd, SortOrderFlag, &cfg.SortOrder, noConfigFile)
 	applyStringArrayFlagOverride(cmd, SkipFlag, &cfg.Skip, noConfigFile)
 	applyStringFlagOverride(cmd, FormatFlag, &cfg.Format, noConfigFile)
+	applyStringFlagOverride(cmd, UncoveredFileFlag, &cfg.UncoveredFile, noConfigFile)
+	applyStringFlagOverride(cmd, SyntaxStyleFlag, &cfg.SyntaxStyle, noConfigFile)
 	applyBoolFlagOverride(cmd, NoTableFlag, &cfg.NoTable, noConfigFile)
 	applyBoolFlagOverride(cmd, NoSummaryFlag, &cfg.NoSummary, noConfigFile)
 	applyBoolFlagOverride(cmd, NoColorFlag, &cfg.NoColor, noConfigFile)
+	applyBoolFlagOverride(cmd, ShowUncoveredFlag, &cfg.ShowUncovered, noConfigFile)
 	applyIntFlagOverride(cmd, TerminalWidthFlag, &cfg.TerminalWidth, noConfigFile)
+	applyIntFlagOverride(cmd, UncoveredContextFlag, &cfg.UncoveredContext, noConfigFile)
 	applyStringFlagOverride(cmd, ModuleNameFlag, &cfg.ModuleName, noConfigFile)
 	applyDiffFromFlagOverride(cmd, DiffFromFlag, &cfg.DiffFrom, noConfigFile)
 
@@ -646,6 +673,31 @@ func initFlags(cmd *cobra.Command) {
 		InitFlag,
 		false,
 		InitFlagUsage,
+	)
+
+	cmd.Flags().BoolP(
+		ShowUncoveredFlag,
+		ShowUncoveredFlagShort,
+		false,
+		ShowUncoveredFlagUsage,
+	)
+
+	cmd.Flags().String(
+		UncoveredFileFlag,
+		"",
+		UncoveredFileFlagUsage,
+	)
+
+	cmd.Flags().Int(
+		UncoveredContextFlag,
+		2,
+		UncoveredContextFlagUsage,
+	)
+
+	cmd.Flags().String(
+		SyntaxStyleFlag,
+		"github",
+		SyntaxStyleFlagUsage,
 	)
 
 	cmd.Flags().String(
