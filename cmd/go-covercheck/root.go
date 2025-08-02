@@ -101,6 +101,10 @@ const (
 	InitFlag      = "init"
 	InitFlagUsage = "create a sample .go-covercheck.yml config file in the current directory"
 
+	HeatmapOutputFlag      = "heatmap-output"
+	HeatmapOutputFlagShort = "o"
+	HeatmapOutputFlagUsage = "output file path for heatmap formats (default: coverage-heatmap.png or stdout for ASCII)"
+
 	// ConfigFilePermissions permissions.
 	ConfigFilePermissions = 0600
 )
@@ -145,7 +149,7 @@ var (
 		config.SortOrderDesc,
 	)
 
-	FormatFlagUsage = fmt.Sprintf("output format [%s|%s|%s|%s|%s|%s|%s]",
+	FormatFlagUsage = fmt.Sprintf("output format [%s|%s|%s|%s|%s|%s|%s|%s|%s]",
 		config.FormatTable,
 		config.FormatJSON,
 		config.FormatYAML,
@@ -153,6 +157,8 @@ var (
 		config.FormatHTML,
 		config.FormatCSV,
 		config.FormatTSV,
+		config.FormatHeatmapASCII,
+		config.FormatHeatmapPNG,
 	)
 
 	SkipFlagDefault []string
@@ -473,6 +479,10 @@ func applyConfigOverrides(cfg *config.Config, cmd *cobra.Command, noConfigFile b
 		noConfigFile {
 		cfg.ModuleName = v
 	}
+	if v, _ := cmd.Flags().GetString(HeatmapOutputFlag); cmd.Flags().Changed(HeatmapOutputFlag) ||
+		noConfigFile {
+		cfg.HeatmapOutput = v
+	}
 
 	// set cfg.Total thresholds to the global values, iff no override was specified for each.
 	if v, _ := cmd.Flags().GetFloat64(StatementThresholdFlag); !cmd.Flags().Changed(TotalStatementThresholdFlag) &&
@@ -650,6 +660,13 @@ func initFlags(cmd *cobra.Command) {
 		InitFlag,
 		false,
 		InitFlagUsage,
+	)
+
+	cmd.Flags().StringP(
+		HeatmapOutputFlag,
+		HeatmapOutputFlagShort,
+		"",
+		HeatmapOutputFlagUsage,
 	)
 }
 
