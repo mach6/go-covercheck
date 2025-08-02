@@ -30,12 +30,7 @@ func (h *ASCIIHeatmap) Generate(results compute.Results) error {
 	// Generate header
 	h.writeHeader()
 
-	// Generate file coverage heat map
-	if err := h.generateFileHeatmap(results.ByFile); err != nil {
-		return err
-	}
-
-	// Generate package coverage heat map
+	// Generate package coverage heat map only (no file-level)
 	if err := h.generatePackageHeatmap(results.ByPackage); err != nil {
 		return err
 	}
@@ -54,13 +49,13 @@ func (h *ASCIIHeatmap) writeHeader() {
 	fmt.Fprintln(h.writer, "")
 	
 	// Legend
-	fmt.Fprintln(h.writer, "Coverage Legend:")
+	fmt.Fprintln(h.writer, "Statement Coverage Legend:")
 	if !h.config.NoColor {
-		fmt.Fprintf(h.writer, "  %s ========== %s  90-100%%\n", color.GreenString(""), "Excellent")
-		fmt.Fprintf(h.writer, "  %s ========== %s  70-89%%\n", color.YellowString(""), "Good")
-		fmt.Fprintf(h.writer, "  %s ========== %s  50-69%%\n", color.New(color.FgHiYellow).Sprint(""), "Fair")
-		fmt.Fprintf(h.writer, "  %s ========== %s  30-49%%\n", color.New(color.FgRed).Sprint(""), "Poor")
-		fmt.Fprintf(h.writer, "  %s ========== %s  0-29%%\n", color.New(color.FgHiRed).Sprint(""), "Critical")
+		fmt.Fprintf(h.writer, "  %s Excellent  90-100%%\n", color.GreenString("=========="))
+		fmt.Fprintf(h.writer, "  %s Good       70-89%%\n", color.YellowString("=========="))
+		fmt.Fprintf(h.writer, "  %s Fair       50-69%%\n", color.New(color.FgHiYellow).Sprint("=========="))
+		fmt.Fprintf(h.writer, "  %s Poor       30-49%%\n", color.RedString("=========="))
+		fmt.Fprintf(h.writer, "  %s Critical   0-29%%\n", color.New(color.FgHiRed).Sprint("=========="))
 	} else {
 		fmt.Fprintln(h.writer, "  ========== Excellent  90-100%")
 		fmt.Fprintln(h.writer, "  ========== Good       70-89%")
@@ -71,36 +66,12 @@ func (h *ASCIIHeatmap) writeHeader() {
 	fmt.Fprintln(h.writer, "")
 }
 
-func (h *ASCIIHeatmap) generateFileHeatmap(files []compute.ByFile) error {
-	if len(files) == 0 {
-		return nil
-	}
-
-	fmt.Fprintln(h.writer, "FILES BY COVERAGE:")
-	fmt.Fprintln(h.writer, strings.Repeat("─", 60))
-
-	// Sort files by coverage percentage (descending)
-	sortedFiles := make([]compute.ByFile, len(files))
-	copy(sortedFiles, files)
-	sort.Slice(sortedFiles, func(i, j int) bool {
-		return sortedFiles[i].StatementPercentage > sortedFiles[j].StatementPercentage
-	})
-
-	for _, file := range sortedFiles {
-		bar := h.generateCoverageBar(file.StatementPercentage)
-		fileName := h.truncateFileName(file.File, 35)
-		fmt.Fprintf(h.writer, "%s %s %6.1f%%\n", bar, fileName, file.StatementPercentage)
-	}
-	fmt.Fprintln(h.writer, "")
-	return nil
-}
-
 func (h *ASCIIHeatmap) generatePackageHeatmap(packages []compute.ByPackage) error {
 	if len(packages) == 0 {
 		return nil
 	}
 
-	fmt.Fprintln(h.writer, "PACKAGES BY COVERAGE:")
+	fmt.Fprintln(h.writer, "PACKAGES BY STATEMENT COVERAGE:")
 	fmt.Fprintln(h.writer, strings.Repeat("─", 60))
 
 	// Sort packages by coverage percentage (descending)
@@ -126,8 +97,8 @@ func (h *ASCIIHeatmap) generateSummary(totals compute.Totals) {
 	stmtBar := h.generateCoverageBar(totals.Statements.Percentage)
 	blockBar := h.generateCoverageBar(totals.Blocks.Percentage)
 	
-	fmt.Fprintf(h.writer, "%s Statements %s %6.1f%%\n", stmtBar, totals.Statements.Coverage, totals.Statements.Percentage)
-	fmt.Fprintf(h.writer, "%s Blocks     %s %6.1f%%\n", blockBar, totals.Blocks.Coverage, totals.Blocks.Percentage)
+	fmt.Fprintf(h.writer, "%s Statement Coverage %s %6.1f%%\n", stmtBar, totals.Statements.Coverage, totals.Statements.Percentage)
+	fmt.Fprintf(h.writer, "%s Block Coverage     %s %6.1f%%\n", blockBar, totals.Blocks.Coverage, totals.Blocks.Percentage)
 	fmt.Fprintln(h.writer, "")
 }
 

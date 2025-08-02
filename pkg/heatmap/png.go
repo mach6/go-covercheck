@@ -29,13 +29,18 @@ func NewPNGHeatmap(writer io.Writer, cfg *config.Config) *PNGHeatmap {
 	return &PNGHeatmap{
 		writer: writer,
 		config: cfg,
-		width:  800,
-		height: 600,
+		width:  1000, // Will be set dynamically
+		height: 600,  // Will be calculated based on content
 	}
 }
 
 // Generate creates a PNG heat map image of the coverage results.
 func (h *PNGHeatmap) Generate(results compute.Results) error {
+	// Calculate required height based on content
+	requiredHeight := h.calculateRequiredHeight(results)
+	h.height = requiredHeight
+	h.width = 1000 // Make it wider to accommodate more content
+	
 	// Create the image
 	img := image.NewRGBA(image.Rect(0, 0, h.width, h.height))
 	
@@ -47,22 +52,12 @@ func (h *PNGHeatmap) Generate(results compute.Results) error {
 	
 	// Calculate layout
 	startY := 80
-	fileHeight := h.calculateFileHeight(len(results.ByFile))
-	packageHeight := h.calculatePackageHeight(len(results.ByPackage))
 	
-	// Draw file heat map
-	if len(results.ByFile) > 0 {
-		h.drawSectionTitle(img, "Files by Coverage", 60, startY)
-		startY += 30
-		startY = h.drawFileHeatmap(img, results.ByFile, startY, fileHeight)
-		startY += 20
-	}
-	
-	// Draw package heat map
+	// Draw package heat map only (no files)
 	if len(results.ByPackage) > 0 {
-		h.drawSectionTitle(img, "Packages by Coverage", 60, startY)
+		h.drawSectionTitle(img, "Packages by Statement Coverage", 60, startY)
 		startY += 30
-		startY = h.drawPackageHeatmap(img, results.ByPackage, startY, packageHeight)
+		startY = h.drawPackageHeatmap(img, results.ByPackage, startY)
 		startY += 20
 	}
 	
@@ -114,84 +109,32 @@ func (h *PNGHeatmap) drawText(img *image.RGBA, text string, x, y int, c color.RG
 	}
 }
 
-func (h *PNGHeatmap) calculateFileHeight(fileCount int) int {
-	maxHeight := 200
-	itemHeight := 20
-	totalHeight := fileCount * itemHeight
-	if totalHeight > maxHeight {
-		return maxHeight
+func (h *PNGHeatmap) calculateRequiredHeight(results compute.Results) int {
+	baseHeight := 200 // Title, margins, legend space
+	
+	// Package section
+	packageHeight := len(results.ByPackage) * 22 // 22 pixels per package
+	if packageHeight > 0 {
+		packageHeight += 60 // Section title and spacing
 	}
+	
+	// Summary section
+	summaryHeight := 100 // Overall coverage section
+	
+	// Legend
+	legendHeight := 120
+	
+	totalHeight := baseHeight + packageHeight + summaryHeight + legendHeight
+	
+	// Ensure minimum height
+	if totalHeight < 400 {
+		totalHeight = 400
+	}
+	
 	return totalHeight
 }
 
-func (h *PNGHeatmap) calculatePackageHeight(packageCount int) int {
-	maxHeight := 150
-	itemHeight := 25
-	totalHeight := packageCount * itemHeight
-	if totalHeight > maxHeight {
-		return maxHeight
-	}
-	return totalHeight
-}
-
-func (h *PNGHeatmap) drawFileHeatmap(img *image.RGBA, files []compute.ByFile, startY, maxHeight int) int {
-	if len(files) == 0 {
-		return startY
-	}
-	
-	// Sort files by coverage percentage (descending)
-	sortedFiles := make([]compute.ByFile, len(files))
-	copy(sortedFiles, files)
-	sort.Slice(sortedFiles, func(i, j int) bool {
-		return sortedFiles[i].StatementPercentage > sortedFiles[j].StatementPercentage
-	})
-	
-	itemHeight := 18
-	x := 80
-	y := startY
-	barWidth := 200
-	
-	visibleFiles := len(sortedFiles)
-	if maxHeight/itemHeight < visibleFiles {
-		visibleFiles = maxHeight / itemHeight
-	}
-	
-	for i := 0; i < visibleFiles; i++ {
-		file := sortedFiles[i]
-		
-		// Draw coverage bar
-		barColor := h.getCoverageColor(file.StatementPercentage)
-		barLength := int(float64(barWidth) * file.StatementPercentage / 100.0)
-		
-		// Background bar
-		h.drawRect(img, x, y-8, barWidth, 12, color.RGBA{220, 220, 220, 255})
-		// Coverage bar
-		if barLength > 0 {
-			h.drawRect(img, x, y-8, barLength, 12, barColor)
-		}
-		
-		// File name
-		fileName := h.truncateText(file.File, 35)
-		h.drawText(img, fileName, x+barWidth+10, y, color.RGBA{0, 0, 0, 255}, false)
-		
-		// Percentage
-		percentText := fmt.Sprintf("%.1f%%", file.StatementPercentage)
-		h.drawText(img, percentText, x+barWidth+300, y, color.RGBA{0, 0, 0, 255}, false)
-		
-		y += itemHeight
-	}
-	
-	// Show truncation message if needed
-	if len(sortedFiles) > visibleFiles {
-		truncMsg := fmt.Sprintf("... and %d more files", len(sortedFiles)-visibleFiles)
-		h.drawText(img, truncMsg, x, y, color.RGBA{128, 128, 128, 255}, false)
-		y += itemHeight
-	}
-	
-	return y
-}
-
-func (h *PNGHeatmap) drawPackageHeatmap(img *image.RGBA, packages []compute.ByPackage, startY, maxHeight int) int {
+func (h *PNGHeatmap) drawPackageHeatmap(img *image.RGBA, packages []compute.ByPackage, startY int) int {
 	if len(packages) == 0 {
 		return startY
 	}
@@ -208,14 +151,8 @@ func (h *PNGHeatmap) drawPackageHeatmap(img *image.RGBA, packages []compute.ByPa
 	y := startY
 	barWidth := 200
 	
-	visiblePackages := len(sortedPackages)
-	if maxHeight/itemHeight < visiblePackages {
-		visiblePackages = maxHeight / itemHeight
-	}
-	
-	for i := 0; i < visiblePackages; i++ {
-		pkg := sortedPackages[i]
-		
+	// Draw all packages without truncation
+	for _, pkg := range sortedPackages {
 		// Draw coverage bar
 		barColor := h.getCoverageColor(pkg.StatementPercentage)
 		barLength := int(float64(barWidth) * pkg.StatementPercentage / 100.0)
@@ -228,20 +165,13 @@ func (h *PNGHeatmap) drawPackageHeatmap(img *image.RGBA, packages []compute.ByPa
 		}
 		
 		// Package name
-		packageName := h.truncateText(pkg.Package, 35)
+		packageName := h.truncateText(pkg.Package, 50) // Longer since we have more width
 		h.drawText(img, packageName, x+barWidth+10, y, color.RGBA{0, 0, 0, 255}, false)
 		
 		// Percentage
 		percentText := fmt.Sprintf("%.1f%%", pkg.StatementPercentage)
-		h.drawText(img, percentText, x+barWidth+300, y, color.RGBA{0, 0, 0, 255}, false)
+		h.drawText(img, percentText, x+barWidth+400, y, color.RGBA{0, 0, 0, 255}, false)
 		
-		y += itemHeight
-	}
-	
-	// Show truncation message if needed
-	if len(sortedPackages) > visiblePackages {
-		truncMsg := fmt.Sprintf("... and %d more packages", len(sortedPackages)-visiblePackages)
-		h.drawText(img, truncMsg, x, y, color.RGBA{128, 128, 128, 255}, false)
 		y += itemHeight
 	}
 	
@@ -264,7 +194,7 @@ func (h *PNGHeatmap) drawSummary(img *image.RGBA, totals compute.Totals, startY 
 		h.drawRect(img, x, y-8, stmtLength, 12, stmtColor)
 	}
 	
-	stmtText := fmt.Sprintf("Statements %s (%.1f%%)", totals.Statements.Coverage, totals.Statements.Percentage)
+	stmtText := fmt.Sprintf("Statement Coverage %s (%.1f%%)", totals.Statements.Coverage, totals.Statements.Percentage)
 	h.drawText(img, stmtText, x+barWidth+10, y, color.RGBA{0, 0, 0, 255}, false)
 	
 	// Blocks
@@ -277,15 +207,15 @@ func (h *PNGHeatmap) drawSummary(img *image.RGBA, totals compute.Totals, startY 
 		h.drawRect(img, x, y-8, blockLength, 12, blockColor)
 	}
 	
-	blockText := fmt.Sprintf("Blocks     %s (%.1f%%)", totals.Blocks.Coverage, totals.Blocks.Percentage)
+	blockText := fmt.Sprintf("Block Coverage     %s (%.1f%%)", totals.Blocks.Coverage, totals.Blocks.Percentage)
 	h.drawText(img, blockText, x+barWidth+10, y, color.RGBA{0, 0, 0, 255}, false)
 }
 
 func (h *PNGHeatmap) drawLegend(img *image.RGBA) {
-	legendX := h.width - 200
+	legendX := h.width - 250 // Adjusted for wider image
 	legendY := 100
 	
-	h.drawText(img, "Coverage Legend:", legendX, legendY, color.RGBA{0, 0, 0, 255}, false)
+	h.drawText(img, "Statement Coverage Legend:", legendX, legendY, color.RGBA{0, 0, 0, 255}, false)
 	legendY += 20
 	
 	legend := []struct {

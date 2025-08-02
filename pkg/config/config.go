@@ -40,6 +40,7 @@ const (
 	FormatMD          = "md"
 	FormatHeatmapASCII = "heatmap-ascii"
 	FormatHeatmapPNG  = "heatmap-png"
+	FormatFlameGraph  = "flamegraph"
 	FormatDefault     = FormatTable
 
 	thresholdOff = 0
@@ -144,11 +145,11 @@ func (c *Config) Validate() error { //nolint:cyclop
 	}
 
 	switch c.Format {
-	case FormatJSON, FormatYAML, FormatTable, FormatMD, FormatCSV, FormatHTML, FormatTSV, FormatHeatmapASCII, FormatHeatmapPNG:
+	case FormatJSON, FormatYAML, FormatTable, FormatMD, FormatCSV, FormatHTML, FormatTSV, FormatHeatmapASCII, FormatHeatmapPNG, FormatFlameGraph:
 		break
 	default:
-		return fmt.Errorf("format must be one of %s|%s|%s|%s|%s|%s|%s|%s|%s",
-			FormatJSON, FormatYAML, FormatTable, FormatCSV, FormatHTML, FormatTSV, FormatMD, FormatHeatmapASCII, FormatHeatmapPNG)
+		return fmt.Errorf("format must be one of %s|%s|%s|%s|%s|%s|%s|%s|%s|%s",
+			FormatJSON, FormatYAML, FormatTable, FormatCSV, FormatHTML, FormatTSV, FormatMD, FormatHeatmapASCII, FormatHeatmapPNG, FormatFlameGraph)
 	}
 
 	if c.NoSummary && c.NoTable && c.Format != FormatJSON && c.Format != FormatYAML {
