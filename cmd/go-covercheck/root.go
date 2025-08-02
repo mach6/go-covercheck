@@ -101,6 +101,13 @@ const (
 	InitFlag      = "init"
 	InitFlagUsage = "create a sample .go-covercheck.yml config file in the current directory"
 
+	ShowUncoveredFlag      = "show-uncovered"
+	ShowUncoveredFlagShort = "U"
+	ShowUncoveredFlagUsage = "show uncovered lines with source code"
+
+	UncoveredFileFlag      = "uncovered-file"
+	UncoveredFileFlagUsage = "show uncovered lines for specific file (implies --show-uncovered)"
+
 	// ConfigFilePermissions permissions.
 	ConfigFilePermissions = 0600
 )
@@ -229,6 +236,16 @@ func showCoverage(args []string, cfg *config.Config) (compute.Results, bool, err
 		return compute.Results{}, false, err
 	}
 	filtered := filter(profiles, cfg)
+
+	// If showing uncovered lines, handle that separately
+	if cfg.ShowUncovered {
+		err := output.ShowUncoveredLines(filtered, cfg)
+		if err != nil {
+			return compute.Results{}, false, err
+		}
+		// For uncovered lines mode, we don't need to return results or failure status
+		return compute.Results{}, false, nil
+	}
 
 	results, failed := compute.CollectResults(filtered, cfg)
 	output.FormatAndReport(results, cfg, failed)
@@ -473,6 +490,18 @@ func applyConfigOverrides(cfg *config.Config, cmd *cobra.Command, noConfigFile b
 		noConfigFile {
 		cfg.ModuleName = v
 	}
+	if v, _ := cmd.Flags().GetBool(ShowUncoveredFlag); cmd.Flags().Changed(ShowUncoveredFlag) ||
+		noConfigFile {
+		cfg.ShowUncovered = v
+	}
+	if v, _ := cmd.Flags().GetString(UncoveredFileFlag); cmd.Flags().Changed(UncoveredFileFlag) ||
+		noConfigFile {
+		cfg.UncoveredFile = v
+		// If uncovered-file is specified, automatically enable show-uncovered
+		if v != "" {
+			cfg.ShowUncovered = true
+		}
+	}
 
 	// set cfg.Total thresholds to the global values, iff no override was specified for each.
 	if v, _ := cmd.Flags().GetFloat64(StatementThresholdFlag); !cmd.Flags().Changed(TotalStatementThresholdFlag) &&
@@ -650,6 +679,19 @@ func initFlags(cmd *cobra.Command) {
 		InitFlag,
 		false,
 		InitFlagUsage,
+	)
+
+	cmd.Flags().BoolP(
+		ShowUncoveredFlag,
+		ShowUncoveredFlagShort,
+		false,
+		ShowUncoveredFlagUsage,
+	)
+
+	cmd.Flags().String(
+		UncoveredFileFlag,
+		"",
+		UncoveredFileFlagUsage,
 	)
 }
 
