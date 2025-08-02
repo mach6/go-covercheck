@@ -40,6 +40,13 @@ const (
 	FormatMD      = "md"
 	FormatDefault = FormatTable
 
+	TableStyleDefault = "default"
+	TableStyleLight   = "light"
+	TableStyleBold    = "bold"
+	TableStyleRounded = "rounded"
+	TableStyleDouble  = "double"
+	TableStyleDefValue = TableStyleLight
+
 	thresholdOff = 0
 	thresholdMax = 100
 
@@ -78,6 +85,7 @@ type Config struct {
 	NoSummary          bool                 `yaml:"noSummary,omitempty"`
 	NoColor            bool                 `yaml:"noColor,omitempty"`
 	Format             string               `yaml:"format,omitempty"`
+	TableStyle         string               `yaml:"tableStyle,omitempty"`
 	TerminalWidth      int                  `yaml:"terminalWidth,omitempty"`
 	ModuleName         string               `yaml:"moduleName,omitempty"`
 }
@@ -110,6 +118,7 @@ func (c *Config) ApplyDefaults() {
 	c.SortOrder = SortOrderDefault
 	c.Skip = []string{}
 	c.Format = FormatDefault
+	c.TableStyle = TableStyleDefValue
 
 	c.initPerFileWhenNil()
 	c.initPerPackageWhenNil()
@@ -146,6 +155,14 @@ func (c *Config) Validate() error { //nolint:cyclop
 	default:
 		return fmt.Errorf("format must be one of %s|%s|%s|%s|%s|%s|%s",
 			FormatJSON, FormatYAML, FormatTable, FormatCSV, FormatHTML, FormatTSV, FormatMD)
+	}
+
+	switch c.TableStyle {
+	case TableStyleDefault, TableStyleLight, TableStyleBold, TableStyleRounded, TableStyleDouble:
+		break
+	default:
+		return fmt.Errorf("table-style must be one of %s|%s|%s|%s|%s",
+			TableStyleDefault, TableStyleLight, TableStyleBold, TableStyleRounded, TableStyleDouble)
 	}
 
 	if c.NoSummary && c.NoTable && c.Format != FormatJSON && c.Format != FormatYAML {
