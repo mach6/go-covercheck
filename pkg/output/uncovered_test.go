@@ -291,7 +291,7 @@ func testFunc() {
 	cfg1.ApplyDefaults()
 	cfg1.ShowUncovered = true
 	cfg1.NoColor = false
-	cfg1.DarkStyle = false
+	cfg1.SyntaxStyle = "github"
 	color.NoColor = false
 
 	stdout1, stderr1 := test.RepipeStdOutAndErrForTest(func() {
@@ -304,7 +304,7 @@ func testFunc() {
 	cfg2.ApplyDefaults()
 	cfg2.ShowUncovered = true
 	cfg2.NoColor = false
-	cfg2.DarkStyle = true
+	cfg2.SyntaxStyle = "github-dark"
 	color.NoColor = false
 
 	stdout2, stderr2 := test.RepipeStdOutAndErrForTest(func() {

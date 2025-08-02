@@ -111,8 +111,8 @@ const (
 	UncoveredContextFlag      = "uncovered-context"
 	UncoveredContextFlagUsage = "number of context lines to show around uncovered blocks [default: 2]"
 
-	DarkStyleFlag      = "dark-style"
-	DarkStyleFlagUsage = "use dark terminal-friendly syntax highlighting colors"
+	SyntaxStyleFlag      = "syntax-style"
+	SyntaxStyleFlagUsage = "syntax highlighting style for uncovered code. Available: github, github-dark, monokai, dracula, solarized-dark, solarized-light, nord, catppuccin-mocha, etc."
 
 	// ConfigFilePermissions permissions.
 	ConfigFilePermissions = 0600
@@ -512,9 +512,9 @@ func applyConfigOverrides(cfg *config.Config, cmd *cobra.Command, noConfigFile b
 		noConfigFile {
 		cfg.UncoveredContext = v
 	}
-	if v, _ := cmd.Flags().GetBool(DarkStyleFlag); cmd.Flags().Changed(DarkStyleFlag) ||
+	if v, _ := cmd.Flags().GetString(SyntaxStyleFlag); cmd.Flags().Changed(SyntaxStyleFlag) ||
 		noConfigFile {
-		cfg.DarkStyle = v
+		cfg.SyntaxStyle = v
 	}
 
 	// set cfg.Total thresholds to the global values, iff no override was specified for each.
@@ -714,10 +714,10 @@ func initFlags(cmd *cobra.Command) {
 		UncoveredContextFlagUsage,
 	)
 
-	cmd.Flags().Bool(
-		DarkStyleFlag,
-		false,
-		DarkStyleFlagUsage,
+	cmd.Flags().String(
+		SyntaxStyleFlag,
+		"github",
+		SyntaxStyleFlagUsage,
 	)
 }
 

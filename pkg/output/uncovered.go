@@ -449,20 +449,10 @@ func highlightGoSyntax(content string, cfg *config.Config) string {
 		formatter = formatters.Fallback
 	}
 
-	// Choose style based on dark style preference
+	// Choose style based on user preference
 	var style *chroma.Style
-	if cfg.DarkStyle {
-		// Use dark terminal-friendly styles
-		style = styles.Get("github-dark")
-		if style == nil {
-			style = styles.Get("monokai")
-		}
-		if style == nil {
-			style = styles.Get("dracula")
-		}
-	} else {
-		// Use light styles (default)
-		style = styles.Get("github")
+	if cfg.SyntaxStyle != "" {
+		style = styles.Get(cfg.SyntaxStyle)
 	}
 	
 	if style == nil {
