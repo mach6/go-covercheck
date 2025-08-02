@@ -7,14 +7,18 @@ type HasBy interface {
 
 // By holds cover.Profile information.
 type By struct {
-	Statements                         string  `json:"statementCoverage"   yaml:"statementCoverage"`
-	Blocks                             string  `json:"blockCoverage"       yaml:"blockCoverage"`
-	StatementPercentage                float64 `json:"statementPercentage" yaml:"statementPercentage"`
-	BlockPercentage                    float64 `json:"blockPercentage"     yaml:"blockPercentage"`
-	StatementThreshold                 float64 `json:"statementThreshold"  yaml:"statementThreshold"`
-	BlockThreshold                     float64 `json:"blockThreshold"      yaml:"blockThreshold"`
-	Failed                             bool    `json:"failed"              yaml:"failed"`
-	stmts, blocks, stmtHits, blockHits int
+	Statements                                   string  `json:"statementCoverage"   yaml:"statementCoverage"`
+	Blocks                                       string  `json:"blockCoverage"       yaml:"blockCoverage"`
+	Functions                                    string  `json:"functionCoverage"    yaml:"functionCoverage"`
+	StatementPercentage                          float64 `json:"statementPercentage" yaml:"statementPercentage"`
+	BlockPercentage                              float64 `json:"blockPercentage"     yaml:"blockPercentage"`
+	FunctionPercentage                           float64 `json:"functionPercentage"  yaml:"functionPercentage"`
+	StatementThreshold                           float64 `json:"statementThreshold"  yaml:"statementThreshold"`
+	BlockThreshold                               float64 `json:"blockThreshold"      yaml:"blockThreshold"`
+	FunctionThreshold                            float64 `json:"functionThreshold"   yaml:"functionThreshold"`
+	Failed                                       bool    `json:"failed"              yaml:"failed"`
+	stmts, blocks, stmtHits, blockHits           int
+	functions, functionHits                      int
 }
 
 // ByFile holds information for a cover.Profile result of a file.
@@ -43,6 +47,7 @@ func (f ByPackage) GetBy() By {
 type Totals struct {
 	Statements TotalStatements `json:"statements" yaml:"statements"`
 	Blocks     TotalBlocks     `json:"blocks"     yaml:"blocks"`
+	Functions  TotalFunctions  `json:"functions"  yaml:"functions"`
 }
 
 // TotalBlocks holds cover.Profile total block results.
@@ -63,6 +68,16 @@ type TotalStatements struct {
 	Failed                 bool    `json:"failed"     yaml:"failed"`
 	totalCoveredStatements int
 	totalStatements        int
+}
+
+// TotalFunctions holds cover.Profile total function results.
+type TotalFunctions struct {
+	totalFunctions        int
+	totalCoveredFunctions int
+	Coverage              string  `json:"coverage"   yaml:"coverage"`
+	Threshold             float64 `json:"threshold"  yaml:"threshold"`
+	Percentage            float64 `json:"percentage" yaml:"percentage"`
+	Failed                bool    `json:"failed"     yaml:"failed"`
 }
 
 // Results holds information for all stats collected form the cover.Profile data.

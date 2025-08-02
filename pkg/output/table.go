@@ -52,7 +52,7 @@ func renderTable(results compute.Results, cfg *config.Config) {
 		},
 	)
 
-	t.AppendHeader(table.Row{"", "Statements", "Blocks", "Statement %", "Block %"})
+	t.AppendHeader(table.Row{"", "Statements", "Blocks", "Functions", "Statement %", "Block %", "Function %"})
 
 	t.AppendSeparator()
 	t.AppendRow(table.Row{text.Bold.Sprint("BY FILE")})
@@ -66,27 +66,35 @@ func renderTable(results compute.Results, cfg *config.Config) {
 			AlignFooter: text.AlignRight, WidthMin: fixedWidth},
 		{Name: "Blocks", Align: text.AlignRight,
 			AlignFooter: text.AlignRight, WidthMin: fixedWidth},
+		{Name: "Functions", Align: text.AlignRight,
+			AlignFooter: text.AlignRight, WidthMin: fixedWidth},
 		{Name: "Statement %", Align: text.AlignRight,
 			AlignFooter: text.AlignRight, WidthMax: fixedWidth, WidthMin: fixedWidth},
 		{Name: "Block %", Align: text.AlignRight,
+			AlignFooter: text.AlignRight, WidthMax: fixedWidth, WidthMin: fixedWidth},
+		{Name: "Function %", Align: text.AlignRight,
 			AlignFooter: text.AlignRight, WidthMax: fixedWidth, WidthMin: fixedWidth},
 	})
 
 	for _, r := range results.ByFile {
 		stmtColor := severityColor(r.StatementPercentage, r.StatementThreshold)
 		blockColor := severityColor(r.BlockPercentage, r.BlockThreshold)
+		functionColor := severityColor(r.FunctionPercentage, r.FunctionThreshold)
 
 		t.AppendRow(table.Row{
 			r.File,
 			r.Statements,
 			r.Blocks,
+			r.Functions,
 			stmtColor(fmt.Sprintf("%.1f", r.StatementPercentage)),
 			blockColor(fmt.Sprintf("%.1f", r.BlockPercentage)),
+			functionColor(fmt.Sprintf("%.1f", r.FunctionPercentage)),
 		})
 	}
 
 	stmtColor := severityColor(results.ByTotal.Statements.Percentage, results.ByTotal.Statements.Threshold)
 	blockColor := severityColor(results.ByTotal.Blocks.Percentage, results.ByTotal.Blocks.Threshold)
+	functionColor := severityColor(results.ByTotal.Functions.Percentage, results.ByTotal.Functions.Threshold)
 
 	t.AppendSeparator()
 	t.AppendRow(table.Row{text.Bold.Sprint("BY PACKAGE")})
@@ -95,13 +103,16 @@ func renderTable(results compute.Results, cfg *config.Config) {
 	for _, r := range results.ByPackage {
 		stmtColor := severityColor(r.StatementPercentage, r.StatementThreshold)
 		blockColor := severityColor(r.BlockPercentage, r.BlockThreshold)
+		functionColor := severityColor(r.FunctionPercentage, r.FunctionThreshold)
 
 		t.AppendRow(table.Row{
 			r.Package,
 			r.Statements,
 			r.Blocks,
+			r.Functions,
 			stmtColor(fmt.Sprintf("%.1f", r.StatementPercentage)),
 			blockColor(fmt.Sprintf("%.1f", r.BlockPercentage)),
+			functionColor(fmt.Sprintf("%.1f", r.FunctionPercentage)),
 		})
 	}
 
@@ -113,8 +124,10 @@ func renderTable(results compute.Results, cfg *config.Config) {
 		"",
 		text.Bold.Sprint(results.ByTotal.Statements.Coverage),
 		text.Bold.Sprint(results.ByTotal.Blocks.Coverage),
+		text.Bold.Sprint(results.ByTotal.Functions.Coverage),
 		stmtColor(text.Bold.Sprintf("%.1f", results.ByTotal.Statements.Percentage)),
 		blockColor(text.Bold.Sprintf("%.1f", results.ByTotal.Blocks.Percentage)),
+		functionColor(text.Bold.Sprintf("%.1f", results.ByTotal.Functions.Percentage)),
 	})
 
 	switch cfg.Format {

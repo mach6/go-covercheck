@@ -24,6 +24,7 @@ func collect(profiles []*cover.Profile, cfg *config.Config) (Results, bool) { //
 		ByTotal: Totals{
 			Statements: TotalStatements{},
 			Blocks:     TotalBlocks{},
+			Functions:  TotalFunctions{},
 		},
 		ByPackage: make([]ByPackage, 0),
 	}
@@ -39,8 +40,16 @@ func collect(profiles []*cover.Profile, cfg *config.Config) (Results, bool) { //
 			blocks++
 		}
 
+		// Calculate function coverage
+		functions, functionHits, err := GetFunctionCoverageForFile(p.FileName, p.Blocks)
+		if err != nil {
+			// If we can't get function coverage, default to 0
+			functions, functionHits = 0, 0
+		}
+
 		stmtPct := math.Percent(stmtHits, stmts)
 		blockPct := math.Percent(blockHits, blocks)
+		functionPct := math.Percent(functionHits, functions)
 
 		stmtThreshold := cfg.StatementThreshold
 		if t, ok := cfg.PerFile.Statements[p.FileName]; ok {
@@ -54,6 +63,12 @@ func collect(profiles []*cover.Profile, cfg *config.Config) (Results, bool) { //
 		}
 		failed = failed || blockPct < blockThreshold
 
+		functionThreshold := cfg.FunctionThreshold
+		if t, ok := cfg.PerFile.Functions[p.FileName]; ok {
+			functionThreshold = t
+		}
+		failed = failed || functionPct < functionThreshold
+
 		if failed {
 			hasFailure = true
 		}
@@ -63,15 +78,20 @@ func collect(profiles []*cover.Profile, cfg *config.Config) (Results, bool) { //
 			By: By{
 				Statements:          fmt.Sprintf("%d/%d", stmtHits, stmts),
 				Blocks:              fmt.Sprintf("%d/%d", blockHits, blocks),
+				Functions:           fmt.Sprintf("%d/%d", functionHits, functions),
 				StatementPercentage: stmtPct,
 				StatementThreshold:  stmtThreshold,
 				BlockPercentage:     blockPct,
 				BlockThreshold:      blockThreshold,
+				FunctionPercentage:  functionPct,
+				FunctionThreshold:   functionThreshold,
 				Failed:              failed,
 				stmtHits:            stmtHits,
 				blockHits:           blockHits,
 				stmts:               stmts,
 				blocks:              blocks,
+				functions:           functions,
+				functionHits:        functionHits,
 			},
 		})
 
@@ -79,6 +99,8 @@ func collect(profiles []*cover.Profile, cfg *config.Config) (Results, bool) { //
 		results.ByTotal.Statements.totalCoveredStatements += stmtHits
 		results.ByTotal.Blocks.totalBlocks += blocks
 		results.ByTotal.Blocks.totalCoveredBlocks += blockHits
+		results.ByTotal.Functions.totalFunctions += functions
+		results.ByTotal.Functions.totalCoveredFunctions += functionHits
 	}
 
 	sortFileResults(results.ByFile, cfg)
@@ -88,7 +110,8 @@ func collect(profiles []*cover.Profile, cfg *config.Config) (Results, bool) { //
 
 	return results, hasFailure || hasPackageFailure ||
 		results.ByTotal.Statements.Failed ||
-		results.ByTotal.Blocks.Failed
+		results.ByTotal.Blocks.Failed ||
+		results.ByTotal.Functions.Failed
 }
 
 func collectPackageResults(results *Results, cfg *config.Config) bool {
@@ -104,6 +127,8 @@ func collectPackageResults(results *Results, cfg *config.Config) bool {
 		p.blockHits += v.blockHits
 		p.blocks += v.blocks
 		p.stmts += v.stmts
+		p.functions += v.functions
+		p.functionHits += v.functionHits
 		working[path.Dir(v.File)] = p
 	}
 
@@ -111,8 +136,10 @@ func collectPackageResults(results *Results, cfg *config.Config) bool {
 	for _, v := range working {
 		v.Statements = fmt.Sprintf("%d/%d", v.stmtHits, v.stmts)
 		v.Blocks = fmt.Sprintf("%d/%d", v.blockHits, v.blocks)
+		v.Functions = fmt.Sprintf("%d/%d", v.functionHits, v.functions)
 		v.StatementPercentage = math.Percent(v.stmtHits, v.stmts)
 		v.BlockPercentage = math.Percent(v.blockHits, v.blocks)
+		v.FunctionPercentage = math.Percent(v.functionHits, v.functions)
 
 		v.StatementThreshold = cfg.StatementThreshold
 		if t, ok := cfg.PerPackage.Statements[v.Package]; ok {
@@ -125,6 +152,12 @@ func collectPackageResults(results *Results, cfg *config.Config) bool {
 			v.BlockThreshold = t
 		}
 		v.Failed = v.Failed || v.BlockPercentage < v.BlockThreshold
+
+		v.FunctionThreshold = cfg.FunctionThreshold
+		if t, ok := cfg.PerPackage.Functions[v.Package]; ok {
+			v.FunctionThreshold = t
+		}
+		v.Failed = v.Failed || v.FunctionPercentage < v.FunctionThreshold
 
 		if v.Failed {
 			hasFailed = true
@@ -150,6 +183,14 @@ func setTotals(results *Results, cfg *config.Config) {
 	results.ByTotal.Blocks.Percentage = math.Percent(results.ByTotal.Blocks.totalCoveredBlocks,
 		results.ByTotal.Blocks.totalBlocks)
 	results.ByTotal.Blocks.Failed = results.ByTotal.Blocks.Percentage < results.ByTotal.Blocks.Threshold
+
+	results.ByTotal.Functions.Threshold = cfg.Total[config.FunctionsSection]
+	results.ByTotal.Functions.Coverage =
+		fmt.Sprintf("%d/%d", results.ByTotal.Functions.totalCoveredFunctions,
+			results.ByTotal.Functions.totalFunctions)
+	results.ByTotal.Functions.Percentage = math.Percent(results.ByTotal.Functions.totalCoveredFunctions,
+		results.ByTotal.Functions.totalFunctions)
+	results.ByTotal.Functions.Failed = results.ByTotal.Functions.Percentage < results.ByTotal.Functions.Threshold
 }
 
 func sortBy[T HasBy](results []T, cfg *config.Config) {
@@ -170,6 +211,11 @@ func sortBy[T HasBy](results []T, cfg *config.Config) {
 				return byI.BlockPercentage > byJ.BlockPercentage
 			}
 			return byI.BlockPercentage < byJ.BlockPercentage
+		case config.SortByFunctionPercent:
+			if sortByDesc {
+				return byI.FunctionPercentage > byJ.FunctionPercentage
+			}
+			return byI.FunctionPercentage < byJ.FunctionPercentage
 		case config.SortByStatements:
 			if sortByDesc {
 				return byI.stmtHits > byJ.stmtHits
@@ -180,6 +226,11 @@ func sortBy[T HasBy](results []T, cfg *config.Config) {
 				return byI.blockHits > byJ.blockHits
 			}
 			return byI.blockHits < byJ.blockHits
+		case config.SortByFunctions:
+			if sortByDesc {
+				return byI.functionHits > byJ.functionHits
+			}
+			return byI.functionHits < byJ.functionHits
 		default:
 			return false
 		}
@@ -188,7 +239,7 @@ func sortBy[T HasBy](results []T, cfg *config.Config) {
 
 func sortFileResults(results []ByFile, cfg *config.Config) {
 	switch cfg.SortBy {
-	case config.SortByStatementPercent, config.SortByBlockPercent, config.SortByStatements, config.SortByBlocks:
+	case config.SortByStatementPercent, config.SortByBlockPercent, config.SortByFunctionPercent, config.SortByStatements, config.SortByBlocks, config.SortByFunctions:
 		sortBy(results, cfg)
 		return
 	default:
@@ -205,7 +256,7 @@ func sortFileResults(results []ByFile, cfg *config.Config) {
 
 func sortPackageResults(results []ByPackage, cfg *config.Config) {
 	switch cfg.SortBy {
-	case config.SortByStatementPercent, config.SortByBlockPercent, config.SortByStatements, config.SortByBlocks:
+	case config.SortByStatementPercent, config.SortByBlockPercent, config.SortByFunctionPercent, config.SortByStatements, config.SortByBlocks, config.SortByFunctions:
 		sortBy(results, cfg)
 		return
 	default:

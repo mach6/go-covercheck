@@ -15,8 +15,14 @@ statementThreshold: 65.0
 # disabled with 0
 blockThreshold: 60.0
 
+# global threshold % for function coverage.
+# global default for per file %, per package %, and total %
+# default 60.
+# disabled with 0
+functionThreshold: 55.0
+
 # sortBy condition for table output formats.
-# file|blocks|statements|statement-percent|block-percent
+# file|blocks|statements|functions|statement-percent|block-percent|function-percent
 # default file
 sortBy: statement-percent
 
@@ -48,7 +54,7 @@ format: table
 terminalWidth: 0
 
 # per-file threshold overrides
-# default {"statements": {}, "blocks": {}}
+# default {"statements": {}, "blocks": {}, "functions": {}}
 # disabled with 0
 perFile:
   statements:
@@ -57,9 +63,12 @@ perFile:
   blocks:
 #    main.go: 0
 #    cmd/root.go: 20
+  functions:
+#    main.go: 0
+#    cmd/root.go: 80
 
 # per-package threshold overrides
-# default {"statements": {}, "blocks": {}}
+# default {"statements": {}, "blocks": {}, "functions": {}}
 # disabled with 0
 perPackage:
   statements:
@@ -67,13 +76,16 @@ perPackage:
   blocks:
 #    pkg/config: 10
 #    pkg/formatter: 0
+  functions:
+#    pkg/config: 50
 
 # total threshold overrides
-# default {"statements": statementThreshold, "blocks": blockThreshold}
+# default {"statements": statementThreshold, "blocks": blockThreshold, "functions": functionThreshold}
 # disabled with 0
 total:
   statements: 65.0
   blocks: 60
+  functions: 55.0
 
 # skip package(s) and/or file(s) regex
 # default []

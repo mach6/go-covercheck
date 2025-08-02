@@ -37,7 +37,8 @@ func compareByPackage(results compute.Results, refEntry *history.Entry) bool {
 			if curr.Package == prev.Package { //nolint:nestif
 				s, ss := formatDelta(curr.StatementPercentage - prev.StatementPercentage)
 				b, sb := formatDelta(curr.BlockPercentage - prev.BlockPercentage)
-				if ss || sb {
+				f, sf := formatDelta(curr.FunctionPercentage - prev.FunctionPercentage)
+				if ss || sb || sf {
 					if !bPrintedPkg {
 						fmt.Printf(" → By Package\n")
 						bPrintedPkg = true
@@ -51,6 +52,10 @@ func compareByPackage(results compute.Results, refEntry *history.Entry) bool {
 						compareShowB()
 						fmt.Printf("%s [%s]\n", curr.Package, b)
 					}
+					if sf {
+						compareShowF()
+						fmt.Printf("%s [%s]\n", curr.Package, f)
+					}
 				}
 			}
 		}
@@ -63,8 +68,9 @@ func compareByTotal(results compute.Results, refEntry *history.Entry) bool {
 	bPrintedTotal := false
 	deltaS, okS := formatDelta(results.ByTotal.Statements.Percentage - refEntry.Results.ByTotal.Statements.Percentage)
 	deltaB, okB := formatDelta(results.ByTotal.Blocks.Percentage - refEntry.Results.ByTotal.Blocks.Percentage)
+	deltaF, okF := formatDelta(results.ByTotal.Functions.Percentage - refEntry.Results.ByTotal.Functions.Percentage)
 
-	if okS || okB {
+	if okS || okB || okF {
 		fmt.Printf(" → By Total\n")
 		bPrintedTotal = true
 		if okS {
@@ -74,6 +80,10 @@ func compareByTotal(results compute.Results, refEntry *history.Entry) bool {
 		if okB {
 			compareShowB()
 			fmt.Printf("total [%s]\n", deltaB)
+		}
+		if okF {
+			compareShowF()
+			fmt.Printf("total [%s]\n", deltaF)
 		}
 	}
 	return bPrintedTotal
@@ -87,7 +97,8 @@ func compareByFile(results compute.Results, refEntry *history.Entry) bool {
 			if curr.File == prev.File { //nolint:nestif
 				s, ss := formatDelta(curr.StatementPercentage - prev.StatementPercentage)
 				b, sb := formatDelta(curr.BlockPercentage - prev.BlockPercentage)
-				if ss || sb {
+				f, sf := formatDelta(curr.FunctionPercentage - prev.FunctionPercentage)
+				if ss || sb || sf {
 					if !bPrintedFile {
 						fmt.Printf(" → By File\n")
 						bPrintedFile = true
@@ -100,6 +111,10 @@ func compareByFile(results compute.Results, refEntry *history.Entry) bool {
 					if sb {
 						compareShowB()
 						fmt.Printf("%s [%s]\n", curr.File, b)
+					}
+					if sf {
+						compareShowF()
+						fmt.Printf("%s [%s]\n", curr.File, f)
 					}
 				}
 			}
@@ -173,6 +188,8 @@ func ShowHistory(h *history.History, limit int, cfg *config.Config) {
 			entry.Results.ByTotal.Statements.Threshold)
 		blockColor := severityColor(entry.Results.ByTotal.Blocks.Percentage,
 			entry.Results.ByTotal.Blocks.Threshold)
+		funcColor := severityColor(entry.Results.ByTotal.Functions.Percentage,
+			entry.Results.ByTotal.Functions.Threshold)
 
 		wrapTextWidth := 20
 		t.AppendRow(table.Row{
@@ -182,7 +199,8 @@ func ShowHistory(h *history.History, limit int, cfg *config.Config) {
 			fmt.Sprintf("%-15s", wrapText(strings.Join(entry.Tags, ", "), wrapTextWidth)),
 			wrapText(fmt.Sprintf("%-15s", entry.Label), wrapTextWidth),
 			stmtColor(fmt.Sprintf("%-7s", entry.Results.ByTotal.Statements.Coverage)) + " [S]\n" +
-				blockColor(fmt.Sprintf("%-7s", entry.Results.ByTotal.Blocks.Coverage)) + " [B]",
+				blockColor(fmt.Sprintf("%-7s", entry.Results.ByTotal.Blocks.Coverage)) + " [B]\n" +
+				funcColor(fmt.Sprintf("%-7s", entry.Results.ByTotal.Functions.Coverage)) + " [F]",
 		})
 	}
 
@@ -233,4 +251,8 @@ func compareShowS() {
 
 func compareShowB() {
 	fmt.Printf("    [%s] ", color.New(color.FgHiMagenta).Sprint("B"))
+}
+
+func compareShowF() {
+	fmt.Printf("    [%s] ", color.New(color.FgGreen).Sprint("F"))
 }
