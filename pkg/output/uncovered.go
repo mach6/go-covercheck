@@ -8,6 +8,9 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/alecthomas/chroma/v2/formatters"
+	"github.com/alecthomas/chroma/v2/lexers"
+	"github.com/alecthomas/chroma/v2/styles"
 	"github.com/fatih/color"
 	"github.com/mach6/go-covercheck/pkg/config"
 	"golang.org/x/tools/cover"
@@ -114,9 +117,16 @@ func analyzeFileUncovered(profile *cover.Profile, cfg *config.Config) (FileUncov
 			// This block is uncovered
 			for line := block.StartLine; line <= block.EndLine; line++ {
 				if line <= len(sourceLines) {
+					lineContent := sourceLines[line-1] // Convert to 0-based index
+					
+					// Skip lines that shouldn't be considered uncovered
+					if shouldSkipLine(lineContent) {
+						continue
+					}
+					
 					uncoveredLine := UncoveredLine{
 						LineNumber: line,
-						Content:    sourceLines[line-1], // Convert to 0-based index
+						Content:    lineContent,
 						IsCovered:  false,
 					}
 
@@ -148,6 +158,33 @@ func analyzeFileUncovered(profile *cover.Profile, cfg *config.Config) (FileUncov
 	}
 
 	return info, nil
+}
+
+// shouldSkipLine determines if a line should be skipped when showing uncovered lines
+func shouldSkipLine(content string) bool {
+	trimmed := strings.TrimSpace(content)
+	
+	// Skip empty lines
+	if trimmed == "" {
+		return true
+	}
+	
+	// Skip lines with only closing braces
+	if trimmed == "}" {
+		return true
+	}
+	
+	// Skip comment-only lines
+	if strings.HasPrefix(trimmed, "//") {
+		return true
+	}
+	
+	// Skip block comment lines (/* ... */)
+	if strings.HasPrefix(trimmed, "/*") || strings.HasPrefix(trimmed, "*") || trimmed == "*/" {
+		return true
+	}
+	
+	return false
 }
 
 // addContextLines adds context lines around an uncovered block
@@ -304,105 +341,59 @@ func formatSourceLine(line UncoveredLine, cfg *config.Config) string {
 	// With color
 	if line.IsCovered {
 		lineNumStr = color.New(color.FgGreen).Sprint(lineNumStr)
-		content := highlightGoSyntax(line.Content)
+		content := highlightGoSyntax(line.Content, cfg)
 		return fmt.Sprintf("  %s: %s", lineNumStr, content)
 	}
 
 	// Uncovered line
 	lineNumStr = color.New(color.FgRed).Sprint(lineNumStr)
-	content := highlightGoSyntax(line.Content)
+	content := highlightGoSyntax(line.Content, cfg)
 	return fmt.Sprintf("- %s: %s", lineNumStr, content)
 }
 
-// highlightGoSyntax provides basic Go syntax highlighting
-func highlightGoSyntax(content string) string {
-	if content == "" {
+// highlightGoSyntax provides Go syntax highlighting using chroma
+func highlightGoSyntax(content string, cfg *config.Config) string {
+	if content == "" || cfg.NoColor {
 		return content
 	}
 
-	// Basic Go keywords with word boundaries
-	keywords := map[string]color.Attribute{
-		"package":   color.FgMagenta,
-		"import":    color.FgMagenta,
-		"func":      color.FgBlue,
-		"var":       color.FgBlue,
-		"const":     color.FgBlue,
-		"type":      color.FgBlue,
-		"struct":    color.FgBlue,
-		"interface": color.FgBlue,
-		"if":        color.FgYellow,
-		"else":      color.FgYellow,
-		"for":       color.FgYellow,
-		"switch":    color.FgYellow,
-		"case":      color.FgYellow,
-		"default":   color.FgYellow,
-		"return":    color.FgYellow,
-		"break":     color.FgYellow,
-		"continue":  color.FgYellow,
-		"go":        color.FgYellow,
-		"defer":     color.FgYellow,
-		"select":    color.FgYellow,
-		"chan":      color.FgCyan,
-		"map":       color.FgCyan,
-		"range":     color.FgYellow,
+	// Get the Go lexer
+	lexer := lexers.Get("go")
+	if lexer == nil {
+		lexer = lexers.Fallback
 	}
 
-	result := content
-
-	// Handle string literals first (to avoid highlighting keywords inside strings)
-	if strings.Contains(result, `"`) {
-		// Simple string highlighting - this is basic but functional
-		result = strings.ReplaceAll(result, `"`, color.New(color.FgGreen).Sprint(`"`))
+	// Get a terminal formatter with 256 colors
+	formatter := formatters.Get("terminal256")
+	if formatter == nil {
+		formatter = formatters.Fallback
 	}
 
-	// Highlight comments
-	if strings.Contains(result, "//") {
-		parts := strings.Split(result, "//")
-		if len(parts) > 1 {
-			commentPart := "//" + strings.Join(parts[1:], "//")
-			highlighted := color.New(color.FgGreen, color.Italic).Sprint(commentPart)
-			result = parts[0] + highlighted
-		}
+	// Use a style similar to GitHub or VS Code
+	style := styles.Get("github")
+	if style == nil {
+		style = styles.Fallback
 	}
 
-	// Highlight keywords
-	for keyword, colorAttr := range keywords {
-		// Use word boundaries to avoid partial matches
-		patterns := []string{
-			keyword + " ",
-			keyword + "\t",
-			keyword + "(",
-			keyword + "{",
-			keyword + "\n",
-			" " + keyword + " ",
-			" " + keyword + "\t",
-			" " + keyword + "(",
-			" " + keyword + "{",
-			"\t" + keyword + " ",
-			"\t" + keyword + "\t",
-			"\t" + keyword + "(",
-			"\t" + keyword + "{",
-		}
-
-		for _, pattern := range patterns {
-			if strings.Contains(result, pattern) {
-				highlighted := color.New(colorAttr, color.Bold).Sprint(keyword)
-				replacement := strings.ReplaceAll(pattern, keyword, highlighted)
-				result = strings.ReplaceAll(result, pattern, replacement)
-			}
-		}
-
-		// Handle keyword at start of line
-		if strings.HasPrefix(strings.TrimSpace(result), keyword+" ") ||
-			strings.HasPrefix(strings.TrimSpace(result), keyword+"\t") ||
-			strings.HasPrefix(strings.TrimSpace(result), keyword+"(") ||
-			strings.HasPrefix(strings.TrimSpace(result), keyword+"{") {
-			highlighted := color.New(colorAttr, color.Bold).Sprint(keyword)
-			result = strings.Replace(result, keyword, highlighted, 1)
-		}
+	// Tokenize and format the content
+	iterator, err := lexer.Tokenise(nil, content)
+	if err != nil {
+		// Fall back to original content if highlighting fails
+		return content
 	}
 
-	return result
+	var result strings.Builder
+	err = formatter.Format(&result, style, iterator)
+	if err != nil {
+		// Fall back to original content if formatting fails
+		return content
+	}
+
+	highlighted := result.String()
+	// Remove trailing newlines added by formatter
+	highlighted = strings.TrimSuffix(highlighted, "\n")
+	
+	return highlighted
 }
 
 // shouldUsePager determines if we should use a pager for output
@@ -421,7 +412,7 @@ func isTerminal() bool {
 	return (fileInfo.Mode() & os.ModeCharDevice) != 0
 }
 
-// displayWithPager displays output using a pager (less/more)
+// displayWithPager displays output using a pager (less/more) with filename header
 func displayWithPager(output string) error {
 	// Try to use 'less' first, then 'more'
 	pagers := []string{"less", "more"}
@@ -434,8 +425,10 @@ func displayWithPager(output string) error {
 			cmd.Stderr = os.Stderr
 			
 			if pager == "less" {
-				// Add some useful less options
-				cmd.Env = append(os.Environ(), "LESS=-R") // Enable color support
+				// Add useful less options for better display
+				cmd.Env = append(os.Environ(), 
+					"LESS=-R -S -F -X", // Enable color, no line wrap, quit if one screen, don't clear screen
+				)
 			}
 			
 			return cmd.Run()

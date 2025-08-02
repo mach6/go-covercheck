@@ -92,7 +92,7 @@ func TestShowUncoveredLines_SpecificFile(t *testing.T) {
 	testContent := `package main
 
 func uncoveredFunc() {
-	// This is uncovered
+	panic("This is uncovered")
 }
 `
 	err := os.WriteFile(testFile1, []byte(testContent), 0644)
