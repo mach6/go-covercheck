@@ -48,7 +48,7 @@ func FormatAndReport(results compute.Results, cfg *config.Config, hasFailure boo
 			bailOnError(err)
 			yamlColor(y)
 		}
-	case config.FormatHeatmapASCII, config.FormatHeatmapPNG, config.FormatFlameGraph:
+	case config.FormatHeatmapASCII, config.FormatHeatmapPNG, config.FormatFlameGraph, config.FormatFlameGraphPNG:
 		// Warn if using no-color with ASCII heatmap
 		if cfg.Format == config.FormatHeatmapASCII && cfg.NoColor {
 			fmt.Fprintf(os.Stderr, "Warning: --no-color (-w) option doesn't make sense for ASCII heatmap format - colors enhance readability\n")
@@ -81,6 +81,15 @@ func FormatAndReport(results compute.Results, cfg *config.Config, hasFailure boo
 				output = "coverage-flamegraph.txt"
 			}
 			fmt.Printf("Coverage flame graph saved to: %s\n", output)
+		}
+		
+		// For flame graph PNG format, show success message
+		if cfg.Format == config.FormatFlameGraphPNG {
+			output := cfg.HeatmapOutput
+			if output == "" {
+				output = "coverage-flamegraph.png"
+			}
+			fmt.Printf("Coverage flame graph PNG saved to: %s\n", output)
 		}
 	default:
 		bailOnError(errors.New(color.RedString("Unsupported format: %s", cfg.Format)))
