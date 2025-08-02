@@ -12,13 +12,18 @@ var (
 	msgF = "    [%s] %s [+%s required for %s threshold]\n"
 )
 
-func renderSummary(hasFailure bool, results compute.Results, cfg *config.Config) {
+func renderSummary(hasFailure bool, results compute.Results, cfg *config.Config, showedEmptyMessage bool) {
 	if cfg.NoSummary {
 		return
 	}
 
-	if !hasFailure {
+	if !hasFailure && !showedEmptyMessage {
 		fmt.Println(color.New(color.FgGreen).Sprint("✔"), "All good")
+		return
+	}
+	
+	if !hasFailure && showedEmptyMessage {
+		// No summary message when we already showed empty results message
 		return
 	}
 
