@@ -62,18 +62,18 @@ func readModuleNameFromGoMod() string {
 	return ""
 }
 
-// validateModuleNameMatchesFilePaths checks if the given module name is a prefix 
+// validateModuleNameMatchesFilePaths checks if the given module name is a prefix
 // for all file paths in the profiles.
 func validateModuleNameMatchesFilePaths(moduleName string, profiles []*cover.Profile) bool {
 	if moduleName == "" || len(profiles) == 0 {
 		return false
 	}
-	
+
 	// Ensure module name has trailing slash for proper prefix matching
 	if !strings.HasSuffix(moduleName, "/") {
 		moduleName += "/"
 	}
-	
+
 	for _, profile := range profiles {
 		if !strings.HasPrefix(profile.FileName, moduleName) {
 			return false

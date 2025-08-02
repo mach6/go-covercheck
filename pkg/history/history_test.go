@@ -364,7 +364,7 @@ func TestHistory_DeleteByRef(t *testing.T) {
 	}, "label1")
 
 	h.Entries[0].Commit = "commit123"
-	h.Entries[0].Branch = "main" 
+	h.Entries[0].Branch = "main"
 	h.Entries[0].Tags = []string{"v1.0.0"}
 
 	require.Len(t, h.Entries, 1)
@@ -381,7 +381,7 @@ func TestHistory_DeleteByRef(t *testing.T) {
 		},
 	}, "label2")
 	h.Entries[0].Branch = "feature"
-	
+
 	deleted = h.DeleteByRef("feature")
 	require.True(t, deleted)
 	require.Empty(t, h.Entries)
