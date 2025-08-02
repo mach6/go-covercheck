@@ -1,5 +1,6 @@
 blockThreshold: 50
 statementThreshold: 65
+lineThreshold: 70
 
 skip:
   - pkg/test/*
@@ -7,3 +8,4 @@ skip:
 total:
   statements: 80.0
   blocks: 75
+  lines: 85.0
