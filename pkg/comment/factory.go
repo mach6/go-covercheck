@@ -6,7 +6,7 @@ import (
 )
 
 // SupportedPlatforms lists all supported platforms.
-var SupportedPlatforms = []string{"github", "gitlab", "gitea"}
+var SupportedPlatforms = []string{"github", "gitlab", "gitea", "gogs"}
 
 // NewPoster creates a new Poster instance based on the platform type.
 func NewPoster(platformType, baseURL string) (Poster, error) {
@@ -17,6 +17,8 @@ func NewPoster(platformType, baseURL string) (Poster, error) {
 		return NewGitLabPoster(baseURL), nil
 	case "gitea":
 		return NewGiteaPoster(baseURL), nil
+	case "gogs":
+		return NewGogsPoster(baseURL), nil
 	default:
 		return nil, fmt.Errorf("unsupported platform type: %s (supported: %s)",
 			platformType, strings.Join(SupportedPlatforms, ", "))

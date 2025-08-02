@@ -88,7 +88,7 @@ comment:
   enabled: false
   
   platform:
-    # platform type: github|gitlab|gitea
+    # platform type: github|gitlab|gitea|gogs
     # required when comment posting is enabled
     type: github
     

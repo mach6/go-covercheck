@@ -331,7 +331,7 @@ Comment posting can be configured via the config file or CLI flags:
 comment:
   enabled: true
   platform:
-    type: github                      # github|gitlab|gitea
+    type: github                      # github|gitlab|gitea|gogs
     baseUrl: https://api.github.com   # optional for self-hosted instances
     token: ghp_xxxxxxxxxxxxxxxxxxxx   # API authentication token
     repository: owner/repo-name       # repository identifier
@@ -359,12 +359,12 @@ go-covercheck coverage.out \
   --comment-repository group/project \
   --comment-pr 456
 
-# Post to self-hosted instance
+# Post to self-hosted Gogs instance
 go-covercheck coverage.out \
   --comment \
-  --comment-platform gitea \
-  --comment-base-url https://git.company.com \
-  --comment-token $GITEA_TOKEN \
+  --comment-platform gogs \
+  --comment-base-url https://gogs.company.com \
+  --comment-token $GOGS_TOKEN \
   --comment-repository org/repo \
   --comment-pr 789
 ```
@@ -384,6 +384,7 @@ Each platform requires an API token:
 - **GitHub**: Personal Access Token or GitHub App token with `repo` scope
 - **GitLab**: Personal Access Token or Project Access Token with `api` scope  
 - **Gitea**: Application Token with repository permissions
+- **Gogs**: Access Token with repository permissions
 
 Tokens can be provided via:
 - CLI flag: `--comment-token`

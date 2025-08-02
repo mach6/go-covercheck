@@ -107,7 +107,7 @@ const (
 	CommentFlagUsage = "post coverage results as a comment to PR/MR"
 
 	CommentPlatformFlag      = "comment-platform"
-	CommentPlatformFlagUsage = "platform to post comment to [github|gitlab|gitea]"
+	CommentPlatformFlagUsage = "platform to post comment to [github|gitlab|gitea|gogs]"
 
 	CommentBaseURLFlag      = "comment-base-url"
 	CommentBaseURLFlagUsage = "base URL for the platform API (for self-hosted instances)"
