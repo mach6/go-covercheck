@@ -15,6 +15,7 @@ A fast, flexible CLI tool for enforcing test coverage thresholds in Go projects.
 - 🆕 Check coverage only on changed files in git diff.
 - Supports statement and block coverage separately.
 - Native `table`|`json`|`yaml`|`md`|`html`|`csv`|`tsv` output.
+- Configurable table styles (`default`|`light`|`bold`|`rounded`|`double`).
 - Configurable via a `.go-covercheck.yml` or CLI flags.
 - Sorting and colored table output.
 - Colored `json` and `yaml` output.
@@ -28,7 +29,6 @@ The following items are noteworthy and not (currently) supported.
 
 - Does not support configurable profile block count (how many times a section of code was hit) thresholds. The assumption
   is any value `>=1` is enough.
-- Table style is not configurable.
 - Color codes (see [Color Legend](#-color-legend)) are not configurable.
 - Severity weights (see [Color Legend](#-color-legend)) are not configurable.
 
@@ -111,6 +111,9 @@ Here is a sample `.go-covercheck.yml` configuration file:
 # Optional, global thresholds overriding the default (70 statements, 50 blocks)
 statementThreshold: 65.0
 blockThreshold: 60.0
+
+# Optional, table style for table output format (default: light)
+tableStyle: bold
 
 # Optional, by total thresholds overriding the global values above
 total:
@@ -278,6 +281,26 @@ go-covercheck --diff-from $(git describe --tags --abbrev=0)
 ### 🛡️ Fallback Behavior
 
 If git operations fail (e.g., not in a git repository, invalid reference), `go-covercheck` will automatically fall back to checking all files with a warning message.
+
+### 🎨 Table Styles
+
+You can customize the appearance of table output using the `--table-style` flag or by configuring `tableStyle` in your `.go-covercheck.yml` file.
+
+Available table styles:
+- `default` - ASCII characters (compatible with all terminals)
+- `light` - Unicode light box drawing characters (default)
+- `bold` - Unicode bold box drawing characters
+- `rounded` - Unicode rounded corner characters
+- `double` - Unicode double line characters
+
+**Example:**
+```shell
+# Use bold table style via CLI
+go-covercheck --table-style=bold
+
+# Use rounded table style via config file
+echo "tableStyle: rounded" >> .go-covercheck.yml
+```
 
 ## 🕰️ History
 
