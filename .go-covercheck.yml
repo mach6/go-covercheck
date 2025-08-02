@@ -1,5 +1,7 @@
 blockThreshold: 50
 statementThreshold: 65
+sortBy: statement-percent
+sortOrder: desc
 
 skip:
   - pkg/test/*
