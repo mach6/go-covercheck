@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"path"
 	"sort"
+	"strconv"
+	"strings"
 
 	"github.com/mach6/go-covercheck/pkg/config"
 	"github.com/mach6/go-covercheck/pkg/math"
@@ -15,6 +17,73 @@ import (
 func CollectResults(profiles []*cover.Profile, cfg *config.Config) (Results, bool) {
 	normalizeNames(profiles, cfg)
 	return collect(profiles, cfg)
+}
+
+func collectUncoveredLines(p *cover.Profile) string {
+	var uncoveredLines []int
+	
+	// Collect all uncovered line numbers
+	for _, b := range p.Blocks {
+		if b.Count == 0 {
+			// Add all lines in this uncovered block
+			for line := b.StartLine; line <= b.EndLine; line++ {
+				uncoveredLines = append(uncoveredLines, line)
+			}
+		}
+	}
+	
+	if len(uncoveredLines) == 0 {
+		return ""
+	}
+	
+	// Remove duplicates and sort
+	lineMap := make(map[int]bool)
+	for _, line := range uncoveredLines {
+		lineMap[line] = true
+	}
+	
+	uniqueLines := make([]int, 0, len(lineMap))
+	for line := range lineMap {
+		uniqueLines = append(uniqueLines, line)
+	}
+	sort.Ints(uniqueLines)
+	
+	// Convert to ranges where possible
+	return formatLineRanges(uniqueLines)
+}
+
+func formatLineRanges(lines []int) string {
+	if len(lines) == 0 {
+		return ""
+	}
+	
+	var ranges []string
+	start := lines[0]
+	end := lines[0]
+	
+	for i := 1; i < len(lines); i++ {
+		if lines[i] == end+1 {
+			// Consecutive line, extend the range
+			end = lines[i]
+		} else {
+			// Non-consecutive, finalize the current range and start a new one
+			ranges = append(ranges, formatRange(start, end))
+			start = lines[i]
+			end = lines[i]
+		}
+	}
+	
+	// Add the final range
+	ranges = append(ranges, formatRange(start, end))
+	
+	return strings.Join(ranges, ",")
+}
+
+func formatRange(start, end int) string {
+	if start == end {
+		return strconv.Itoa(start)
+	}
+	return strconv.Itoa(start) + "-" + strconv.Itoa(end)
 }
 
 func collect(profiles []*cover.Profile, cfg *config.Config) (Results, bool) { //nolint:cyclop
@@ -58,7 +127,7 @@ func collect(profiles []*cover.Profile, cfg *config.Config) (Results, bool) { //
 			hasFailure = true
 		}
 
-		results.ByFile = append(results.ByFile, ByFile{
+		byFile := ByFile{
 			File: p.FileName,
 			By: By{
 				Statements:          fmt.Sprintf("%d/%d", stmtHits, stmts),
@@ -73,7 +142,13 @@ func collect(profiles []*cover.Profile, cfg *config.Config) (Results, bool) { //
 				stmts:               stmts,
 				blocks:              blocks,
 			},
-		})
+		}
+
+		if cfg.ShowUncoveredLines {
+			byFile.By.UncoveredLines = collectUncoveredLines(p)
+		}
+
+		results.ByFile = append(results.ByFile, byFile)
 
 		results.ByTotal.Statements.totalStatements += stmts
 		results.ByTotal.Statements.totalCoveredStatements += stmtHits

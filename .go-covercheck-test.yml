@@ -1,0 +1,10 @@
+blockThreshold: 50
+statementThreshold: 65
+showUncoveredLines: true
+
+skip:
+  - pkg/test/*
+
+total:
+  statements: 80.0
+  blocks: 75

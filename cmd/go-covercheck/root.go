@@ -101,6 +101,10 @@ const (
 	InitFlag      = "init"
 	InitFlagUsage = "create a sample .go-covercheck.yml config file in the current directory"
 
+	ShowUncoveredLinesFlag      = "show-uncovered-lines"
+	ShowUncoveredLinesFlagShort = "U"
+	ShowUncoveredLinesFlagUsage = "show line numbers not covered by tests"
+
 	// ConfigFilePermissions permissions.
 	ConfigFilePermissions = 0600
 )
@@ -473,6 +477,10 @@ func applyConfigOverrides(cfg *config.Config, cmd *cobra.Command, noConfigFile b
 		noConfigFile {
 		cfg.ModuleName = v
 	}
+	if v, _ := cmd.Flags().GetBool(ShowUncoveredLinesFlag); cmd.Flags().Changed(ShowUncoveredLinesFlag) ||
+		noConfigFile {
+		cfg.ShowUncoveredLines = v
+	}
 
 	// set cfg.Total thresholds to the global values, iff no override was specified for each.
 	if v, _ := cmd.Flags().GetFloat64(StatementThresholdFlag); !cmd.Flags().Changed(TotalStatementThresholdFlag) &&
@@ -650,6 +658,13 @@ func initFlags(cmd *cobra.Command) {
 		InitFlag,
 		false,
 		InitFlagUsage,
+	)
+
+	cmd.Flags().BoolP(
+		ShowUncoveredLinesFlag,
+		ShowUncoveredLinesFlagShort,
+		false,
+		ShowUncoveredLinesFlagUsage,
 	)
 }
 

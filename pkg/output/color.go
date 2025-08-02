@@ -83,3 +83,7 @@ func severityColor(actual, goal float64) func(a ...interface{}) string {
 		return color.New(color.FgGreen).SprintFunc()
 	}
 }
+
+func redColor(a ...interface{}) string {
+	return color.New(color.FgRed).SprintFunc()(a...)
+}
