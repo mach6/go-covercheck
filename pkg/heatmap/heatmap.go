@@ -31,30 +31,6 @@ func NewGenerator(format string, cfg *config.Config) (Generator, io.WriteCloser,
 		}
 		
 		return NewPNGHeatmap(file, cfg), file, nil
-	case config.FormatFlameGraphPNG:
-		output := cfg.HeatmapOutput
-		if output == "" {
-			output = "coverage-flamegraph.png"
-		}
-		
-		file, err := os.Create(output)
-		if err != nil {
-			return nil, nil, fmt.Errorf("failed to create flame graph PNG file %s: %w", output, err)
-		}
-		
-		return NewFlameGraphPNG(file, cfg), file, nil
-	case config.FormatFlameGraph:
-		output := cfg.HeatmapOutput
-		if output == "" {
-			output = "coverage-flamegraph.txt"
-		}
-		
-		file, err := os.Create(output)
-		if err != nil {
-			return nil, nil, fmt.Errorf("failed to create flame graph file %s: %w", output, err)
-		}
-		
-		return NewFlameGraph(file, cfg), file, nil
 	default:
 		return nil, nil, fmt.Errorf("unsupported heatmap format: %s", format)
 	}

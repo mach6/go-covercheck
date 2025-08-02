@@ -149,7 +149,7 @@ var (
 		config.SortOrderDesc,
 	)
 
-	FormatFlagUsage = fmt.Sprintf("output format [%s|%s|%s|%s|%s|%s|%s|%s|%s|%s|%s]",
+	FormatFlagUsage = fmt.Sprintf("output format [%s|%s|%s|%s|%s|%s|%s|%s|%s]",
 		config.FormatTable,
 		config.FormatJSON,
 		config.FormatYAML,
@@ -159,8 +159,6 @@ var (
 		config.FormatTSV,
 		config.FormatHeatmapASCII,
 		config.FormatHeatmapPNG,
-		config.FormatFlameGraph,
-		config.FormatFlameGraphPNG,
 	)
 
 	SkipFlagDefault []string

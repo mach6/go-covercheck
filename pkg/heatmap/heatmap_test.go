@@ -110,16 +110,6 @@ func TestNewGenerator(t *testing.T) {
 		writer.Close()
 	})
 
-	t.Run("Flame graph format", func(t *testing.T) {
-		cfg.HeatmapOutput = "/tmp/test-flamegraph.txt"
-		generator, writer, err := NewGenerator(config.FormatFlameGraph, cfg)
-		assert.NoError(t, err)
-		assert.NotNil(t, generator)
-		assert.NotNil(t, writer)
-		assert.IsType(t, &FlameGraph{}, generator)
-		writer.Close()
-	})
-
 	t.Run("Unsupported format", func(t *testing.T) {
 		generator, writer, err := NewGenerator("unsupported", cfg)
 		assert.Error(t, err)
@@ -152,64 +142,6 @@ func TestASCIIHeatmap_TruncateFileName(t *testing.T) {
 			if len(tt.filename) > tt.maxLen {
 				assert.Contains(t, result, "...")
 			}
-		})
-	}
-}
-
-func TestFlameGraph_Generate(t *testing.T) {
-	cfg := &config.Config{}
-	var buf bytes.Buffer
-	flamegraph := NewFlameGraph(&buf, cfg)
-
-	// Create test data
-	results := compute.Results{
-		ByPackage: []compute.ByPackage{
-			{
-				Package: "github.com/mach6/go-covercheck/pkg/compute",
-				By: compute.By{
-					StatementPercentage: 85.0,
-					Statements:         "17/20",
-				},
-			},
-			{
-				Package: "github.com/mach6/go-covercheck/pkg/config",
-				By: compute.By{
-					StatementPercentage: 95.0,
-					Statements:         "19/20",
-				},
-			},
-		},
-	}
-
-	err := flamegraph.Generate(results)
-	assert.NoError(t, err)
-
-	output := buf.String()
-	assert.Contains(t, output, "# Coverage Flame Graph Data")
-	assert.Contains(t, output, "# Format: stack_trace sample_count")
-	assert.Contains(t, output, "github.com;mach6;go-covercheck;pkg;config 19")
-	assert.Contains(t, output, "github.com;mach6;go-covercheck;pkg;compute 17")
-}
-
-func TestFlameGraph_PackageToStack(t *testing.T) {
-	cfg := &config.Config{}
-	var buf bytes.Buffer
-	flamegraph := NewFlameGraph(&buf, cfg)
-
-	tests := []struct {
-		name        string
-		packagePath string
-		expected    string
-	}{
-		{"simple package", "pkg/test", "pkg;test"},
-		{"deep package", "github.com/user/repo/pkg/module", "github.com;user;repo;pkg;module"},
-		{"single component", "main", "main"},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			result := flamegraph.packageToStack(tt.packagePath)
-			assert.Equal(t, tt.expected, result)
 		})
 	}
 }
