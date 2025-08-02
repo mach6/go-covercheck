@@ -66,20 +66,21 @@ type PerThresholdOverride struct {
 
 // Config for application.
 type Config struct {
-	StatementThreshold float64              `yaml:"statementThreshold,omitempty"`
-	BlockThreshold     float64              `yaml:"blockThreshold,omitempty"`
-	SortBy             string               `yaml:"sortBy,omitempty"`
-	SortOrder          string               `yaml:"sortOrder,omitempty"`
-	Skip               []string             `yaml:"skip,omitempty"`
-	PerFile            PerThresholdOverride `yaml:"perFile,omitempty"`
-	PerPackage         PerThresholdOverride `yaml:"perPackage,omitempty"`
-	Total              PerOverride          `yaml:"total,omitempty"`
-	NoTable            bool                 `yaml:"noTable,omitempty"`
-	NoSummary          bool                 `yaml:"noSummary,omitempty"`
-	NoColor            bool                 `yaml:"noColor,omitempty"`
-	Format             string               `yaml:"format,omitempty"`
-	TerminalWidth      int                  `yaml:"terminalWidth,omitempty"`
-	ModuleName         string               `yaml:"moduleName,omitempty"`
+	StatementThreshold  float64              `yaml:"statementThreshold,omitempty"`
+	BlockThreshold      float64              `yaml:"blockThreshold,omitempty"`
+	SortBy              string               `yaml:"sortBy,omitempty"`
+	SortOrder           string               `yaml:"sortOrder,omitempty"`
+	Skip                []string             `yaml:"skip,omitempty"`
+	PerFile             PerThresholdOverride `yaml:"perFile,omitempty"`
+	PerPackage          PerThresholdOverride `yaml:"perPackage,omitempty"`
+	Total               PerOverride          `yaml:"total,omitempty"`
+	NoTable             bool                 `yaml:"noTable,omitempty"`
+	NoSummary           bool                 `yaml:"noSummary,omitempty"`
+	NoColor             bool                 `yaml:"noColor,omitempty"`
+	Format              string               `yaml:"format,omitempty"`
+	TerminalWidth       int                  `yaml:"terminalWidth,omitempty"`
+	ModuleName          string               `yaml:"moduleName,omitempty"`
+	ShowUncoveredLines  bool                 `yaml:"showUncoveredLines,omitempty"`
 }
 
 // Load a Config from a path or produce an error.
