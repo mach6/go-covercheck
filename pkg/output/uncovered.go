@@ -23,6 +23,7 @@ type UncoveredLine struct {
 	LineNumber int
 	Content    string
 	IsCovered  bool
+	IsFiltered bool // True if this line should be displayed without markers (empty, comments, etc.)
 }
 
 // UncoveredBlock represents a block of uncovered lines with context
@@ -130,6 +131,7 @@ func analyzeFileUncovered(profile *cover.Profile, cfg *config.Config) (FileUncov
 						LineNumber: line,
 						Content:    lineContent,
 						IsCovered:  false,
+						IsFiltered: false, // These lines are already filtered by shouldSkipLine
 					}
 
 					// Group consecutive uncovered lines into blocks
@@ -276,6 +278,7 @@ func addContextLines(block *UncoveredBlock, sourceLines []string, coveredLines m
 			LineNumber: i,
 			Content:    sourceLines[i-1],
 			IsCovered:  coveredLines[i],
+			IsFiltered: shouldSkipLine(sourceLines[i-1]),
 		}
 		block.ContextLines = append(block.ContextLines, contextLine)
 	}
@@ -289,6 +292,7 @@ func addContextLines(block *UncoveredBlock, sourceLines []string, coveredLines m
 			LineNumber: i,
 			Content:    sourceLines[i-1],
 			IsCovered:  coveredLines[i],
+			IsFiltered: shouldSkipLine(sourceLines[i-1]),
 		}
 		block.ContextLines = append(block.ContextLines, contextLine)
 	}
@@ -395,6 +399,17 @@ func buildUncoveredOutput(infos []FileUncoveredInfo, cfg *config.Config) string 
 // formatSourceLine formats a source line with proper coloring and indicators
 func formatSourceLine(line UncoveredLine, cfg *config.Config) string {
 	lineNumStr := fmt.Sprintf("%4d", line.LineNumber)
+
+	// If this is a filtered line (comment, empty, closing brace), display without markers
+	if line.IsFiltered {
+		if cfg.NoColor {
+			return fmt.Sprintf("  %s: %s", lineNumStr, line.Content)
+		}
+		// Show filtered lines in muted color without syntax highlighting
+		lineNumStr = color.New(color.FgHiBlack).Sprint(lineNumStr)
+		content := color.New(color.FgHiBlack).Sprint(line.Content)
+		return fmt.Sprintf("  %s: %s", lineNumStr, content)
+	}
 
 	if cfg.NoColor {
 		if line.IsCovered {
