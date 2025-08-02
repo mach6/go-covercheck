@@ -31,14 +31,16 @@ const (
 	SortOrderDesc    = "desc"
 	SortOrderDefault = SortOrderAsc
 
-	FormatJSON    = "json"
-	FormatYAML    = "yaml"
-	FormatTable   = "table"
-	FormatCSV     = "csv"
-	FormatHTML    = "html"
-	FormatTSV     = "tsv"
-	FormatMD      = "md"
-	FormatDefault = FormatTable
+	FormatJSON        = "json"
+	FormatYAML        = "yaml"
+	FormatTable       = "table"
+	FormatCSV         = "csv"
+	FormatHTML        = "html"
+	FormatTSV         = "tsv"
+	FormatMD          = "md"
+	FormatHeatmapASCII = "heatmap-ascii"
+	FormatHeatmapPNG  = "heatmap-png"
+	FormatDefault     = FormatTable
 
 	thresholdOff = 0
 	thresholdMax = 100
@@ -80,6 +82,7 @@ type Config struct {
 	Format             string               `yaml:"format,omitempty"`
 	TerminalWidth      int                  `yaml:"terminalWidth,omitempty"`
 	ModuleName         string               `yaml:"moduleName,omitempty"`
+	HeatmapOutput      string               `yaml:"heatmapOutput,omitempty"`
 }
 
 // Load a Config from a path or produce an error.
@@ -141,11 +144,11 @@ func (c *Config) Validate() error { //nolint:cyclop
 	}
 
 	switch c.Format {
-	case FormatJSON, FormatYAML, FormatTable, FormatMD, FormatCSV, FormatHTML, FormatTSV:
+	case FormatJSON, FormatYAML, FormatTable, FormatMD, FormatCSV, FormatHTML, FormatTSV, FormatHeatmapASCII, FormatHeatmapPNG:
 		break
 	default:
-		return fmt.Errorf("format must be one of %s|%s|%s|%s|%s|%s|%s",
-			FormatJSON, FormatYAML, FormatTable, FormatCSV, FormatHTML, FormatTSV, FormatMD)
+		return fmt.Errorf("format must be one of %s|%s|%s|%s|%s|%s|%s|%s|%s",
+			FormatJSON, FormatYAML, FormatTable, FormatCSV, FormatHTML, FormatTSV, FormatMD, FormatHeatmapASCII, FormatHeatmapPNG)
 	}
 
 	if c.NoSummary && c.NoTable && c.Format != FormatJSON && c.Format != FormatYAML {

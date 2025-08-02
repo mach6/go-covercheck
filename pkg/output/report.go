@@ -10,6 +10,7 @@ import (
 	"github.com/hokaccha/go-prettyjson"
 	"github.com/mach6/go-covercheck/pkg/compute"
 	"github.com/mach6/go-covercheck/pkg/config"
+	"github.com/mach6/go-covercheck/pkg/heatmap"
 	"gopkg.in/yaml.v3"
 )
 
@@ -46,6 +47,31 @@ func FormatAndReport(results compute.Results, cfg *config.Config, hasFailure boo
 			y, err := yaml.Marshal(results)
 			bailOnError(err)
 			yamlColor(y)
+		}
+	case config.FormatHeatmapASCII, config.FormatHeatmapPNG:
+		// Warn if using no-color with ASCII heatmap
+		if cfg.Format == config.FormatHeatmapASCII && cfg.NoColor {
+			fmt.Fprintf(os.Stderr, "Warning: --no-color (-w) option doesn't make sense for ASCII heatmap format - colors enhance readability\n")
+		}
+		
+		generator, writer, err := heatmap.NewGenerator(cfg.Format, cfg)
+		bailOnError(err)
+		defer func() {
+			if closeErr := writer.Close(); closeErr != nil {
+				fmt.Fprintf(os.Stderr, "Warning: failed to close heatmap output: %v\n", closeErr)
+			}
+		}()
+		
+		err = generator.Generate(results)
+		bailOnError(err)
+		
+		// For PNG format, show success message
+		if cfg.Format == config.FormatHeatmapPNG {
+			output := cfg.HeatmapOutput
+			if output == "" {
+				output = "coverage-heatmap.png"
+			}
+			fmt.Printf("Coverage heat map saved to: %s\n", output)
 		}
 	default:
 		bailOnError(errors.New(color.RedString("Unsupported format: %s", cfg.Format)))
