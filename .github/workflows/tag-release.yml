@@ -95,12 +95,12 @@ jobs:
           cd homebrew-tap
 
           # Update the formula
-          sed -i "s|url \".*\"|url \"https://github.com/mach6/go-covercheck/archive/refs/tags/${TAG}.tar.gz\"|" go-covercheck/go-covercheck.rb
-          sed -i "s|sha256 \".*\"|sha256 \"${SHA256}\"|" go-covercheck/go-covercheck.rb
+          sed -i "s|url \".*\"|url \"https://github.com/mach6/go-covercheck/archive/refs/tags/${TAG}.tar.gz\"|" go-covercheck.rb
+          sed -i "s|sha256 \".*\"|sha256 \"${SHA256}\"|" go-covercheck.rb
 
           # Commit and push changes
           git checkout -b update-go-covercheck-${TAG}
-          git add go-covercheck/go-covercheck.rb
+          git add go-covercheck.rb
           git commit -m "Update go-covercheck formula for ${TAG}"
           git push origin update-go-covercheck-${TAG}
 
