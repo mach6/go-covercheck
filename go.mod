@@ -3,6 +3,7 @@ module github.com/mach6/go-covercheck
 go 1.24
 
 require (
+	code.gitea.io/sdk/gitea v0.21.0
 	github.com/fatih/color v1.18.0
 	github.com/go-git/go-git/v6 v6.0.0-20250711134917-1f24ae85fe16
 	github.com/goccy/go-yaml v1.18.0
@@ -17,7 +18,6 @@ require (
 )
 
 require (
-	code.gitea.io/sdk/gitea v0.21.0 // indirect
 	dario.cat/mergo v1.0.1 // indirect
 	github.com/42wim/httpsig v1.2.2 // indirect
 	github.com/Microsoft/go-winio v0.6.2 // indirect
