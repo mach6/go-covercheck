@@ -47,6 +47,10 @@ format: table
 # default 0
 terminalWidth: 0
 
+# show line numbers not covered by tests
+# default true
+showUncoveredLines: true
+
 # per-file threshold overrides
 # default {"statements": {}, "blocks": {}}
 # disabled with 0

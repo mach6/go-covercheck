@@ -14,6 +14,7 @@ type By struct {
 	StatementThreshold                 float64 `json:"statementThreshold"  yaml:"statementThreshold"`
 	BlockThreshold                     float64 `json:"blockThreshold"      yaml:"blockThreshold"`
 	Failed                             bool    `json:"failed"              yaml:"failed"`
+	UncoveredLines                     string  `json:"uncoveredLines,omitempty" yaml:"uncoveredLines,omitempty"`
 	stmts, blocks, stmtHits, blockHits int
 }
 

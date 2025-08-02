@@ -1,9 +1,13 @@
 package compute
 
 import (
+	"bufio"
 	"fmt"
+	"os"
 	"path"
 	"sort"
+	"strconv"
+	"strings"
 
 	"github.com/mach6/go-covercheck/pkg/config"
 	"github.com/mach6/go-covercheck/pkg/math"
@@ -15,6 +19,185 @@ import (
 func CollectResults(profiles []*cover.Profile, cfg *config.Config) (Results, bool) {
 	normalizeNames(profiles, cfg)
 	return collect(profiles, cfg)
+}
+
+func collectUncoveredLines(p *cover.Profile) string {
+	var uncoveredLines []int
+
+	// Collect all uncovered line numbers
+	for _, b := range p.Blocks {
+		if b.Count == 0 {
+			// Add all lines in this uncovered block
+			for line := b.StartLine; line <= b.EndLine; line++ {
+				uncoveredLines = append(uncoveredLines, line)
+			}
+		}
+	}
+
+	if len(uncoveredLines) == 0 {
+		return ""
+	}
+
+	// Remove duplicates and sort
+	lineMap := make(map[int]bool)
+	for _, line := range uncoveredLines {
+		lineMap[line] = true
+	}
+
+	uniqueLines := make([]int, 0, len(lineMap))
+	for line := range lineMap {
+		uniqueLines = append(uniqueLines, line)
+	}
+	sort.Ints(uniqueLines)
+
+	// Filter out excluded lines (empty, comments, closing braces)
+	filteredLines := filterExcludedLines(uniqueLines, p.FileName)
+
+	// Convert to ranges where possible
+	return formatLineRanges(filteredLines)
+}
+
+// filterExcludedLines removes lines that should not be considered as uncovered:
+// - Empty lines (only whitespace)
+// - Comment lines (starting with //)
+// - Lines that only contain closing braces }
+func filterExcludedLines(lines []int, fileName string) []int {
+	// Try to read the source file
+	fileLines, err := readFileLines(fileName)
+	if err != nil {
+		// If we can't read the file, return all lines (fallback to original behavior)
+		return lines
+	}
+
+	var filteredLines []int
+	inBlockComment := false
+
+	for _, lineNum := range lines {
+		// Convert to 0-based index for slice access
+		index := lineNum - 1
+		if index < 0 || index >= len(fileLines) {
+			// Line number out of range, include it
+			filteredLines = append(filteredLines, lineNum)
+			continue
+		}
+
+		line := fileLines[index]
+		trimmedLine := strings.TrimSpace(line)
+
+		// Handle block comment start/end
+		lineHasBlockStart := strings.Contains(line, "/*")
+		lineHasBlockEnd := strings.Contains(line, "*/")
+
+		// Handle single-line block comments /* ... */
+		if lineHasBlockStart && lineHasBlockEnd {
+			// Remove the block comment part and check if there's remaining code
+			commentStart := strings.Index(line, "/*")
+			commentEnd := strings.Index(line, "*/") + 2
+
+			// Create a line with the block comment removed
+			beforeComment := line[:commentStart]
+			afterComment := ""
+			if commentEnd < len(line) {
+				afterComment = line[commentEnd:]
+			}
+			lineWithoutBlockComment := beforeComment + afterComment
+			trimmedWithoutBlock := strings.TrimSpace(lineWithoutBlockComment)
+
+			// If there's still meaningful code after removing block comment, keep it
+			if trimmedWithoutBlock != "" && !strings.HasPrefix(trimmedWithoutBlock, "//") && trimmedWithoutBlock != "}" {
+				filteredLines = append(filteredLines, lineNum)
+			}
+			continue
+		}
+
+		// If this line ends a block comment, filter it and stop being in block comment
+		if lineHasBlockEnd {
+			inBlockComment = false
+			continue
+		}
+
+		// Skip if we're currently in a block comment
+		if inBlockComment {
+			continue
+		}
+
+		// If this line starts a block comment, filter it and start being in block comment
+		if lineHasBlockStart {
+			inBlockComment = true
+			continue
+		}
+
+		// Skip empty lines
+		if trimmedLine == "" {
+			continue
+		}
+
+		// Skip single-line comments
+		if strings.HasPrefix(trimmedLine, "//") {
+			continue
+		}
+
+		// Skip lines that only contain closing braces
+		if trimmedLine == "}" {
+			continue
+		}
+
+		// Include this line
+		filteredLines = append(filteredLines, lineNum)
+	}
+
+	return filteredLines
+}
+
+// readFileLines reads a file and returns its lines
+func readFileLines(fileName string) ([]string, error) {
+	file, err := os.Open(fileName)
+	if err != nil {
+		return nil, err
+	}
+	defer file.Close()
+
+	var lines []string
+	scanner := bufio.NewScanner(file)
+	for scanner.Scan() {
+		lines = append(lines, scanner.Text())
+	}
+
+	return lines, scanner.Err()
+}
+
+func formatLineRanges(lines []int) string {
+	if len(lines) == 0 {
+		return ""
+	}
+
+	var ranges []string
+	start := lines[0]
+	end := lines[0]
+
+	for i := 1; i < len(lines); i++ {
+		if lines[i] == end+1 {
+			// Consecutive line, extend the range
+			end = lines[i]
+		} else {
+			// Non-consecutive, finalize the current range and start a new one
+			ranges = append(ranges, formatRange(start, end))
+			start = lines[i]
+			end = lines[i]
+		}
+	}
+
+	// Add the final range
+	ranges = append(ranges, formatRange(start, end))
+
+	return strings.Join(ranges, ",")
+}
+
+func formatRange(start, end int) string {
+	if start == end {
+		return strconv.Itoa(start)
+	}
+	return strconv.Itoa(start) + "-" + strconv.Itoa(end)
 }
 
 func collect(profiles []*cover.Profile, cfg *config.Config) (Results, bool) { //nolint:cyclop
@@ -58,7 +241,7 @@ func collect(profiles []*cover.Profile, cfg *config.Config) (Results, bool) { //
 			hasFailure = true
 		}
 
-		results.ByFile = append(results.ByFile, ByFile{
+		byFile := ByFile{
 			File: p.FileName,
 			By: By{
 				Statements:          fmt.Sprintf("%d/%d", stmtHits, stmts),
@@ -73,7 +256,13 @@ func collect(profiles []*cover.Profile, cfg *config.Config) (Results, bool) { //
 				stmts:               stmts,
 				blocks:              blocks,
 			},
-		})
+		}
+
+		if !cfg.HideUncoveredLines {
+			byFile.By.UncoveredLines = collectUncoveredLines(p)
+		}
+
+		results.ByFile = append(results.ByFile, byFile)
 
 		results.ByTotal.Statements.totalStatements += stmts
 		results.ByTotal.Statements.totalCoveredStatements += stmtHits

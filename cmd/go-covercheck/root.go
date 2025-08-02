@@ -104,6 +104,10 @@ const (
 	DiffFromFlag      = "diff-from"
 	DiffFromFlagUsage = "git reference (commit/branch/tag) to diff from; enables diff-only mode"
 
+	NoUncoveredLinesFlag      = "no-uncovered-lines"
+	NoUncoveredLinesFlagShort = "Q"
+	NoUncoveredLinesFlagUsage = "hide line numbers not covered by tests"
+
 	// ConfigFilePermissions permissions.
 	ConfigFilePermissions = 0600
 )
@@ -424,9 +428,10 @@ func applyConfigOverrides(cfg *config.Config, cmd *cobra.Command, noConfigFile b
 	applyBoolFlagOverride(cmd, NoTableFlag, &cfg.NoTable, noConfigFile)
 	applyBoolFlagOverride(cmd, NoSummaryFlag, &cfg.NoSummary, noConfigFile)
 	applyBoolFlagOverride(cmd, NoColorFlag, &cfg.NoColor, noConfigFile)
+	applyBoolFlagOverride(cmd, NoUncoveredLinesFlag, &cfg.HideUncoveredLines, noConfigFile)
 	applyIntFlagOverride(cmd, TerminalWidthFlag, &cfg.TerminalWidth, noConfigFile)
 	applyStringFlagOverride(cmd, ModuleNameFlag, &cfg.ModuleName, noConfigFile)
-	applyDiffFromFlagOverride(cmd, DiffFromFlag, &cfg.DiffFrom, noConfigFile)
+	applyStringFlagOverride(cmd, DiffFromFlag, &cfg.DiffFrom, noConfigFile)
 
 	// set cfg.Total thresholds to the global values, iff no override was specified for each.
 	if v, _ := cmd.Flags().GetFloat64(StatementThresholdFlag); !cmd.Flags().Changed(TotalStatementThresholdFlag) &&
@@ -448,12 +453,6 @@ func applyFloat64FlagOverride(cmd *cobra.Command, flagName string, target *float
 func applyFloat64TotalFlagOverride(cmd *cobra.Command, flagName string, section string, target map[string]float64) {
 	if v, _ := cmd.Flags().GetFloat64(flagName); cmd.Flags().Changed(flagName) {
 		target[section] = v
-	}
-}
-
-func applyDiffFromFlagOverride(cmd *cobra.Command, flagName string, target *string, noConfigFile bool) {
-	if v, _ := cmd.Flags().GetString(flagName); cmd.Flags().Changed(flagName) || noConfigFile {
-		*target = v
 	}
 }
 
@@ -646,6 +645,13 @@ func initFlags(cmd *cobra.Command) {
 		InitFlag,
 		false,
 		InitFlagUsage,
+	)
+
+	cmd.Flags().BoolP(
+		NoUncoveredLinesFlag,
+		NoUncoveredLinesFlagShort,
+		false,
+		NoUncoveredLinesFlagUsage,
 	)
 
 	cmd.Flags().String(

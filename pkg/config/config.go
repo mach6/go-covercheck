@@ -81,6 +81,7 @@ type Config struct {
 	TerminalWidth      int                  `yaml:"terminalWidth,omitempty"`
 	ModuleName         string               `yaml:"moduleName,omitempty"`
 	DiffFrom           string               `yaml:"diffFrom,omitempty"`
+	HideUncoveredLines bool                 `yaml:"hideUncoveredLines,omitempty"`
 }
 
 // Load a Config from a path or produce an error.
