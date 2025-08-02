@@ -6,3 +6,4 @@ coverage.out
 unit-test-report.json
 go-covercheck
 !**/go-covercheck/
+*.png
