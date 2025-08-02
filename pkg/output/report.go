@@ -20,12 +20,23 @@ func bailOnError(err error) {
 	}
 }
 
+// isEmptyResults checks if the results contain no coverage data
+func isEmptyResults(results compute.Results) bool {
+	return len(results.ByFile) == 0 && len(results.ByPackage) == 0 &&
+		results.ByTotal.Statements.Coverage == "0/0" &&
+		results.ByTotal.Blocks.Coverage == "0/0"
+}
+
 // FormatAndReport writes out formatted profile results.
 func FormatAndReport(results compute.Results, cfg *config.Config, hasFailure bool) {
 	switch cfg.Format {
 	case config.FormatTable, config.FormatMD, config.FormatHTML, config.FormatCSV, config.FormatTSV:
-		renderTable(results, cfg)
-		_ = os.Stdout.Sync()
+		if isEmptyResults(results) && !cfg.NoTable {
+			fmt.Println("No coverage results to display")
+		} else {
+			renderTable(results, cfg)
+			_ = os.Stdout.Sync()
+		}
 		renderSummary(hasFailure, results, cfg)
 	case config.FormatJSON:
 		if cfg.NoColor {

@@ -172,3 +172,147 @@ func TestFormatAndReport_YAMLOutput_NoColor(t *testing.T) {
 	require.Contains(t, stdout, "file:")
 	require.Contains(t, stdout, "main.go")
 }
+
+func TestFormatAndReport_EmptyResults_Table(t *testing.T) {
+	cfg := new(config.Config)
+	cfg.ApplyDefaults()
+	cfg.Format = config.FormatTable
+	cfg.NoColor = true
+
+	// Empty profiles should result in empty results
+	profiles := []*cover.Profile{}
+
+	stdout, stderr := test.RepipeStdOutAndErrForTest(func() {
+		results, failed := compute.CollectResults(profiles, cfg)
+		require.False(t, failed)
+		output.FormatAndReport(results, cfg, failed)
+	})
+
+	require.Empty(t, stderr)
+	require.Contains(t, stdout, "No coverage results to display")
+	require.Contains(t, stdout, "✔ All good")
+	require.NotContains(t, stdout, "STATEMENTS")
+	require.NotContains(t, stdout, "BLOCKS")
+}
+
+func TestFormatAndReport_EmptyResults_Markdown(t *testing.T) {
+	cfg := new(config.Config)
+	cfg.ApplyDefaults()
+	cfg.Format = config.FormatMD
+	cfg.NoColor = true
+
+	profiles := []*cover.Profile{}
+
+	stdout, stderr := test.RepipeStdOutAndErrForTest(func() {
+		results, failed := compute.CollectResults(profiles, cfg)
+		require.False(t, failed)
+		output.FormatAndReport(results, cfg, failed)
+	})
+
+	require.Empty(t, stderr)
+	require.Contains(t, stdout, "No coverage results to display")
+}
+
+func TestFormatAndReport_EmptyResults_CSV(t *testing.T) {
+	cfg := new(config.Config)
+	cfg.ApplyDefaults()
+	cfg.Format = config.FormatCSV
+	cfg.NoColor = true
+
+	profiles := []*cover.Profile{}
+
+	stdout, stderr := test.RepipeStdOutAndErrForTest(func() {
+		results, failed := compute.CollectResults(profiles, cfg)
+		require.False(t, failed)
+		output.FormatAndReport(results, cfg, failed)
+	})
+
+	require.Empty(t, stderr)
+	require.Contains(t, stdout, "No coverage results to display")
+}
+
+func TestFormatAndReport_EmptyResults_JSON(t *testing.T) {
+	cfg := new(config.Config)
+	cfg.ApplyDefaults()
+	cfg.Format = config.FormatJSON
+	cfg.NoColor = true
+
+	profiles := []*cover.Profile{}
+
+	stdout, stderr := test.RepipeStdOutAndErrForTest(func() {
+		results, failed := compute.CollectResults(profiles, cfg)
+		require.False(t, failed)
+		output.FormatAndReport(results, cfg, failed)
+	})
+
+	require.Empty(t, stderr)
+	require.Contains(t, stdout, `"byFile": []`)
+	require.Contains(t, stdout, `"byPackage": []`)
+	require.Contains(t, stdout, `"coverage": "0/0"`)
+	require.NotContains(t, stdout, "No coverage results to display")
+}
+
+func TestFormatAndReport_EmptyResults_YAML(t *testing.T) {
+	cfg := new(config.Config)
+	cfg.ApplyDefaults()
+	cfg.Format = config.FormatYAML
+	cfg.NoColor = true
+
+	profiles := []*cover.Profile{}
+
+	stdout, stderr := test.RepipeStdOutAndErrForTest(func() {
+		results, failed := compute.CollectResults(profiles, cfg)
+		require.False(t, failed)
+		output.FormatAndReport(results, cfg, failed)
+	})
+
+	require.Empty(t, stderr)
+	require.Contains(t, stdout, "byFile: []")
+	require.Contains(t, stdout, "byPackage: []")
+	require.Contains(t, stdout, "coverage: 0/0")
+	require.NotContains(t, stdout, "No coverage results to display")
+}
+
+func TestFormatAndReport_EmptyResults_TableWithNoTable(t *testing.T) {
+	cfg := new(config.Config)
+	cfg.ApplyDefaults()
+	cfg.Format = config.FormatTable
+	cfg.NoTable = true
+	cfg.NoColor = true
+
+	profiles := []*cover.Profile{}
+
+	stdout, stderr := test.RepipeStdOutAndErrForTest(func() {
+		results, failed := compute.CollectResults(profiles, cfg)
+		require.False(t, failed)
+		output.FormatAndReport(results, cfg, failed)
+	})
+
+	require.Empty(t, stderr)
+	require.Contains(t, stdout, "✔ All good")
+	require.NotContains(t, stdout, "No coverage results to display")
+	require.NotContains(t, stdout, "STATEMENTS")
+	require.NotContains(t, stdout, "BLOCKS")
+}
+
+func TestFormatAndReport_EmptyResults_TableWithNoSummary(t *testing.T) {
+	cfg := new(config.Config)
+	cfg.ApplyDefaults()
+	cfg.Format = config.FormatTable
+	cfg.NoSummary = true
+	cfg.NoColor = true
+
+	profiles := []*cover.Profile{}
+
+	stdout, stderr := test.RepipeStdOutAndErrForTest(func() {
+		results, failed := compute.CollectResults(profiles, cfg)
+		require.False(t, failed)
+		output.FormatAndReport(results, cfg, failed)
+	})
+
+	require.Empty(t, stderr)
+	require.Contains(t, stdout, "No coverage results to display")
+	require.NotContains(t, stdout, "✔ All good")
+	require.NotContains(t, stdout, "STATEMENTS")
+	require.NotContains(t, stdout, "BLOCKS")
+}
