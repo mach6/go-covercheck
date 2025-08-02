@@ -23,8 +23,10 @@ const (
 	SortByFile             = "file"
 	SortByStatements       = "statements"
 	SortByBlocks           = "blocks"
+	SortByFunctions        = "functions"
 	SortByStatementPercent = "statement-percent"
 	SortByBlockPercent     = "block-percent"
+	SortByFunctionPercent  = "function-percent"
 	SortByDefault          = SortByFile
 
 	SortOrderAsc     = "asc"
@@ -51,23 +53,30 @@ const (
 	BlockThresholdOff     = thresholdOff
 	BlockThresholdMax     = thresholdMax
 
+	FunctionThresholdDefault = 60
+	FunctionThresholdOff     = thresholdOff
+	FunctionThresholdMax     = thresholdMax
+
 	StatementsSection = "statements"
 	BlocksSection     = "blocks"
+	FunctionsSection  = "functions"
 )
 
 // PerOverride holds override per thresholds.
 type PerOverride map[string]float64
 
-// PerThresholdOverride holds PerOverride's for Statements and Blocks.
+// PerThresholdOverride holds PerOverride's for Statements, Blocks, and Functions.
 type PerThresholdOverride struct {
 	Statements PerOverride `yaml:"statements"`
 	Blocks     PerOverride `yaml:"blocks"`
+	Functions  PerOverride `yaml:"functions"`
 }
 
 // Config for application.
 type Config struct {
 	StatementThreshold float64              `yaml:"statementThreshold,omitempty"`
 	BlockThreshold     float64              `yaml:"blockThreshold,omitempty"`
+	FunctionThreshold  float64              `yaml:"functionThreshold,omitempty"`
 	SortBy             string               `yaml:"sortBy,omitempty"`
 	SortOrder          string               `yaml:"sortOrder,omitempty"`
 	Skip               []string             `yaml:"skip,omitempty"`
@@ -106,6 +115,7 @@ func Load(path string) (*Config, error) {
 func (c *Config) ApplyDefaults() {
 	c.StatementThreshold = StatementThresholdDefault
 	c.BlockThreshold = BlockThresholdDefault
+	c.FunctionThreshold = FunctionThresholdDefault
 	c.SortBy = SortByDefault
 	c.SortOrder = SortOrderDefault
 	c.Skip = []string{}
@@ -113,7 +123,7 @@ func (c *Config) ApplyDefaults() {
 
 	c.initPerFileWhenNil()
 	c.initPerPackageWhenNil()
-	c.setTotalThresholds(StatementThresholdDefault, BlockThresholdDefault)
+	c.setTotalThresholds(StatementThresholdDefault, BlockThresholdDefault, FunctionThresholdDefault)
 }
 
 // Validate the config or return an error if it is not valid.
@@ -124,13 +134,16 @@ func (c *Config) Validate() error { //nolint:cyclop
 	if c.BlockThreshold < BlockThresholdOff || c.BlockThreshold > BlockThresholdMax {
 		return errors.New("block threshold must be between 0 and 100")
 	}
+	if c.FunctionThreshold < FunctionThresholdOff || c.FunctionThreshold > FunctionThresholdMax {
+		return errors.New("function threshold must be between 0 and 100")
+	}
 
 	switch c.SortBy {
-	case SortByFile, SortByStatements, SortByBlocks, SortByStatementPercent, SortByBlockPercent:
+	case SortByFile, SortByStatements, SortByBlocks, SortByFunctions, SortByStatementPercent, SortByBlockPercent, SortByFunctionPercent:
 		break
 	default:
-		return fmt.Errorf("sort-by must be one of %s|%s|%s|%s|%s",
-			SortByFile, SortByStatements, SortByBlocks, SortByStatementPercent, SortByBlockPercent)
+		return fmt.Errorf("sort-by must be one of %s|%s|%s|%s|%s|%s|%s",
+			SortByFile, SortByStatements, SortByBlocks, SortByFunctions, SortByStatementPercent, SortByBlockPercent, SortByFunctionPercent)
 	}
 
 	switch c.SortOrder {
@@ -158,7 +171,7 @@ func (c *Config) Validate() error { //nolint:cyclop
 
 	c.initPerFileWhenNil()
 	c.initPerPackageWhenNil()
-	c.setTotalThresholds(c.StatementThreshold, c.BlockThreshold)
+	c.setTotalThresholds(c.StatementThreshold, c.BlockThreshold, c.FunctionThreshold)
 
 	return nil
 }
@@ -170,6 +183,9 @@ func (c *Config) initPerFileWhenNil() {
 	if c.PerFile.Statements == nil {
 		c.PerFile.Statements = PerOverride{}
 	}
+	if c.PerFile.Functions == nil {
+		c.PerFile.Functions = PerOverride{}
+	}
 }
 
 func (c *Config) initPerPackageWhenNil() {
@@ -179,9 +195,12 @@ func (c *Config) initPerPackageWhenNil() {
 	if c.PerPackage.Statements == nil {
 		c.PerPackage.Statements = PerOverride{}
 	}
+	if c.PerPackage.Functions == nil {
+		c.PerPackage.Functions = PerOverride{}
+	}
 }
 
-func (c *Config) setTotalThresholds(totalStatement, totalBlock float64) {
+func (c *Config) setTotalThresholds(totalStatement, totalBlock, totalFunction float64) {
 	if c.Total == nil {
 		c.Total = PerOverride{}
 	}
@@ -190,5 +209,8 @@ func (c *Config) setTotalThresholds(totalStatement, totalBlock float64) {
 	}
 	if _, exists := c.Total[BlocksSection]; !exists {
 		c.Total[BlocksSection] = totalBlock
+	}
+	if _, exists := c.Total[FunctionsSection]; !exists {
+		c.Total[FunctionsSection] = totalFunction
 	}
 }

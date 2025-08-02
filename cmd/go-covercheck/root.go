@@ -53,6 +53,14 @@ const (
 	TotalBlockThresholdFlagShort = "B"
 	TotalBlockThresholdFlagUsage = "total block threshold to enforce [0=disabled]"
 
+	FunctionThresholdFlag      = "function-threshold"
+	FunctionThresholdFlagShort = "n"
+	FunctionThresholdFlagUsage = "global function threshold to enforce [0=disabled]"
+
+	TotalFunctionThresholdFlag      = "total-function-threshold"
+	TotalFunctionThresholdFlagShort = "F"
+	TotalFunctionThresholdFlagUsage = "total function threshold to enforce [0=disabled]"
+
 	SortByFlag    = "sort-by"
 	SortOrderFlag = "sort-order"
 
@@ -132,12 +140,14 @@ var (
 	)
 
 	SortByFlagUsage = fmt.Sprintf(
-		"sort-by [%s|%s|%s|%s|%s]",
+		"sort-by [%s|%s|%s|%s|%s|%s|%s]",
 		config.SortByFile,
 		config.SortByBlocks,
 		config.SortByStatements,
+		config.SortByFunctions,
 		config.SortByStatementPercent,
 		config.SortByBlockPercent,
+		config.SortByFunctionPercent,
 	)
 
 	SortOrderFlagUsage = fmt.Sprintf("sort order [%s|%s]",
@@ -431,11 +441,18 @@ func applyConfigOverrides(cfg *config.Config, cmd *cobra.Command, noConfigFile b
 		noConfigFile {
 		cfg.BlockThreshold = v
 	}
+	if v, _ := cmd.Flags().GetFloat64(FunctionThresholdFlag); cmd.Flags().Changed(FunctionThresholdFlag) ||
+		noConfigFile {
+		cfg.FunctionThreshold = v
+	}
 	if v, _ := cmd.Flags().GetFloat64(TotalStatementThresholdFlag); cmd.Flags().Changed(TotalStatementThresholdFlag) {
 		cfg.Total[config.StatementsSection] = v
 	}
 	if v, _ := cmd.Flags().GetFloat64(TotalBlockThresholdFlag); cmd.Flags().Changed(TotalBlockThresholdFlag) {
 		cfg.Total[config.BlocksSection] = v
+	}
+	if v, _ := cmd.Flags().GetFloat64(TotalFunctionThresholdFlag); cmd.Flags().Changed(TotalFunctionThresholdFlag) {
+		cfg.Total[config.FunctionsSection] = v
 	}
 	if v, _ := cmd.Flags().GetString(SortByFlag); cmd.Flags().Changed(SortByFlag) ||
 		noConfigFile {
@@ -482,6 +499,10 @@ func applyConfigOverrides(cfg *config.Config, cmd *cobra.Command, noConfigFile b
 	if v, _ := cmd.Flags().GetFloat64(BlockThresholdFlag); !cmd.Flags().Changed(TotalBlockThresholdFlag) &&
 		cfg.Total[config.BlocksSection] == config.BlockThresholdDefault {
 		cfg.Total[config.BlocksSection] = v
+	}
+	if v, _ := cmd.Flags().GetFloat64(FunctionThresholdFlag); !cmd.Flags().Changed(TotalFunctionThresholdFlag) &&
+		cfg.Total[config.FunctionsSection] == config.FunctionThresholdDefault {
+		cfg.Total[config.FunctionsSection] = v
 	}
 }
 
@@ -553,6 +574,13 @@ func initFlags(cmd *cobra.Command) {
 	)
 
 	cmd.Flags().Float64P(
+		FunctionThresholdFlag,
+		FunctionThresholdFlagShort,
+		config.FunctionThresholdDefault,
+		FunctionThresholdFlagUsage,
+	)
+
+	cmd.Flags().Float64P(
 		TotalStatementThresholdFlag,
 		TotalStatementThresholdFlagShort,
 		0,
@@ -564,6 +592,13 @@ func initFlags(cmd *cobra.Command) {
 		TotalBlockThresholdFlagShort,
 		0,
 		TotalBlockThresholdFlagUsage,
+	)
+
+	cmd.Flags().Float64P(
+		TotalFunctionThresholdFlag,
+		TotalFunctionThresholdFlagShort,
+		0,
+		TotalFunctionThresholdFlagUsage,
 	)
 
 	cmd.Flags().String(
