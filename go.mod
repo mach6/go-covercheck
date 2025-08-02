@@ -17,16 +17,21 @@ require (
 )
 
 require (
+	code.gitea.io/sdk/gitea v0.21.0 // indirect
 	dario.cat/mergo v1.0.1 // indirect
+	github.com/42wim/httpsig v1.2.2 // indirect
 	github.com/Microsoft/go-winio v0.6.2 // indirect
 	github.com/ProtonMail/go-crypto v1.3.0 // indirect
 	github.com/cloudflare/circl v1.6.1 // indirect
 	github.com/cyphar/filepath-securejoin v0.4.1 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
+	github.com/davidmz/go-pageant v1.0.2 // indirect
 	github.com/emirpasic/gods v1.18.1 // indirect
+	github.com/go-fed/httpsig v1.1.0 // indirect
 	github.com/go-git/gcfg/v2 v2.0.2 // indirect
 	github.com/go-git/go-billy/v6 v6.0.0-20250627091229-31e2a16eef30 // indirect
 	github.com/golang/groupcache v0.0.0-20241129210726-2c02b8208cf8 // indirect
+	github.com/hashicorp/go-version v1.7.0 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/kevinburke/ssh_config v1.2.0 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
