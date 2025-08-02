@@ -164,6 +164,98 @@ $ go-covercheck coverage.out
 Note: if the file `coverage.out` is not specified, `go-covercheck` will look for a file named `coverage.out` in the current directory.
 You can also specify a different file name and path.
 
+## 🔧 Integration with `go tool covdata`
+
+For integration tests or when collecting coverage from running binaries, you can use `go tool covdata` to work with coverage data directories and convert them to the standard coverage profile format that `go-covercheck` understands.
+
+### 🧪 Basic Workflow with Coverage Data Directory
+
+When running tests with the `-test.gocoverdir` flag, coverage data is written to a directory instead of a single file:
+
+```shell
+# Run tests and write coverage data to a directory
+go test -cover -test.gocoverdir=./coverdata ./...
+
+# Convert coverage data directory to standard coverage profile
+go tool covdata textfmt -i=./coverdata -o=coverage.out
+
+# Run go-covercheck on the converted coverage profile
+go-covercheck coverage.out
+```
+
+### 🏗️ Integration Testing Scenario
+
+This workflow is particularly useful for integration tests where you want to collect coverage from a running binary:
+
+```shell
+# 1. Build your binary with coverage support
+go build -cover -o myapp ./cmd/myapp
+
+# 2. Set environment variable for coverage data directory
+export GOCOVERDIR=./coverdata
+mkdir -p $GOCOVERDIR
+
+# 3. Run your binary (coverage data will be written to GOCOVERDIR)
+./myapp &
+APP_PID=$!
+
+# 4. Run your integration tests against the running binary
+curl http://localhost:8080/health
+curl http://localhost:8080/api/users
+# ... more integration test calls
+
+# 5. Stop the binary (this flushes coverage data)
+kill $APP_PID
+
+# 6. Convert coverage data to standard format
+go tool covdata textfmt -i=./coverdata -o=integration-coverage.out
+
+# 7. Check coverage with go-covercheck
+go-covercheck integration-coverage.out
+```
+
+### 🔀 Merging Coverage from Multiple Sources
+
+You can combine coverage from unit tests and integration tests using `go tool covdata`:
+
+```shell
+# Run unit tests with coverage data directory
+mkdir -p unit-coverdata
+go test -cover -test.gocoverdir=./unit-coverdata ./...
+
+# Run integration tests (assuming they also write to a coverdata directory)
+mkdir -p integration-coverdata
+# ... run integration tests that populate integration-coverdata
+
+# Merge coverage data from multiple sources
+mkdir -p merged-coverdata
+go tool covdata merge -i=unit-coverdata,integration-coverdata -o=merged-coverdata
+
+# Convert merged data to coverage profile
+go tool covdata textfmt -i=./merged-coverdata -o=combined-coverage.out
+
+# Check combined coverage
+go-covercheck combined-coverage.out
+```
+
+### 📊 Advanced Coverage Data Operations
+
+The `go tool covdata` command provides several useful operations:
+
+```shell
+# Get percentage summary without converting to text format
+go tool covdata percent -i=./coverdata
+
+# List packages with coverage data
+go tool covdata pkglist -i=./coverdata
+
+# Get function-level coverage information
+go tool covdata func -i=./coverdata
+
+# Subtract one coverage dataset from another
+go tool covdata subtract -i=./all-coverdata -i2=./unit-coverdata -o=./integration-only-coverdata
+```
+
 ### 🎛️ CLI Flags
 
 You can also use CLI flags to configure `go-covercheck` without a config file.
