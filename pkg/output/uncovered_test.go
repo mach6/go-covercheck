@@ -203,3 +203,127 @@ func uncoveredFunc() {
 		require.True(t, strings.Contains(stdout, "\x1b[") || strings.Contains(stdout, "\033["))
 	}
 }
+
+func TestShowUncoveredLines_FilteringBehavior(t *testing.T) {
+	// Create a test file with various line types that should be filtered
+	testFile := "/tmp/test_filtering_behavior.go"
+	testContent := `package main
+
+import "fmt"
+
+func testFunc() {
+	// This comment should be filtered
+	fmt.Println("actual code")
+	
+	/* Block comment start
+	   Block comment middle
+	   Block comment end */
+	if true {
+		fmt.Println("more code")
+	} // Comment after closing brace
+}`
+	err := os.WriteFile(testFile, []byte(testContent), 0644)
+	require.NoError(t, err)
+	defer os.Remove(testFile)
+
+	cfg := new(config.Config)
+	cfg.ApplyDefaults()
+	cfg.ShowUncovered = true
+	cfg.NoColor = true
+	color.NoColor = true
+
+	// Mark all lines as uncovered to test filtering
+	profiles := []*cover.Profile{
+		{
+			FileName: testFile,
+			Blocks: []cover.ProfileBlock{
+				{NumStmt: 1, Count: 0, StartLine: 1, EndLine: 15}, // All lines uncovered
+			},
+		},
+	}
+
+	stdout, stderr := test.RepipeStdOutAndErrForTest(func() {
+		err := output.ShowUncoveredLines(profiles, cfg)
+		require.NoError(t, err)
+	})
+
+	require.Empty(t, stderr)
+	
+	// Should contain actual code lines
+	require.Contains(t, stdout, `fmt.Println("actual code")`)
+	require.Contains(t, stdout, `fmt.Println("more code")`)
+	require.Contains(t, stdout, "package main")
+	require.Contains(t, stdout, `import "fmt"`)
+	require.Contains(t, stdout, "func testFunc() {")
+	require.Contains(t, stdout, "if true {")
+	
+	// Should NOT contain filtered lines
+	require.NotContains(t, stdout, "// This comment should be filtered")
+	require.NotContains(t, stdout, "/* Block comment start")
+	require.NotContains(t, stdout, "Block comment middle")
+	require.NotContains(t, stdout, "Block comment end */")
+	require.NotContains(t, stdout, "} // Comment after closing brace")
+}
+
+func TestShowUncoveredLines_DarkStyle(t *testing.T) {
+	// Create a test file 
+	testFile := "/tmp/test_dark_style.go"
+	testContent := `package main
+
+func testFunc() {
+	return // uncovered line
+}`
+	err := os.WriteFile(testFile, []byte(testContent), 0644)
+	require.NoError(t, err)
+	defer os.Remove(testFile)
+
+	profiles := []*cover.Profile{
+		{
+			FileName: testFile,
+			Blocks: []cover.ProfileBlock{
+				{NumStmt: 1, Count: 0, StartLine: 4, EndLine: 4}, // Uncovered line
+			},
+		},
+	}
+
+	// Test with dark style disabled
+	cfg1 := new(config.Config)
+	cfg1.ApplyDefaults()
+	cfg1.ShowUncovered = true
+	cfg1.NoColor = false
+	cfg1.DarkStyle = false
+	color.NoColor = false
+
+	stdout1, stderr1 := test.RepipeStdOutAndErrForTest(func() {
+		err := output.ShowUncoveredLines(profiles, cfg1)
+		require.NoError(t, err)
+	})
+
+	// Test with dark style enabled
+	cfg2 := new(config.Config)
+	cfg2.ApplyDefaults()
+	cfg2.ShowUncovered = true
+	cfg2.NoColor = false
+	cfg2.DarkStyle = true
+	color.NoColor = false
+
+	stdout2, stderr2 := test.RepipeStdOutAndErrForTest(func() {
+		err := output.ShowUncoveredLines(profiles, cfg2)
+		require.NoError(t, err)
+	})
+
+	require.Empty(t, stderr1)
+	require.Empty(t, stderr2)
+	
+	// Both should contain the uncovered line
+	require.Contains(t, stdout1, "return")
+	require.Contains(t, stdout2, "return")
+	
+	// Both should have color codes if terminal supports color
+	if !strings.Contains(os.Getenv("TERM"), "dumb") {
+		hasColor1 := strings.Contains(stdout1, "\x1b[") || strings.Contains(stdout1, "\033[")
+		hasColor2 := strings.Contains(stdout2, "\x1b[") || strings.Contains(stdout2, "\033[")
+		require.True(t, hasColor1)
+		require.True(t, hasColor2)
+	}
+}

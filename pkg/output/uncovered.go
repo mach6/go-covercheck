@@ -9,6 +9,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/alecthomas/chroma/v2"
 	"github.com/alecthomas/chroma/v2/formatters"
 	"github.com/alecthomas/chroma/v2/lexers"
 	"github.com/alecthomas/chroma/v2/styles"
@@ -170,18 +171,81 @@ func shouldSkipLine(content string) bool {
 		return true
 	}
 
-	// Skip lines with only closing braces
-	if trimmed == "}" {
-		return true
-	}
-
-	// Skip comment-only lines
+	// Skip comment-only lines (single line comments)
 	if strings.HasPrefix(trimmed, "//") {
 		return true
 	}
 
-	// Skip block comment lines (/* ... */)
+	// Skip block comment lines
 	if strings.HasPrefix(trimmed, "/*") || strings.HasPrefix(trimmed, "*") || trimmed == "*/" {
+		return true
+	}
+
+	// Skip lines that end with block comment termination
+	if strings.HasSuffix(trimmed, "*/") {
+		return true
+	}
+
+	// Skip lines that start with closing braces (even if followed by comments)
+	if strings.HasPrefix(trimmed, "}") {
+		return true
+	}
+
+	// Skip lines that look like block comment content (heuristic)
+	// These are lines that don't contain typical Go syntax patterns
+	if isLikelyBlockCommentContent(trimmed) {
+		return true
+	}
+
+	return false
+}
+
+// isLikelyBlockCommentContent uses heuristics to detect lines that are likely
+// part of block comments but don't have explicit comment markers
+func isLikelyBlockCommentContent(trimmed string) bool {
+	// Skip if line doesn't contain any Go syntax indicators
+	hasGoSyntax := strings.Contains(trimmed, "(") ||
+		strings.Contains(trimmed, ")") ||
+		strings.Contains(trimmed, "{") ||
+		strings.Contains(trimmed, "}") ||
+		strings.Contains(trimmed, "=") ||
+		strings.Contains(trimmed, ":=") ||
+		strings.Contains(trimmed, ";") ||
+		strings.Contains(trimmed, "import") ||
+		strings.Contains(trimmed, "package") ||
+		strings.Contains(trimmed, "func") ||
+		strings.Contains(trimmed, "var") ||
+		strings.Contains(trimmed, "const") ||
+		strings.Contains(trimmed, "type") ||
+		strings.Contains(trimmed, "if") ||
+		strings.Contains(trimmed, "else") ||
+		strings.Contains(trimmed, "for") ||
+		strings.Contains(trimmed, "return") ||
+		strings.Contains(trimmed, "go ") ||
+		strings.Contains(trimmed, "defer") ||
+		strings.Contains(trimmed, "select") ||
+		strings.Contains(trimmed, "switch") ||
+		strings.Contains(trimmed, "case") ||
+		strings.Contains(trimmed, "default") ||
+		strings.Contains(trimmed, "range") ||
+		strings.Contains(trimmed, "chan") ||
+		strings.Contains(trimmed, "<-") ||
+		strings.Contains(trimmed, "&&") ||
+		strings.Contains(trimmed, "||") ||
+		strings.Contains(trimmed, "++") ||
+		strings.Contains(trimmed, "--") ||
+		strings.Contains(trimmed, ".")
+
+	// If it has obvious Go syntax, it's probably not a comment
+	if hasGoSyntax {
+		return false
+	}
+
+	// If it's just plain text without Go syntax and is reasonably long,
+	// it's likely a comment. However, be conservative and only filter
+	// lines that are clearly prose-like
+	if len(strings.Fields(trimmed)) >= 2 && !hasGoSyntax {
+		// This is likely prose text in a comment
 		return true
 	}
 
@@ -370,8 +434,22 @@ func highlightGoSyntax(content string, cfg *config.Config) string {
 		formatter = formatters.Fallback
 	}
 
-	// Use a style similar to GitHub or VS Code
-	style := styles.Get("github")
+	// Choose style based on dark style preference
+	var style *chroma.Style
+	if cfg.DarkStyle {
+		// Use dark terminal-friendly styles
+		style = styles.Get("github-dark")
+		if style == nil {
+			style = styles.Get("monokai")
+		}
+		if style == nil {
+			style = styles.Get("dracula")
+		}
+	} else {
+		// Use light styles (default)
+		style = styles.Get("github")
+	}
+	
 	if style == nil {
 		style = styles.Fallback
 	}
