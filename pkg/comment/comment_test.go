@@ -115,12 +115,12 @@ func TestNewPoster(t *testing.T) {
 
 func TestGitHubPoster_Validation(t *testing.T) {
 	poster := NewGitHubPoster("")
-	
+
 	tests := []struct {
-		name     string
-		cfg      *config.Config
-		wantErr  bool
-		errMsg   string
+		name    string
+		cfg     *config.Config
+		wantErr bool
+		errMsg  string
 	}{
 		{
 			name: "missing token",
@@ -180,9 +180,9 @@ func TestGitHubPoster_Validation(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			// Create empty results for testing
 			results := compute.Results{}
-			
+
 			err := poster.PostComment(context.Background(), results, tt.cfg)
-			
+
 			if tt.wantErr {
 				if err == nil {
 					t.Errorf("PostComment() expected error but got none")

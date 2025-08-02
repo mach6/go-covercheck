@@ -18,7 +18,7 @@ func NewPoster(platformType, baseURL string) (Poster, error) {
 	case "gitea":
 		return NewGiteaPoster(baseURL), nil
 	default:
-		return nil, fmt.Errorf("unsupported platform type: %s (supported: %s)", 
+		return nil, fmt.Errorf("unsupported platform type: %s (supported: %s)",
 			platformType, strings.Join(SupportedPlatforms, ", "))
 	}
 }

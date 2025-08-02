@@ -22,7 +22,7 @@ func NewGiteaPoster(baseURL string) *GiteaPoster {
 		// There's no default public Gitea instance, so this should be provided
 		baseURL = "https://gitea.com"
 	}
-	
+
 	return &GiteaPoster{
 		client:  nil, // Will be initialized in PostComment with the token
 		baseURL: strings.TrimSuffix(baseURL, "/"),
@@ -41,7 +41,7 @@ func (g *GiteaPoster) PostComment(ctx context.Context, results compute.Results, 
 	if commentCfg.Platform.PullRequestID <= 0 {
 		return fmt.Errorf("pull request ID is required")
 	}
-	
+
 	// Initialize the client with token if not already done
 	if g.client == nil {
 		client, err := gitea.NewClient(g.baseURL, gitea.SetToken(commentCfg.Platform.Token))
@@ -50,7 +50,7 @@ func (g *GiteaPoster) PostComment(ctx context.Context, results compute.Results, 
 		}
 		g.client = client
 	}
-	
+
 	// Parse repository owner and name
 	parts := strings.Split(commentCfg.Platform.Repository, "/")
 	if len(parts) != 2 {
@@ -58,10 +58,10 @@ func (g *GiteaPoster) PostComment(ctx context.Context, results compute.Results, 
 	}
 	owner, repo := parts[0], parts[1]
 	prID := int64(commentCfg.Platform.PullRequestID)
-	
+
 	// Format the comment content
 	body := FormatMarkdown(results, cfg, commentCfg.Platform.IncludeColors)
-	
+
 	// If updateExisting is enabled, try to find and update existing comment
 	if commentCfg.Platform.UpdateExisting {
 		if err := g.updateExistingComment(ctx, body, owner, repo, prID); err != nil {
@@ -70,7 +70,7 @@ func (g *GiteaPoster) PostComment(ctx context.Context, results compute.Results, 
 		}
 		return nil
 	}
-	
+
 	// Create a new comment
 	return g.createComment(ctx, body, owner, repo, prID)
 }
@@ -81,12 +81,12 @@ func (g *GiteaPoster) createComment(ctx context.Context, body, owner, repo strin
 		State: gitea.ReviewStateComment, // Just a comment, not approval/request changes
 		Body:  body,
 	}
-	
+
 	_, _, err := g.client.CreatePullReview(owner, repo, prID, options)
 	if err != nil {
 		return fmt.Errorf("failed to create pull request review comment: %w", err)
 	}
-	
+
 	return nil
 }
 
@@ -97,7 +97,7 @@ func (g *GiteaPoster) updateExistingComment(ctx context.Context, body, owner, re
 	if err != nil {
 		return fmt.Errorf("failed to list pull reviews: %w", err)
 	}
-	
+
 	// Find existing go-covercheck review
 	var existingReview *gitea.PullReview
 	for i := range reviews {
@@ -106,11 +106,11 @@ func (g *GiteaPoster) updateExistingComment(ctx context.Context, body, owner, re
 			break
 		}
 	}
-	
+
 	if existingReview == nil {
 		return fmt.Errorf("no existing go-covercheck review found")
 	}
-	
+
 	// For Gitea, we need to submit a new review to update, as there's no direct update API
 	// This is a limitation of Gitea's API compared to GitHub/GitLab
 	return g.createComment(ctx, body, owner, repo, prID)
