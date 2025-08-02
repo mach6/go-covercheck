@@ -1,0 +1,161 @@
+package comment
+
+import (
+	"fmt"
+	"sort"
+	"strings"
+
+	"github.com/mach6/go-covercheck/pkg/compute"
+	"github.com/mach6/go-covercheck/pkg/config"
+)
+
+// FormatMarkdown formats coverage results as a markdown comment suitable for posting to PRs.
+func FormatMarkdown(results compute.Results, cfg *config.Config, includeColors bool) string {
+	var builder strings.Builder
+	
+	// Header
+	builder.WriteString("## 🚦 Coverage Report\n\n")
+	
+	// Overall status
+	hasFailures := results.ByTotal.Statements.Failed || results.ByTotal.Blocks.Failed
+	if hasFailures {
+		if includeColors {
+			builder.WriteString("❌ **Coverage check failed**\n\n")
+		} else {
+			builder.WriteString("❌ Coverage check failed\n\n")
+		}
+	} else {
+		if includeColors {
+			builder.WriteString("✅ **Coverage check passed**\n\n")
+		} else {
+			builder.WriteString("✅ Coverage check passed\n\n")
+		}
+	}
+	
+	// Total coverage summary
+	builder.WriteString("### 📊 Total Coverage\n\n")
+	builder.WriteString("| Metric | Coverage | Threshold | Status |\n")
+	builder.WriteString("|--------|----------|-----------|--------|\n")
+	
+	// Statements
+	stmtStatus := "✅ Pass"
+	if results.ByTotal.Statements.Failed {
+		stmtStatus = "❌ Fail"
+	}
+	builder.WriteString(fmt.Sprintf("| Statements | %s (%.1f%%) | %.1f%% | %s |\n",
+		results.ByTotal.Statements.Coverage,
+		results.ByTotal.Statements.Percentage,
+		results.ByTotal.Statements.Threshold,
+		stmtStatus))
+	
+	// Blocks
+	blockStatus := "✅ Pass"
+	if results.ByTotal.Blocks.Failed {
+		blockStatus = "❌ Fail"
+	}
+	builder.WriteString(fmt.Sprintf("| Blocks | %s (%.1f%%) | %.1f%% | %s |\n",
+		results.ByTotal.Blocks.Coverage,
+		results.ByTotal.Blocks.Percentage,
+		results.ByTotal.Blocks.Threshold,
+		blockStatus))
+	
+	// If there are failures, show details
+	if hasFailures {
+		builder.WriteString("\n### 📋 Coverage Details\n\n")
+		
+		// Show failing files if any
+		var failingFiles []compute.ByFile
+		for _, file := range results.ByFile {
+			if file.Failed {
+				failingFiles = append(failingFiles, file)
+			}
+		}
+		
+		if len(failingFiles) > 0 {
+			builder.WriteString("#### Files Below Threshold\n\n")
+			builder.WriteString("| File | Statements | Blocks | Status |\n")
+			builder.WriteString("|------|------------|--------|---------|\n")
+			
+			// Sort failing files by name for consistent output
+			sort.Slice(failingFiles, func(i, j int) bool {
+				return failingFiles[i].File < failingFiles[j].File
+			})
+			
+			for _, file := range failingFiles {
+				stmtIcon := "❌"
+				blockIcon := "❌"
+				if file.StatementPercentage >= file.StatementThreshold {
+					stmtIcon = "✅"
+				}
+				if file.BlockPercentage >= file.BlockThreshold {
+					blockIcon = "✅"
+				}
+				
+				builder.WriteString(fmt.Sprintf("| `%s` | %s %.1f%% (need %.1f%%) | %s %.1f%% (need %.1f%%) | %s %s |\n",
+					file.File,
+					stmtIcon, file.StatementPercentage, file.StatementThreshold,
+					blockIcon, file.BlockPercentage, file.BlockThreshold,
+					stmtIcon, blockIcon))
+			}
+		}
+		
+		// Show package failures if any
+		var failingPackages []compute.ByPackage
+		for _, pkg := range results.ByPackage {
+			if pkg.Failed {
+				failingPackages = append(failingPackages, pkg)
+			}
+		}
+		
+		if len(failingPackages) > 0 {
+			builder.WriteString("\n#### Packages Below Threshold\n\n")
+			builder.WriteString("| Package | Statements | Blocks | Status |\n")
+			builder.WriteString("|---------|------------|--------|---------|\n")
+			
+			// Sort failing packages by name for consistent output
+			sort.Slice(failingPackages, func(i, j int) bool {
+				return failingPackages[i].Package < failingPackages[j].Package
+			})
+			
+			for _, pkg := range failingPackages {
+				stmtIcon := "❌"
+				blockIcon := "❌"
+				if pkg.StatementPercentage >= pkg.StatementThreshold {
+					stmtIcon = "✅"
+				}
+				if pkg.BlockPercentage >= pkg.BlockThreshold {
+					blockIcon = "✅"
+				}
+				
+				builder.WriteString(fmt.Sprintf("| `%s` | %s %.1f%% (need %.1f%%) | %s %.1f%% (need %.1f%%) | %s %s |\n",
+					pkg.Package,
+					stmtIcon, pkg.StatementPercentage, pkg.StatementThreshold,
+					blockIcon, pkg.BlockPercentage, pkg.BlockThreshold,
+					stmtIcon, blockIcon))
+			}
+		}
+		
+		// Show improvement suggestions
+		builder.WriteString("\n### 💡 Required Improvements\n\n")
+		if results.ByTotal.Statements.Failed {
+			requiredStmt := results.ByTotal.Statements.Threshold - results.ByTotal.Statements.Percentage
+			builder.WriteString(fmt.Sprintf("- **Statements**: Need +%.1f%% to reach %.1f%% threshold\n",
+				requiredStmt, results.ByTotal.Statements.Threshold))
+		}
+		if results.ByTotal.Blocks.Failed {
+			requiredBlock := results.ByTotal.Blocks.Threshold - results.ByTotal.Blocks.Percentage
+			builder.WriteString(fmt.Sprintf("- **Blocks**: Need +%.1f%% to reach %.1f%% threshold\n",
+				requiredBlock, results.ByTotal.Blocks.Threshold))
+		}
+	}
+	
+	// Footer with tool info
+	builder.WriteString(fmt.Sprintf("\n---\n*Generated by [go-covercheck](%s)*\n", "https://github.com/mach6/go-covercheck"))
+	
+	return builder.String()
+}
+
+// formatPercentage formats a percentage with appropriate precision.
+func formatPercentage(percentage float64) string {
+	return fmt.Sprintf("%.1f%%", percentage)
+}

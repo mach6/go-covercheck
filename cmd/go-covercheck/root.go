@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -11,6 +12,7 @@ import (
 
 	"github.com/fatih/color"
 	"github.com/jedib0t/go-pretty/v6/text"
+	"github.com/mach6/go-covercheck/pkg/comment"
 	"github.com/mach6/go-covercheck/pkg/compute"
 	"github.com/mach6/go-covercheck/pkg/config"
 	"github.com/mach6/go-covercheck/pkg/output"
@@ -101,6 +103,27 @@ const (
 	InitFlag      = "init"
 	InitFlagUsage = "create a sample .go-covercheck.yml config file in the current directory"
 
+	CommentFlag      = "comment"
+	CommentFlagUsage = "post coverage results as a comment to PR/MR"
+
+	CommentPlatformFlag      = "comment-platform"
+	CommentPlatformFlagUsage = "platform to post comment to [github|gitlab|gitea]"
+
+	CommentBaseURLFlag      = "comment-base-url"
+	CommentBaseURLFlagUsage = "base URL for the platform API (for self-hosted instances)"
+
+	CommentTokenFlag      = "comment-token"
+	CommentTokenFlagUsage = "authentication token for platform API"
+
+	CommentRepositoryFlag      = "comment-repository"
+	CommentRepositoryFlagUsage = "repository identifier (e.g., owner/repo)"
+
+	CommentPRFlag      = "comment-pr"
+	CommentPRFlagUsage = "pull request or merge request ID"
+
+	CommentUpdateFlag      = "comment-update"
+	CommentUpdateFlagUsage = "update existing comment instead of creating new one"
+
 	// ConfigFilePermissions permissions.
 	ConfigFilePermissions = 0600
 )
@@ -190,6 +213,11 @@ func run(cmd *cobra.Command, args []string) error {
 
 	// handle history operations (compare and save)
 	if err := handleHistoryOperations(cmd, results, cfg); err != nil {
+		return err
+	}
+
+	// handle comment posting
+	if err := handleCommentPosting(results, cfg); err != nil {
 		return err
 	}
 
@@ -474,6 +502,30 @@ func applyConfigOverrides(cfg *config.Config, cmd *cobra.Command, noConfigFile b
 		cfg.ModuleName = v
 	}
 
+	// Comment configuration overrides
+	if v, _ := cmd.Flags().GetBool(CommentFlag); cmd.Flags().Changed(CommentFlag) ||
+		noConfigFile {
+		cfg.Comment.Enabled = v
+	}
+	if v, _ := cmd.Flags().GetString(CommentPlatformFlag); cmd.Flags().Changed(CommentPlatformFlag) {
+		cfg.Comment.Platform.Type = v
+	}
+	if v, _ := cmd.Flags().GetString(CommentBaseURLFlag); cmd.Flags().Changed(CommentBaseURLFlag) {
+		cfg.Comment.Platform.BaseURL = v
+	}
+	if v, _ := cmd.Flags().GetString(CommentTokenFlag); cmd.Flags().Changed(CommentTokenFlag) {
+		cfg.Comment.Platform.Token = v
+	}
+	if v, _ := cmd.Flags().GetString(CommentRepositoryFlag); cmd.Flags().Changed(CommentRepositoryFlag) {
+		cfg.Comment.Platform.Repository = v
+	}
+	if v, _ := cmd.Flags().GetInt(CommentPRFlag); cmd.Flags().Changed(CommentPRFlag) {
+		cfg.Comment.Platform.PullRequestID = v
+	}
+	if v, _ := cmd.Flags().GetBool(CommentUpdateFlag); cmd.Flags().Changed(CommentUpdateFlag) {
+		cfg.Comment.Platform.UpdateExisting = v
+	}
+
 	// set cfg.Total thresholds to the global values, iff no override was specified for each.
 	if v, _ := cmd.Flags().GetFloat64(StatementThresholdFlag); !cmd.Flags().Changed(TotalStatementThresholdFlag) &&
 		cfg.Total[config.StatementsSection] == config.StatementThresholdDefault {
@@ -651,6 +703,79 @@ func initFlags(cmd *cobra.Command) {
 		false,
 		InitFlagUsage,
 	)
+
+	cmd.Flags().Bool(
+		CommentFlag,
+		false,
+		CommentFlagUsage,
+	)
+
+	cmd.Flags().String(
+		CommentPlatformFlag,
+		"",
+		CommentPlatformFlagUsage,
+	)
+
+	cmd.Flags().String(
+		CommentBaseURLFlag,
+		"",
+		CommentBaseURLFlagUsage,
+	)
+
+	cmd.Flags().String(
+		CommentTokenFlag,
+		"",
+		CommentTokenFlagUsage,
+	)
+
+	cmd.Flags().String(
+		CommentRepositoryFlag,
+		"",
+		CommentRepositoryFlagUsage,
+	)
+
+	cmd.Flags().Int(
+		CommentPRFlag,
+		0,
+		CommentPRFlagUsage,
+	)
+
+	cmd.Flags().Bool(
+		CommentUpdateFlag,
+		false,
+		CommentUpdateFlagUsage,
+	)
+}
+
+func handleCommentPosting(results compute.Results, cfg *config.Config) error {
+	// Skip comment posting if not enabled
+	if !cfg.Comment.Enabled {
+		return nil
+	}
+
+	// Validate required comment configuration
+	if cfg.Comment.Platform.Type == "" {
+		return fmt.Errorf("comment platform type is required when comment posting is enabled")
+	}
+
+	// Create poster based on platform type
+	poster, err := comment.NewPoster(cfg.Comment.Platform.Type, cfg.Comment.Platform.BaseURL)
+	if err != nil {
+		return fmt.Errorf("failed to create comment poster: %w", err)
+	}
+
+	// Set default values for color inclusion (enabled by default unless explicitly disabled)
+	if cfg.Comment.Platform.IncludeColors == false && !cfg.NoColor {
+		cfg.Comment.Platform.IncludeColors = true
+	}
+
+	// Post the comment
+	ctx := context.Background()
+	if err := poster.PostComment(ctx, results, cfg); err != nil {
+		return fmt.Errorf("failed to post comment: %w", err)
+	}
+
+	return nil
 }
 
 func shouldSkip(filename string, skip []string) bool {
