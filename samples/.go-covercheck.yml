@@ -79,3 +79,40 @@ total:
 # default []
 skip:
 #  - cmd/root.go
+
+# comment posting configuration for PR/MR comments
+# default {"enabled": false}
+comment:
+  # enable comment posting to PR/MR
+  # default false
+  enabled: false
+  
+  platform:
+    # platform type: github|gitlab|gitea
+    # required when comment posting is enabled
+    type: github
+    
+    # base URL for self-hosted instances
+    # defaults: github.com, gitlab.com, or gitea.com
+    # baseUrl: https://github.enterprise.com
+    
+    # authentication token for API access
+    # required when comment posting is enabled
+    # can also be set via --comment-token flag or environment variable
+    # token: ghp_xxxxxxxxxxxxxxxxxxxx
+    
+    # repository identifier (owner/repo format)
+    # required when comment posting is enabled
+    # repository: owner/repo-name
+    
+    # pull request or merge request ID
+    # required when comment posting is enabled
+    # pullRequestId: 123
+    
+    # include color formatting in comments (emojis and markdown)
+    # default true
+    includeColors: true
+    
+    # update existing go-covercheck comment instead of creating new one
+    # default false
+    updateExisting: false
