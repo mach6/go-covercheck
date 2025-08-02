@@ -2,7 +2,6 @@ package heatmap
 
 import (
 	"bytes"
-	"strings"
 	"testing"
 
 	"github.com/mach6/go-covercheck/pkg/compute"
@@ -58,22 +57,24 @@ func TestASCIIHeatmap_Generate(t *testing.T) {
 	assert.NoError(t, err)
 
 	output := buf.String()
-	assert.Contains(t, output, "COVERAGE HEAT MAP")
-	assert.Contains(t, output, "Statement Coverage Legend:")
-	assert.Contains(t, output, "PACKAGES BY STATEMENT COVERAGE:")
-	assert.Contains(t, output, "OVERALL COVERAGE:")
+	assert.Contains(t, output, "COVERAGE GRID HEAT MAP")
+	assert.Contains(t, output, "Coverage Legend (highlighting improvement opportunities):")
+	assert.Contains(t, output, "FILES BY COVERAGE (highlighting improvement opportunities):")
+	assert.Contains(t, output, "PACKAGES BY COVERAGE (highlighting improvement opportunities):")
+	assert.Contains(t, output, "OVERALL COVERAGE SUMMARY:")
 	assert.Contains(t, output, "pkg/test")
 	assert.Contains(t, output, "85.0%")
 	assert.Contains(t, output, "Statement Coverage")
 	assert.Contains(t, output, "Block Coverage")
 	
-	// Verify files are NOT displayed (packages only)
-	assert.NotContains(t, output, "FILES BY COVERAGE:")
-	assert.NotContains(t, output, "test1.go")
-	assert.NotContains(t, output, "test2.go")
+	// Verify both files and packages are displayed in grid format
+	assert.Contains(t, output, "test1.go")
+	assert.Contains(t, output, "test2.go")
+	assert.Contains(t, output, "95.0%")
+	assert.Contains(t, output, "75.0%")
 }
 
-func TestASCIIHeatmap_GenerateCoverageBar(t *testing.T) {
+func TestASCIIHeatmap_GenerateCoverageCell(t *testing.T) {
 	cfg := &config.Config{NoColor: true}
 	var buf bytes.Buffer
 	heatmap := NewASCIIHeatmap(&buf, cfg)
@@ -83,17 +84,17 @@ func TestASCIIHeatmap_GenerateCoverageBar(t *testing.T) {
 		percentage float64
 		expected   string
 	}{
-		{"100 percent", 100.0, "[==========]"},
-		{"90 percent", 90.0, "[========= ]"},
-		{"50 percent", 50.0, "[=====     ]"},
-		{"10 percent", 10.0, "[=         ]"},
-		{"0 percent", 0.0, "[          ]"},
+		{"excellent coverage", 95.0, "▓▓ "},
+		{"good coverage", 80.0, "▒▒ "},
+		{"fair coverage", 60.0, "░░ "},
+		{"poor coverage", 40.0, "▓▓ "},
+		{"critical coverage", 20.0, "██ "},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := heatmap.generateCoverageBar(tt.percentage)
-			assert.Contains(t, result, tt.expected)
+			result := heatmap.generateCoverageCell(tt.percentage)
+			assert.Equal(t, tt.expected, result)
 		})
 	}
 }
@@ -119,28 +120,56 @@ func TestNewGenerator(t *testing.T) {
 	})
 }
 
-func TestASCIIHeatmap_TruncateFileName(t *testing.T) {
+func TestASCIIHeatmap_ExtractFilename(t *testing.T) {
 	cfg := &config.Config{NoColor: true}
 	var buf bytes.Buffer
 	heatmap := NewASCIIHeatmap(&buf, cfg)
 
 	tests := []struct {
 		name     string
-		filename string
-		maxLen   int
+		fullPath string
 		expected string
 	}{
-		{"short filename", "test.go", 20, "test.go"},
-		{"long filename", "very/long/path/to/file.go", 15, "very/long/pa..."},
-		{"exact length", "exact.go", 8, "exact.go"},
+		{"simple filename", "test.go", "test.go"},
+		{"path with slash", "pkg/config/test.go", "test.go"},
+		{"long path", "very/long/path/to/file.go", "file.go"},
+		{"empty path", "", ""},
+		{"path ending with slash", "pkg/", "pkg/"},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := heatmap.truncateFileName(tt.filename, tt.maxLen)
-			assert.True(t, len(strings.TrimSpace(result)) <= tt.maxLen)
-			if len(tt.filename) > tt.maxLen {
-				assert.Contains(t, result, "...")
+			result := heatmap.extractFilename(tt.fullPath)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+func TestASCIIHeatmap_AbbreviateText(t *testing.T) {
+	cfg := &config.Config{NoColor: true}
+	var buf bytes.Buffer
+	heatmap := NewASCIIHeatmap(&buf, cfg)
+
+	tests := []struct {
+		name     string
+		text     string
+		maxLen   int
+		expected string
+	}{
+		{"short text", "test.go", 20, "test.go"},
+		{"long text", "very_long_filename.go", 10, "very_long.."},
+		{"exact length", "exact.go", 8, "exact.go"},
+		{"very short limit", "test.go", 3, "tes"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := heatmap.abbreviateText(tt.text, tt.maxLen)
+			assert.True(t, len(result) <= tt.maxLen)
+			if len(tt.text) > tt.maxLen && tt.maxLen > 3 {
+				assert.Contains(t, result, "..")
+			} else if len(tt.text) <= tt.maxLen {
+				assert.Equal(t, tt.text, result)
 			}
 		})
 	}

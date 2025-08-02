@@ -34,12 +34,12 @@ func NewPNGHeatmap(writer io.Writer, cfg *config.Config) *PNGHeatmap {
 	}
 }
 
-// Generate creates a PNG heat map image of the coverage results.
+// Generate creates a PNG grid heat map image of the coverage results.
 func (h *PNGHeatmap) Generate(results compute.Results) error {
 	// Calculate required height based on content
 	requiredHeight := h.calculateRequiredHeight(results)
 	h.height = requiredHeight
-	h.width = 1000 // Make it wider to accommodate more content
+	h.width = 1200 // Make it wider to accommodate grid layout
 	
 	// Create the image
 	img := image.NewRGBA(image.Rect(0, 0, h.width, h.height))
@@ -48,17 +48,25 @@ func (h *PNGHeatmap) Generate(results compute.Results) error {
 	draw.Draw(img, img.Bounds(), &image.Uniform{color.RGBA{245, 245, 245, 255}}, image.Point{}, draw.Src)
 	
 	// Draw title
-	h.drawTitle(img, "Coverage Heat Map")
+	h.drawTitle(img, "Coverage Grid Heat Map")
 	
 	// Calculate layout
 	startY := 80
 	
-	// Draw package heat map only (no files)
-	if len(results.ByPackage) > 0 {
-		h.drawSectionTitle(img, "Packages by Statement Coverage", 60, startY)
+	// Draw file grid heat map
+	if len(results.ByFile) > 0 {
+		h.drawSectionTitle(img, "Files by Coverage (highlighting improvement opportunities)", 60, startY)
 		startY += 30
-		startY = h.drawPackageHeatmap(img, results.ByPackage, startY)
-		startY += 20
+		startY = h.drawFileGridHeatmap(img, results.ByFile, startY)
+		startY += 30
+	}
+	
+	// Draw package grid heat map
+	if len(results.ByPackage) > 0 {
+		h.drawSectionTitle(img, "Packages by Coverage (highlighting improvement opportunities)", 60, startY)
+		startY += 30
+		startY = h.drawPackageGridHeatmap(img, results.ByPackage, startY)
+		startY += 30
 	}
 	
 	// Draw summary
@@ -110,123 +118,213 @@ func (h *PNGHeatmap) drawText(img *image.RGBA, text string, x, y int, c color.RG
 }
 
 func (h *PNGHeatmap) calculateRequiredHeight(results compute.Results) int {
-	baseHeight := 200 // Title, margins, legend space
+	baseHeight := 200 // Title, margins space
+	
+	// File section
+	fileHeight := 0
+	if len(results.ByFile) > 0 {
+		cols := h.calculateGridCols(len(results.ByFile))
+		rows := (len(results.ByFile) + cols - 1) / cols
+		fileHeight = 60 + rows*80 // Section title + grid cells with labels
+	}
 	
 	// Package section
-	packageHeight := len(results.ByPackage) * 22 // 22 pixels per package
-	if packageHeight > 0 {
-		packageHeight += 60 // Section title and spacing
+	packageHeight := 0
+	if len(results.ByPackage) > 0 {
+		cols := h.calculateGridCols(len(results.ByPackage))
+		rows := (len(results.ByPackage) + cols - 1) / cols
+		packageHeight = 60 + rows*80 // Section title + grid cells with labels
 	}
 	
 	// Summary section
 	summaryHeight := 100 // Overall coverage section
 	
 	// Legend
-	legendHeight := 120
+	legendHeight := 140
 	
-	totalHeight := baseHeight + packageHeight + summaryHeight + legendHeight
+	totalHeight := baseHeight + fileHeight + packageHeight + summaryHeight + legendHeight
 	
 	// Ensure minimum height
-	if totalHeight < 400 {
-		totalHeight = 400
+	if totalHeight < 500 {
+		totalHeight = 500
 	}
 	
 	return totalHeight
 }
 
-func (h *PNGHeatmap) drawPackageHeatmap(img *image.RGBA, packages []compute.ByPackage, startY int) int {
+func (h *PNGHeatmap) drawFileGridHeatmap(img *image.RGBA, files []compute.ByFile, startY int) int {
+	if len(files) == 0 {
+		return startY
+	}
+	
+	// Sort files by coverage percentage (ascending to highlight worst first)
+	sortedFiles := make([]compute.ByFile, len(files))
+	copy(sortedFiles, files)
+	sort.Slice(sortedFiles, func(i, j int) bool {
+		return sortedFiles[i].StatementPercentage < sortedFiles[j].StatementPercentage
+	})
+	
+	cols := h.calculateGridCols(len(sortedFiles))
+	rows := (len(sortedFiles) + cols - 1) / cols
+	
+	cellSize := 40
+	cellSpacing := 50
+	gridStartX := 80
+	gridStartY := startY
+	
+	for row := 0; row < rows; row++ {
+		for col := 0; col < cols; col++ {
+			idx := row*cols + col
+			if idx >= len(sortedFiles) {
+				break
+			}
+			
+			file := sortedFiles[idx]
+			x := gridStartX + col*cellSpacing
+			y := gridStartY + row*80
+			
+			// Draw coverage cell
+			cellColor := h.getCoverageColor(file.StatementPercentage)
+			h.drawRect(img, x, y, cellSize, cellSize, cellColor)
+			
+			// Draw filename (abbreviated)
+			filename := h.extractFilename(file.File)
+			abbreviated := h.truncateText(filename, 8)
+			h.drawText(img, abbreviated, x, y+cellSize+12, color.RGBA{0, 0, 0, 255}, false)
+			
+			// Draw percentage
+			percentText := fmt.Sprintf("%.1f%%", file.StatementPercentage)
+			h.drawText(img, percentText, x, y+cellSize+25, color.RGBA{60, 60, 60, 255}, false)
+		}
+	}
+	
+	return gridStartY + rows*80
+}
+
+func (h *PNGHeatmap) drawPackageGridHeatmap(img *image.RGBA, packages []compute.ByPackage, startY int) int {
 	if len(packages) == 0 {
 		return startY
 	}
 	
-	// Sort packages by coverage percentage (descending)
+	// Sort packages by coverage percentage (ascending to highlight worst first)
 	sortedPackages := make([]compute.ByPackage, len(packages))
 	copy(sortedPackages, packages)
 	sort.Slice(sortedPackages, func(i, j int) bool {
-		return sortedPackages[i].StatementPercentage > sortedPackages[j].StatementPercentage
+		return sortedPackages[i].StatementPercentage < sortedPackages[j].StatementPercentage
 	})
 	
-	itemHeight := 22
-	x := 80
-	y := startY
-	barWidth := 200
+	cols := h.calculateGridCols(len(sortedPackages))
+	rows := (len(sortedPackages) + cols - 1) / cols
 	
-	// Draw all packages without truncation
-	for _, pkg := range sortedPackages {
-		// Draw coverage bar
-		barColor := h.getCoverageColor(pkg.StatementPercentage)
-		barLength := int(float64(barWidth) * pkg.StatementPercentage / 100.0)
-		
-		// Background bar
-		h.drawRect(img, x, y-8, barWidth, 12, color.RGBA{220, 220, 220, 255})
-		// Coverage bar
-		if barLength > 0 {
-			h.drawRect(img, x, y-8, barLength, 12, barColor)
+	cellSize := 50
+	cellSpacing := 80
+	gridStartX := 80
+	gridStartY := startY
+	
+	for row := 0; row < rows; row++ {
+		for col := 0; col < cols; col++ {
+			idx := row*cols + col
+			if idx >= len(sortedPackages) {
+				break
+			}
+			
+			pkg := sortedPackages[idx]
+			x := gridStartX + col*cellSpacing
+			y := gridStartY + row*80
+			
+			// Draw coverage cell
+			cellColor := h.getCoverageColor(pkg.StatementPercentage)
+			h.drawRect(img, x, y, cellSize, cellSize, cellColor)
+			
+			// Draw package name (abbreviated)
+			abbreviated := h.truncateText(pkg.Package, 10)
+			h.drawText(img, abbreviated, x, y+cellSize+12, color.RGBA{0, 0, 0, 255}, false)
+			
+			// Draw percentage
+			percentText := fmt.Sprintf("%.1f%%", pkg.StatementPercentage)
+			h.drawText(img, percentText, x, y+cellSize+25, color.RGBA{60, 60, 60, 255}, false)
 		}
-		
-		// Package name
-		packageName := h.truncateText(pkg.Package, 50) // Longer since we have more width
-		h.drawText(img, packageName, x+barWidth+10, y, color.RGBA{0, 0, 0, 255}, false)
-		
-		// Percentage
-		percentText := fmt.Sprintf("%.1f%%", pkg.StatementPercentage)
-		h.drawText(img, percentText, x+barWidth+400, y, color.RGBA{0, 0, 0, 255}, false)
-		
-		y += itemHeight
 	}
 	
-	return y
+	return gridStartY + rows*80
+}
+
+func (h *PNGHeatmap) calculateGridCols(itemCount int) int {
+	if itemCount <= 0 {
+		return 1
+	}
+	
+	// Aim for roughly square grid, but limit to fit in image width
+	maxCols := 10 // Conservative for readability in PNG
+	if itemCount <= 4 {
+		return itemCount
+	}
+	if itemCount <= 16 {
+		return 4
+	}
+	if itemCount <= 36 {
+		return 6
+	}
+	if itemCount <= 100 {
+		return 10
+	}
+	return maxCols
+}
+
+func (h *PNGHeatmap) extractFilename(fullPath string) string {
+	// Extract just the filename from a full path
+	lastSlash := -1
+	for i := len(fullPath) - 1; i >= 0; i-- {
+		if fullPath[i] == '/' {
+			lastSlash = i
+			break
+		}
+	}
+	if lastSlash != -1 && lastSlash < len(fullPath)-1 {
+		return fullPath[lastSlash+1:]
+	}
+	return fullPath
 }
 
 func (h *PNGHeatmap) drawSummary(img *image.RGBA, totals compute.Totals, startY int) {
-	h.drawSectionTitle(img, "Overall Coverage", 60, startY)
+	h.drawSectionTitle(img, "Overall Coverage Summary", 60, startY)
 	
 	x := 80
 	y := startY + 30
-	barWidth := 200
+	cellSize := 20
 	
 	// Statements
 	stmtColor := h.getCoverageColor(totals.Statements.Percentage)
-	stmtLength := int(float64(barWidth) * totals.Statements.Percentage / 100.0)
-	
-	h.drawRect(img, x, y-8, barWidth, 12, color.RGBA{220, 220, 220, 255})
-	if stmtLength > 0 {
-		h.drawRect(img, x, y-8, stmtLength, 12, stmtColor)
-	}
+	h.drawRect(img, x, y, cellSize, cellSize, stmtColor)
 	
 	stmtText := fmt.Sprintf("Statement Coverage %s (%.1f%%)", totals.Statements.Coverage, totals.Statements.Percentage)
-	h.drawText(img, stmtText, x+barWidth+10, y, color.RGBA{0, 0, 0, 255}, false)
+	h.drawText(img, stmtText, x+cellSize+10, y+15, color.RGBA{0, 0, 0, 255}, false)
 	
 	// Blocks
-	y += 25
+	y += 30
 	blockColor := h.getCoverageColor(totals.Blocks.Percentage)
-	blockLength := int(float64(barWidth) * totals.Blocks.Percentage / 100.0)
-	
-	h.drawRect(img, x, y-8, barWidth, 12, color.RGBA{220, 220, 220, 255})
-	if blockLength > 0 {
-		h.drawRect(img, x, y-8, blockLength, 12, blockColor)
-	}
+	h.drawRect(img, x, y, cellSize, cellSize, blockColor)
 	
 	blockText := fmt.Sprintf("Block Coverage     %s (%.1f%%)", totals.Blocks.Coverage, totals.Blocks.Percentage)
-	h.drawText(img, blockText, x+barWidth+10, y, color.RGBA{0, 0, 0, 255}, false)
+	h.drawText(img, blockText, x+cellSize+10, y+15, color.RGBA{0, 0, 0, 255}, false)
 }
 
 func (h *PNGHeatmap) drawLegend(img *image.RGBA) {
-	legendX := h.width - 250 // Adjusted for wider image
+	legendX := h.width - 280 // Adjusted for wider image and longer text
 	legendY := 100
 	
-	h.drawText(img, "Statement Coverage Legend:", legendX, legendY, color.RGBA{0, 0, 0, 255}, false)
+	h.drawText(img, "Coverage Legend (highlighting opportunities):", legendX, legendY, color.RGBA{0, 0, 0, 255}, false)
 	legendY += 20
 	
 	legend := []struct {
 		label string
 		color color.RGBA
 	}{
-		{"90-100% Excellent", color.RGBA{76, 175, 80, 255}},
-		{"70-89%  Good", color.RGBA{255, 193, 7, 255}},
-		{"50-69%  Fair", color.RGBA{255, 152, 0, 255}},
-		{"30-49%  Poor", color.RGBA{244, 67, 54, 255}},
-		{"0-29%   Critical", color.RGBA{156, 39, 176, 255}},
+		{"0-29%   Critical (High Priority)", color.RGBA{156, 39, 176, 255}},
+		{"30-49%  Poor (Medium Priority)", color.RGBA{244, 67, 54, 255}},
+		{"50-69%  Fair (Low Priority)", color.RGBA{255, 152, 0, 255}},
+		{"70-89%  Good (Maintain)", color.RGBA{255, 193, 7, 255}},
+		{"90-100% Excellent (Well Covered)", color.RGBA{76, 175, 80, 255}},
 	}
 	
 	for _, item := range legend {
