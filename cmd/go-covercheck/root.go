@@ -37,6 +37,9 @@ const (
 	FormatFlag      = "format"
 	FormatFlagShort = "f"
 
+	TableStyleFlag      = "table-style"
+	TableStyleFlagUsage = "table style [default|light|bold|rounded|double]"
+
 	StatementThresholdFlag      = "statement-threshold"
 	StatementThresholdFlagShort = "s"
 	StatementThresholdFlagUsage = "global statement threshold to enforce [0=disabled]"
@@ -534,6 +537,12 @@ func initFlags(cmd *cobra.Command) {
 		FormatFlagShort,
 		config.FormatDefault,
 		FormatFlagUsage,
+	)
+
+	cmd.Flags().String(
+		TableStyleFlag,
+		config.TableStyleDefValue,
+		TableStyleFlagUsage,
 	)
 
 	cmd.Flags().Float64P(
