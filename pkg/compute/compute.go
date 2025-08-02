@@ -1,7 +1,9 @@
 package compute
 
 import (
+	"bufio"
 	"fmt"
+	"os"
 	"path"
 	"sort"
 	"strconv"
@@ -48,8 +50,120 @@ func collectUncoveredLines(p *cover.Profile) string {
 	}
 	sort.Ints(uniqueLines)
 	
+	// Filter out excluded lines (empty, comments, closing braces)
+	filteredLines := filterExcludedLines(uniqueLines, p.FileName)
+	
 	// Convert to ranges where possible
-	return formatLineRanges(uniqueLines)
+	return formatLineRanges(filteredLines)
+}
+
+// filterExcludedLines removes lines that should not be considered as uncovered:
+// - Empty lines (only whitespace)
+// - Comment lines (starting with //)
+// - Lines that only contain closing braces }
+func filterExcludedLines(lines []int, fileName string) []int {
+	// Try to read the source file
+	fileLines, err := readFileLines(fileName)
+	if err != nil {
+		// If we can't read the file, return all lines (fallback to original behavior)
+		return lines
+	}
+	
+	var filteredLines []int
+	inBlockComment := false
+	
+	for _, lineNum := range lines {
+		// Convert to 0-based index for slice access
+		index := lineNum - 1
+		if index < 0 || index >= len(fileLines) {
+			// Line number out of range, include it
+			filteredLines = append(filteredLines, lineNum)
+			continue
+		}
+		
+		line := fileLines[index]
+		trimmedLine := strings.TrimSpace(line)
+		
+		// Handle block comment start/end
+		lineHasBlockStart := strings.Contains(line, "/*")
+		lineHasBlockEnd := strings.Contains(line, "*/")
+		
+		// Handle single-line block comments /* ... */
+		if lineHasBlockStart && lineHasBlockEnd {
+			// Remove the block comment part and check if there's remaining code
+			commentStart := strings.Index(line, "/*")
+			commentEnd := strings.Index(line, "*/") + 2
+			
+			// Create a line with the block comment removed
+			beforeComment := line[:commentStart]
+			afterComment := ""
+			if commentEnd < len(line) {
+				afterComment = line[commentEnd:]
+			}
+			lineWithoutBlockComment := beforeComment + afterComment
+			trimmedWithoutBlock := strings.TrimSpace(lineWithoutBlockComment)
+			
+			// If there's still meaningful code after removing block comment, keep it
+			if trimmedWithoutBlock != "" && !strings.HasPrefix(trimmedWithoutBlock, "//") && trimmedWithoutBlock != "}" {
+				filteredLines = append(filteredLines, lineNum)
+			}
+			continue
+		}
+		
+		// If this line ends a block comment, filter it and stop being in block comment
+		if lineHasBlockEnd {
+			inBlockComment = false
+			continue
+		}
+		
+		// Skip if we're currently in a block comment
+		if inBlockComment {
+			continue
+		}
+		
+		// If this line starts a block comment, filter it and start being in block comment
+		if lineHasBlockStart {
+			inBlockComment = true
+			continue
+		}
+		
+		// Skip empty lines
+		if trimmedLine == "" {
+			continue
+		}
+		
+		// Skip single-line comments
+		if strings.HasPrefix(trimmedLine, "//") {
+			continue
+		}
+		
+		// Skip lines that only contain closing braces
+		if trimmedLine == "}" {
+			continue
+		}
+		
+		// Include this line
+		filteredLines = append(filteredLines, lineNum)
+	}
+	
+	return filteredLines
+}
+
+// readFileLines reads a file and returns its lines
+func readFileLines(fileName string) ([]string, error) {
+	file, err := os.Open(fileName)
+	if err != nil {
+		return nil, err
+	}
+	defer file.Close()
+	
+	var lines []string
+	scanner := bufio.NewScanner(file)
+	for scanner.Scan() {
+		lines = append(lines, scanner.Text())
+	}
+	
+	return lines, scanner.Err()
 }
 
 func formatLineRanges(lines []int) string {
