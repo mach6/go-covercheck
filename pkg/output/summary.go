@@ -21,7 +21,6 @@ func renderSummary(hasFailure bool, results compute.Results, cfg *config.Config)
 		fmt.Println(color.New(color.FgGreen).Sprint("✔"), "All good")
 		return
 	}
-
 	_, _ = fmt.Println(color.New(color.FgRed).Sprint("✘"), "Coverage check failed")
 	renderByFile(results)
 	renderByPackage(results)
