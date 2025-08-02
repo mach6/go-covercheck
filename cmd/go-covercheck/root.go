@@ -45,6 +45,10 @@ const (
 	BlockThresholdFlagShort = "b"
 	BlockThresholdFlagUsage = "global block threshold to enforce [0=disabled]"
 
+	LineThresholdFlag      = "line-threshold"
+	LineThresholdFlagShort = "n"
+	LineThresholdFlagUsage = "global line threshold to enforce [0=disabled]"
+
 	TotalStatementThresholdFlag      = "total-statement-threshold"
 	TotalStatementThresholdFlagShort = "S"
 	TotalStatementThresholdFlagUsage = "total statement threshold to enforce [0=disabled]"
@@ -52,6 +56,10 @@ const (
 	TotalBlockThresholdFlag      = "total-block-threshold"
 	TotalBlockThresholdFlagShort = "B"
 	TotalBlockThresholdFlagUsage = "total block threshold to enforce [0=disabled]"
+
+	TotalLineThresholdFlag      = "total-line-threshold"
+	TotalLineThresholdFlagShort = "N"
+	TotalLineThresholdFlagUsage = "total line threshold to enforce [0=disabled]"
 
 	SortByFlag    = "sort-by"
 	SortOrderFlag = "sort-order"
@@ -104,6 +112,23 @@ const (
 	DiffFromFlag      = "diff-from"
 	DiffFromFlagUsage = "git reference (commit/branch/tag) to diff from; enables diff-only mode"
 
+	NoUncoveredLinesFlag      = "no-uncovered-lines"
+	NoUncoveredLinesFlagShort = "Q"
+	NoUncoveredLinesFlagUsage = "hide line numbers not covered by tests"
+
+	ShowUncoveredFlag      = "show-uncovered"
+	ShowUncoveredFlagShort = "U"
+	ShowUncoveredFlagUsage = "show uncovered lines with source code"
+
+	UncoveredFileFlag      = "uncovered-file"
+	UncoveredFileFlagUsage = "show uncovered lines for specific file (implies --show-uncovered)"
+
+	UncoveredContextFlag      = "uncovered-context"
+	UncoveredContextFlagUsage = "number of context lines to show around uncovered blocks [default: 2]"
+
+	SyntaxStyleFlag      = "syntax-style"
+	SyntaxStyleFlagUsage = "syntax highlighting style for uncovered code. Available: github, github-dark, monokai, dracula, solarized-dark, solarized-light, nord, catppuccin-mocha, etc."
+
 	// ConfigFilePermissions permissions.
 	ConfigFilePermissions = 0600
 )
@@ -135,12 +160,14 @@ var (
 	)
 
 	SortByFlagUsage = fmt.Sprintf(
-		"sort-by [%s|%s|%s|%s|%s]",
+		"sort-by [%s|%s|%s|%s|%s|%s|%s]",
 		config.SortByFile,
 		config.SortByBlocks,
 		config.SortByStatements,
+		config.SortByLines,
 		config.SortByStatementPercent,
 		config.SortByBlockPercent,
+		config.SortByLinePercent,
 	)
 
 	SortOrderFlagUsage = fmt.Sprintf("sort order [%s|%s]",
@@ -232,6 +259,16 @@ func showCoverage(args []string, cfg *config.Config) (compute.Results, bool, err
 		return compute.Results{}, false, err
 	}
 	filtered := filters.FilterProfiles(profiles, cfg)
+
+	// If showing uncovered lines, handle that separately
+	if cfg.ShowUncovered {
+		err := output.ShowUncoveredLines(filtered, cfg)
+		if err != nil {
+			return compute.Results{}, false, err
+		}
+		// For uncovered lines mode, we don't need to return results or failure status
+		return compute.Results{}, false, nil
+	}
 
 	results, failed := compute.CollectResults(filtered, cfg)
 	output.FormatAndReport(results, cfg, failed)
@@ -415,18 +452,25 @@ func getConfig(cmd *cobra.Command) (*config.Config, error) {
 func applyConfigOverrides(cfg *config.Config, cmd *cobra.Command, noConfigFile bool) {
 	applyFloat64FlagOverride(cmd, StatementThresholdFlag, &cfg.StatementThreshold, noConfigFile)
 	applyFloat64FlagOverride(cmd, BlockThresholdFlag, &cfg.BlockThreshold, noConfigFile)
+	applyFloat64FlagOverride(cmd, LineThresholdFlag, &cfg.LineThreshold, noConfigFile)
 	applyFloat64TotalFlagOverride(cmd, TotalStatementThresholdFlag, config.StatementsSection, cfg.Total)
 	applyFloat64TotalFlagOverride(cmd, TotalBlockThresholdFlag, config.BlocksSection, cfg.Total)
+	applyFloat64TotalFlagOverride(cmd, TotalLineThresholdFlag, config.LinesSection, cfg.Total)
 	applyStringFlagOverride(cmd, SortByFlag, &cfg.SortBy, noConfigFile)
 	applyStringFlagOverride(cmd, SortOrderFlag, &cfg.SortOrder, noConfigFile)
 	applyStringArrayFlagOverride(cmd, SkipFlag, &cfg.Skip, noConfigFile)
 	applyStringFlagOverride(cmd, FormatFlag, &cfg.Format, noConfigFile)
+	applyStringFlagOverride(cmd, UncoveredFileFlag, &cfg.UncoveredFile, noConfigFile)
+	applyStringFlagOverride(cmd, SyntaxStyleFlag, &cfg.SyntaxStyle, noConfigFile)
 	applyBoolFlagOverride(cmd, NoTableFlag, &cfg.NoTable, noConfigFile)
 	applyBoolFlagOverride(cmd, NoSummaryFlag, &cfg.NoSummary, noConfigFile)
 	applyBoolFlagOverride(cmd, NoColorFlag, &cfg.NoColor, noConfigFile)
+	applyBoolFlagOverride(cmd, NoUncoveredLinesFlag, &cfg.HideUncoveredLines, noConfigFile)
+	applyBoolFlagOverride(cmd, ShowUncoveredFlag, &cfg.ShowUncovered, noConfigFile)
 	applyIntFlagOverride(cmd, TerminalWidthFlag, &cfg.TerminalWidth, noConfigFile)
+	applyIntFlagOverride(cmd, UncoveredContextFlag, &cfg.UncoveredContext, noConfigFile)
 	applyStringFlagOverride(cmd, ModuleNameFlag, &cfg.ModuleName, noConfigFile)
-	applyDiffFromFlagOverride(cmd, DiffFromFlag, &cfg.DiffFrom, noConfigFile)
+	applyStringFlagOverride(cmd, DiffFromFlag, &cfg.DiffFrom, noConfigFile)
 
 	// set cfg.Total thresholds to the global values, iff no override was specified for each.
 	if v, _ := cmd.Flags().GetFloat64(StatementThresholdFlag); !cmd.Flags().Changed(TotalStatementThresholdFlag) &&
@@ -436,6 +480,10 @@ func applyConfigOverrides(cfg *config.Config, cmd *cobra.Command, noConfigFile b
 	if v, _ := cmd.Flags().GetFloat64(BlockThresholdFlag); !cmd.Flags().Changed(TotalBlockThresholdFlag) &&
 		cfg.Total[config.BlocksSection] == config.BlockThresholdDefault {
 		cfg.Total[config.BlocksSection] = v
+	}
+	if v, _ := cmd.Flags().GetFloat64(LineThresholdFlag); !cmd.Flags().Changed(TotalLineThresholdFlag) &&
+		cfg.Total[config.LinesSection] == config.LineThresholdDefault {
+		cfg.Total[config.LinesSection] = v
 	}
 }
 
@@ -448,12 +496,6 @@ func applyFloat64FlagOverride(cmd *cobra.Command, flagName string, target *float
 func applyFloat64TotalFlagOverride(cmd *cobra.Command, flagName string, section string, target map[string]float64) {
 	if v, _ := cmd.Flags().GetFloat64(flagName); cmd.Flags().Changed(flagName) {
 		target[section] = v
-	}
-}
-
-func applyDiffFromFlagOverride(cmd *cobra.Command, flagName string, target *string, noConfigFile bool) {
-	if v, _ := cmd.Flags().GetString(flagName); cmd.Flags().Changed(flagName) || noConfigFile {
-		*target = v
 	}
 }
 
@@ -549,6 +591,13 @@ func initFlags(cmd *cobra.Command) {
 	)
 
 	cmd.Flags().Float64P(
+		LineThresholdFlag,
+		LineThresholdFlagShort,
+		config.LineThresholdDefault,
+		LineThresholdFlagUsage,
+	)
+
+	cmd.Flags().Float64P(
 		TotalStatementThresholdFlag,
 		TotalStatementThresholdFlagShort,
 		0,
@@ -560,6 +609,13 @@ func initFlags(cmd *cobra.Command) {
 		TotalBlockThresholdFlagShort,
 		0,
 		TotalBlockThresholdFlagUsage,
+	)
+
+	cmd.Flags().Float64P(
+		TotalLineThresholdFlag,
+		TotalLineThresholdFlagShort,
+		0,
+		TotalLineThresholdFlagUsage,
 	)
 
 	cmd.Flags().String(
@@ -646,6 +702,38 @@ func initFlags(cmd *cobra.Command) {
 		InitFlag,
 		false,
 		InitFlagUsage,
+	)
+
+	cmd.Flags().BoolP(
+		NoUncoveredLinesFlag,
+		NoUncoveredLinesFlagShort,
+		false,
+		NoUncoveredLinesFlagUsage,
+	)
+
+	cmd.Flags().BoolP(
+		ShowUncoveredFlag,
+		ShowUncoveredFlagShort,
+		false,
+		ShowUncoveredFlagUsage,
+	)
+
+	cmd.Flags().String(
+		UncoveredFileFlag,
+		"",
+		UncoveredFileFlagUsage,
+	)
+
+	cmd.Flags().Int(
+		UncoveredContextFlag,
+		2,
+		UncoveredContextFlagUsage,
+	)
+
+	cmd.Flags().String(
+		SyntaxStyleFlag,
+		"github",
+		SyntaxStyleFlagUsage,
 	)
 
 	cmd.Flags().String(
