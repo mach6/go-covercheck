@@ -182,7 +182,7 @@ func Test_findModuleName_withGoMod_Mismatch(t *testing.T) {
 go 1.21
 `
 	p := test.CreateTempFile(t, "go.mod", goModContent)
-	t.Chdir(path.Dir(p))
+	t.Chdir(filepath.Dir(p))
 
 	// File paths don't match the module name
 	profiles := []*cover.Profile{
