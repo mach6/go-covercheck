@@ -40,21 +40,21 @@ func longestCommonPrefix(strs []string) string {
 	return commonPrefix
 }
 
-// readModuleNameFromGoMod reads the module name from go.mod file in the current working directory.
-// Returns empty string if file doesn't exist or module name cannot be extracted.
+// readModuleNameFromGoMod reads the module name from go.mod in the current working directory.
+// Returns empty string if the go.mod file doesn't exist, or module name cannot be extracted.
 func readModuleNameFromGoMod() string {
-	file, err := os.Open("go.mod")
+	readFile, err := os.ReadFile("go.mod")
 	if err != nil {
 		return ""
 	}
-	defer file.Close()
 
+	file := strings.NewReader(string(readFile))
 	scanner := bufio.NewScanner(file)
 	for scanner.Scan() {
 		line := strings.TrimSpace(scanner.Text())
 		if strings.HasPrefix(line, "module ") {
 			parts := strings.Fields(line)
-			if len(parts) >= 2 {
+			if len(parts) >= 2 { //nolint:mnd
 				return parts[1]
 			}
 		}

@@ -1,7 +1,9 @@
 package compute //nolint:testpackage
 
 import (
+	"github.com/mach6/go-covercheck/pkg/test"
 	"os"
+	"path"
 	"testing"
 
 	"github.com/mach6/go-covercheck/pkg/config"
@@ -89,12 +91,6 @@ func Test_findModuleName_withConfiguredModuleName(t *testing.T) {
 }
 
 func Test_readModuleNameFromGoMod_Success(t *testing.T) {
-	// Create a temporary go.mod file
-	tmpDir := t.TempDir()
-	originalDir, _ := os.Getwd()
-	defer func() { os.Chdir(originalDir) }()
-	os.Chdir(tmpDir)
-
 	goModContent := `module github.com/example/myproject
 
 go 1.21
@@ -103,7 +99,8 @@ require (
 	github.com/stretchr/testify v1.8.0
 )
 `
-	err := os.WriteFile("go.mod", []byte(goModContent), 0600)
+	p := test.CreateTempFile(t, "go.mod", goModContent)
+	err := os.Chdir(path.Dir(p))
 	require.NoError(t, err)
 
 	moduleName := readModuleNameFromGoMod()
@@ -111,25 +108,19 @@ require (
 }
 
 func Test_readModuleNameFromGoMod_NoFile(t *testing.T) {
-	tmpDir := t.TempDir()
-	originalDir, _ := os.Getwd()
-	defer func() { os.Chdir(originalDir) }()
-	os.Chdir(tmpDir)
+	err := os.Chdir(t.TempDir())
+	require.NoError(t, err)
 
 	moduleName := readModuleNameFromGoMod()
 	require.Equal(t, "", moduleName)
 }
 
 func Test_readModuleNameFromGoMod_InvalidFormat(t *testing.T) {
-	tmpDir := t.TempDir()
-	originalDir, _ := os.Getwd()
-	defer func() { os.Chdir(originalDir) }()
-	os.Chdir(tmpDir)
-
 	goModContent := `// no module declaration
 go 1.21
 `
-	err := os.WriteFile("go.mod", []byte(goModContent), 0600)
+	p := test.CreateTempFile(t, "go.mod", goModContent)
+	err := os.Chdir(path.Dir(p))
 	require.NoError(t, err)
 
 	moduleName := readModuleNameFromGoMod()
@@ -172,17 +163,12 @@ func Test_validateModuleNameMatchesFilePaths_EmptyProfiles(t *testing.T) {
 }
 
 func Test_findModuleName_withGoMod_Success(t *testing.T) {
-	// Create a temporary go.mod file
-	tmpDir := t.TempDir()
-	originalDir, _ := os.Getwd()
-	defer func() { os.Chdir(originalDir) }()
-	os.Chdir(tmpDir)
-
 	goModContent := `module github.com/example/myproject
 
 go 1.21
 `
-	err := os.WriteFile("go.mod", []byte(goModContent), 0600)
+	p := test.CreateTempFile(t, "go.mod", goModContent)
+	err := os.Chdir(path.Dir(p))
 	require.NoError(t, err)
 
 	profiles := []*cover.Profile{
@@ -196,17 +182,12 @@ go 1.21
 }
 
 func Test_findModuleName_withGoMod_Mismatch(t *testing.T) {
-	// Create a temporary go.mod file
-	tmpDir := t.TempDir()
-	originalDir, _ := os.Getwd()
-	defer func() { os.Chdir(originalDir) }()
-	os.Chdir(tmpDir)
-
 	goModContent := `module github.com/example/myproject
 
 go 1.21
 `
-	err := os.WriteFile("go.mod", []byte(goModContent), 0600)
+	p := test.CreateTempFile(t, "go.mod", goModContent)
+	err := os.Chdir(path.Dir(p))
 	require.NoError(t, err)
 
 	// File paths don't match the module name
@@ -222,17 +203,12 @@ go 1.21
 }
 
 func Test_findModuleName_priorityOrder(t *testing.T) {
-	// Create a temporary go.mod file
-	tmpDir := t.TempDir()
-	originalDir, _ := os.Getwd()
-	defer func() { os.Chdir(originalDir) }()
-	os.Chdir(tmpDir)
-
 	goModContent := `module github.com/example/myproject
 
 go 1.21
 `
-	err := os.WriteFile("go.mod", []byte(goModContent), 0600)
+	p := test.CreateTempFile(t, "go.mod", goModContent)
+	err := os.Chdir(path.Dir(p))
 	require.NoError(t, err)
 
 	profiles := []*cover.Profile{
