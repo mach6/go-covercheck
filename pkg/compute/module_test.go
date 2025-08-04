@@ -164,7 +164,7 @@ func Test_findModuleName_withGoMod_Success(t *testing.T) {
 go 1.21
 `
 	p := test.CreateTempFile(t, "go.mod", goModContent)
-	t.Chdir(path.Dir(p))
+	t.Chdir(filepath.Dir(p))
 
 	profiles := []*cover.Profile{
 		{FileName: "github.com/example/myproject/pkg/foo/foo.go"},
