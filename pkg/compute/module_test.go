@@ -1,11 +1,11 @@
 package compute //nolint:testpackage
 
 import (
-	"github.com/mach6/go-covercheck/pkg/test"
 	"path/filepath"
 	"testing"
 
 	"github.com/mach6/go-covercheck/pkg/config"
+	"github.com/mach6/go-covercheck/pkg/test"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/tools/cover"
 )
