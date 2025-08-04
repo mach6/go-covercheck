@@ -180,7 +180,7 @@ func TestFormatAndReport_EmptyResults_Table(t *testing.T) {
 	cfg.NoColor = true
 
 	// Empty profiles should result in empty results
-	profiles := []*cover.Profile{}
+	var profiles []*cover.Profile
 
 	stdout, stderr := test.RepipeStdOutAndErrForTest(func() {
 		results, failed := compute.CollectResults(profiles, cfg)
@@ -201,7 +201,7 @@ func TestFormatAndReport_EmptyResults_Markdown(t *testing.T) {
 	cfg.Format = config.FormatMD
 	cfg.NoColor = true
 
-	profiles := []*cover.Profile{}
+	var profiles []*cover.Profile
 
 	stdout, stderr := test.RepipeStdOutAndErrForTest(func() {
 		results, failed := compute.CollectResults(profiles, cfg)
@@ -219,7 +219,7 @@ func TestFormatAndReport_EmptyResults_CSV(t *testing.T) {
 	cfg.Format = config.FormatCSV
 	cfg.NoColor = true
 
-	profiles := []*cover.Profile{}
+	var profiles []*cover.Profile
 
 	stdout, stderr := test.RepipeStdOutAndErrForTest(func() {
 		results, failed := compute.CollectResults(profiles, cfg)
@@ -237,7 +237,7 @@ func TestFormatAndReport_EmptyResults_JSON(t *testing.T) {
 	cfg.Format = config.FormatJSON
 	cfg.NoColor = true
 
-	profiles := []*cover.Profile{}
+	var profiles []*cover.Profile
 
 	stdout, stderr := test.RepipeStdOutAndErrForTest(func() {
 		results, failed := compute.CollectResults(profiles, cfg)
@@ -258,7 +258,7 @@ func TestFormatAndReport_EmptyResults_YAML(t *testing.T) {
 	cfg.Format = config.FormatYAML
 	cfg.NoColor = true
 
-	profiles := []*cover.Profile{}
+	var profiles []*cover.Profile
 
 	stdout, stderr := test.RepipeStdOutAndErrForTest(func() {
 		results, failed := compute.CollectResults(profiles, cfg)
@@ -273,14 +273,14 @@ func TestFormatAndReport_EmptyResults_YAML(t *testing.T) {
 	require.NotContains(t, stdout, "No coverage results to display")
 }
 
-func TestFormatAndReport_EmptyResults_TableWithNoTable(t *testing.T) {
+func TestFormatAndReport_EmptyResults_NoTable(t *testing.T) {
 	cfg := new(config.Config)
 	cfg.ApplyDefaults()
 	cfg.Format = config.FormatTable
 	cfg.NoTable = true
 	cfg.NoColor = true
 
-	profiles := []*cover.Profile{}
+	var profiles []*cover.Profile
 
 	stdout, stderr := test.RepipeStdOutAndErrForTest(func() {
 		results, failed := compute.CollectResults(profiles, cfg)
@@ -289,20 +289,20 @@ func TestFormatAndReport_EmptyResults_TableWithNoTable(t *testing.T) {
 	})
 
 	require.Empty(t, stderr)
-	require.Contains(t, stdout, "✔ All good")
-	require.NotContains(t, stdout, "No coverage results to display")
+	require.Contains(t, stdout, "No coverage results to display")
+	require.NotContains(t, stdout, "✔ All good")
 	require.NotContains(t, stdout, "STATEMENTS")
 	require.NotContains(t, stdout, "BLOCKS")
 }
 
-func TestFormatAndReport_EmptyResults_TableWithNoSummary(t *testing.T) {
+func TestFormatAndReport_EmptyResults_NoSummary(t *testing.T) {
 	cfg := new(config.Config)
 	cfg.ApplyDefaults()
 	cfg.Format = config.FormatTable
 	cfg.NoSummary = true
 	cfg.NoColor = true
 
-	profiles := []*cover.Profile{}
+	var profiles []*cover.Profile
 
 	stdout, stderr := test.RepipeStdOutAndErrForTest(func() {
 		results, failed := compute.CollectResults(profiles, cfg)

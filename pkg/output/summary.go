@@ -12,21 +12,15 @@ var (
 	msgF = "    [%s] %s [+%s required for %s threshold]\n"
 )
 
-func renderSummary(hasFailure bool, results compute.Results, cfg *config.Config, showedEmptyMessage bool) {
+func renderSummary(hasFailure bool, results compute.Results, cfg *config.Config) {
 	if cfg.NoSummary {
 		return
 	}
 
-	if !hasFailure && !showedEmptyMessage {
+	if !hasFailure {
 		fmt.Println(color.New(color.FgGreen).Sprint("✔"), "All good")
 		return
 	}
-	
-	if !hasFailure && showedEmptyMessage {
-		// No summary message when we already showed empty results message
-		return
-	}
-
 	_, _ = fmt.Println(color.New(color.FgRed).Sprint("✘"), "Coverage check failed")
 	renderByFile(results)
 	renderByPackage(results)
