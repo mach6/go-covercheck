@@ -2,7 +2,6 @@ package compute //nolint:testpackage
 
 import (
 	"github.com/mach6/go-covercheck/pkg/test"
-	"os"
 	"path"
 	"testing"
 
@@ -100,19 +99,17 @@ require (
 )
 `
 	p := test.CreateTempFile(t, "go.mod", goModContent)
-	err := os.Chdir(path.Dir(p))
-	require.NoError(t, err)
+	t.Chdir(path.Dir(p))
 
 	moduleName := readModuleNameFromGoMod()
 	require.Equal(t, "github.com/example/myproject", moduleName)
 }
 
 func Test_readModuleNameFromGoMod_NoFile(t *testing.T) {
-	err := os.Chdir(t.TempDir())
-	require.NoError(t, err)
+	t.Chdir(t.TempDir())
 
 	moduleName := readModuleNameFromGoMod()
-	require.Equal(t, "", moduleName)
+	require.Empty(t, moduleName)
 }
 
 func Test_readModuleNameFromGoMod_InvalidFormat(t *testing.T) {
@@ -120,11 +117,10 @@ func Test_readModuleNameFromGoMod_InvalidFormat(t *testing.T) {
 go 1.21
 `
 	p := test.CreateTempFile(t, "go.mod", goModContent)
-	err := os.Chdir(path.Dir(p))
-	require.NoError(t, err)
+	t.Chdir(path.Dir(p))
 
 	moduleName := readModuleNameFromGoMod()
-	require.Equal(t, "", moduleName)
+	require.Empty(t, moduleName)
 }
 
 func Test_validateModuleNameMatchesFilePaths_Success(t *testing.T) {
@@ -168,8 +164,7 @@ func Test_findModuleName_withGoMod_Success(t *testing.T) {
 go 1.21
 `
 	p := test.CreateTempFile(t, "go.mod", goModContent)
-	err := os.Chdir(path.Dir(p))
-	require.NoError(t, err)
+	t.Chdir(path.Dir(p))
 
 	profiles := []*cover.Profile{
 		{FileName: "github.com/example/myproject/pkg/foo/foo.go"},
@@ -187,8 +182,7 @@ func Test_findModuleName_withGoMod_Mismatch(t *testing.T) {
 go 1.21
 `
 	p := test.CreateTempFile(t, "go.mod", goModContent)
-	err := os.Chdir(path.Dir(p))
-	require.NoError(t, err)
+	t.Chdir(path.Dir(p))
 
 	// File paths don't match the module name
 	profiles := []*cover.Profile{
@@ -208,8 +202,7 @@ func Test_findModuleName_priorityOrder(t *testing.T) {
 go 1.21
 `
 	p := test.CreateTempFile(t, "go.mod", goModContent)
-	err := os.Chdir(path.Dir(p))
-	require.NoError(t, err)
+	t.Chdir(path.Dir(p))
 
 	profiles := []*cover.Profile{
 		{FileName: "github.com/example/myproject/pkg/foo/foo.go"},
