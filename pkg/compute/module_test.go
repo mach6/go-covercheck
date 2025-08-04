@@ -2,7 +2,7 @@ package compute //nolint:testpackage
 
 import (
 	"github.com/mach6/go-covercheck/pkg/test"
-	"path"
+	"path/filepath"
 	"testing"
 
 	"github.com/mach6/go-covercheck/pkg/config"
