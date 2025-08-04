@@ -48,7 +48,7 @@ func readModuleNameFromGoMod() string {
 		return ""
 	}
 
-	file := strings.NewReader(string(readFile))
+	file := bytes.NewReader(readFile)
 	scanner := bufio.NewScanner(file)
 	for scanner.Scan() {
 		line := strings.TrimSpace(scanner.Text())
