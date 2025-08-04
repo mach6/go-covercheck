@@ -117,7 +117,7 @@ func Test_readModuleNameFromGoMod_InvalidFormat(t *testing.T) {
 go 1.21
 `
 	p := test.CreateTempFile(t, "go.mod", goModContent)
-	t.Chdir(path.Dir(p))
+	t.Chdir(filepath.Dir(p))
 
 	moduleName := readModuleNameFromGoMod()
 	require.Empty(t, moduleName)
