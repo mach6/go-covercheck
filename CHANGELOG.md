@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+
+## v0.6.1 - 2025-08-05
+
+[Unreleased]: https://github.com/mach6/go-covercheck/compare/v0.6.1...HEAD
 ## [v0.6.0] - 2025-07-30
 
 ### Changed
