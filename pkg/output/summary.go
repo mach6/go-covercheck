@@ -28,7 +28,7 @@ func renderSummary(hasFailure bool, results compute.Results, cfg *config.Config)
 }
 
 func renderTotal(results compute.Results) {
-	if !results.ByTotal.Statements.Failed && !results.ByTotal.Blocks.Failed {
+	if !results.ByTotal.Statements.Failed && !results.ByTotal.Blocks.Failed && !results.ByTotal.Functions.Failed {
 		return
 	}
 
@@ -54,6 +54,18 @@ func renderTotal(results compute.Results) {
 			"total",
 			severityColor(percentTotalBlocks, totalExpect)(fmt.Sprintf("%.1f%%", gap)),
 			color.New(color.FgHiMagenta).Sprintf("%.1f%%", totalExpect),
+		)
+	}
+
+	totalExpect = results.ByTotal.Functions.Threshold
+	percentTotalFunctions := results.ByTotal.Functions.Percentage
+	if percentTotalFunctions < totalExpect {
+		gap := totalExpect - percentTotalFunctions
+		_, _ = fmt.Printf(msgF,
+			color.New(color.FgHiYellow).Sprint("F"),
+			"total",
+			severityColor(percentTotalFunctions, totalExpect)(fmt.Sprintf("%.1f%%", gap)),
+			color.New(color.FgHiYellow).Sprintf("%.1f%%", totalExpect),
 		)
 	}
 }
@@ -110,6 +122,16 @@ func renderBy[T compute.HasBy](by T, item string) {
 			item,
 			severityColor(r.BlockPercentage, r.BlockThreshold)(fmt.Sprintf("%.1f%%", gap)),
 			color.New(color.FgHiMagenta).Sprintf("%.1f%%", r.BlockThreshold),
+		)
+	}
+
+	if r.FunctionPercentage < r.FunctionThreshold {
+		gap := r.FunctionThreshold - r.FunctionPercentage
+		_, _ = fmt.Printf(msgF,
+			color.New(color.FgHiYellow).Sprint("F"),
+			item,
+			severityColor(r.FunctionPercentage, r.FunctionThreshold)(fmt.Sprintf("%.1f%%", gap)),
+			color.New(color.FgHiYellow).Sprintf("%.1f%%", r.FunctionThreshold),
 		)
 	}
 }
