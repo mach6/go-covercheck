@@ -29,8 +29,8 @@ jobs:
 
       - name: Coverage Check
         run: |
-          go install github.com/mach6/go-covercheck/cmd/go-covercheck@v0.5.0
-          go-covercheck coverage.out -C v0.6.0
+          go install github.com/mach6/go-covercheck/cmd/go-covercheck@v0.6.1
+          go-covercheck coverage.out -C v0.6.1
 
       - name: Build
         run: go build -v ./...
