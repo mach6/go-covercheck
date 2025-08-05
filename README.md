@@ -209,7 +209,7 @@ For integration tests or when collecting coverage from running binaries, you can
 
 #### 🏗️ Integration Testing Scenario
 
-This workflow is particularly useful for integration tests where you want to collect coverage from a running binary:
+This workflow is particularly useful for integration tests where you want to assert coverage from a running binary:
 
 ```shell
 # 1. Build your binary with coverage support
