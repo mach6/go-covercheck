@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [v0.6.1] - 2025-08-05
+
+## What's Changed
+* chore: update changelog for v0.6.0
+* Add module name dectection from go.mod
+* Fix empty table display issue - show message instead of empty tables
+
 ## [v0.6.0] - 2025-07-30
 
 ### Changed
@@ -120,7 +127,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Color-coded results with severity indicators
 - Summary reporting for failed coverage checks
 
-[Unreleased]: https://github.com/mach6/go-covercheck/compare/v0.6.0...HEAD
+[Unreleased]: https://github.com/mach6/go-covercheck/compare/v0.6.1...HEAD
+[v0.6.1]: https://github.com/mach6/go-covercheck/compare/v0.6.0...v0.6.1
 [v0.6.0]: https://github.com/mach6/go-covercheck/compare/v0.5.0...v0.6.0
 [v0.5.0]: https://github.com/mach6/go-covercheck/compare/v0.4.1...v0.5.0
 [v0.4.1]: https://github.com/mach6/go-covercheck/compare/v0.4.0...v0.4.1
