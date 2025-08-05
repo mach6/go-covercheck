@@ -28,8 +28,8 @@ The following items are noteworthy and not (currently) supported.
 - Does not support configurable profile block count (how many times a section of code was hit) thresholds. The assumption
   is any value `>=1` is enough.
 - Table style is not configurable.
-- Color codes (see [Color Legend](#🎨-color-legend)) are not configurable.
-- Severity weights (see [Color Legend](#🎨-color-legend)) are not configurable.
+- Color codes (see [Color Legend](#-color-legend)) are not configurable.
+- Severity weights (see [Color Legend](#-color-legend)) are not configurable.
 
 ## 📖 Background
 
