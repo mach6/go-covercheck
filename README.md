@@ -345,7 +345,7 @@ When a history entry is successfully deleted, you'll see a confirmation message:
 
 ```text
 $ go-covercheck --delete-history main
-✓ Deleted history entry for ref: main
+≡ Deleted history entry for ref: main
 ```
 
 If the reference is not found, an error message will be displayed:
