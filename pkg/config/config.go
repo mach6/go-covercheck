@@ -80,6 +80,10 @@ type Config struct {
 	Format             string               `yaml:"format,omitempty"`
 	TerminalWidth      int                  `yaml:"terminalWidth,omitempty"`
 	ModuleName         string               `yaml:"moduleName,omitempty"`
+	ShowUncovered      bool                 `yaml:"showUncovered,omitempty"`
+	UncoveredFile      string               `yaml:"uncoveredFile,omitempty"`
+	UncoveredContext   int                  `yaml:"uncoveredContext,omitempty"`
+	SyntaxStyle        string               `yaml:"syntaxStyle,omitempty"`
 }
 
 // Load a Config from a path or produce an error.
@@ -110,6 +114,7 @@ func (c *Config) ApplyDefaults() {
 	c.SortOrder = SortOrderDefault
 	c.Skip = []string{}
 	c.Format = FormatDefault
+	c.SyntaxStyle = "github"
 
 	c.initPerFileWhenNil()
 	c.initPerPackageWhenNil()
