@@ -75,9 +75,9 @@ func saveHistory(cmd *cobra.Command, results compute.Results, historyLimit int, 
 	// Only show success messages for non-JSON/YAML formats
 	if cfg.Format != config.FormatJSON && cfg.Format != config.FormatYAML {
 		if label != "" {
-			fmt.Printf("✓ Saved history entry with label: %s\n", label)
+			fmt.Printf("≡ Saved history entry with label: %s\n", label)
 		} else {
-			fmt.Printf("✓ Saved history entry\n")
+			fmt.Printf("≡ Saved history entry\n")
 		}
 	}
 	return nil
@@ -122,7 +122,7 @@ func deleteHistory(cmd *cobra.Command, deleteRef string, historyLimit int) error
 		return fmt.Errorf("failed to save history after deletion: %w", err)
 	}
 
-	fmt.Printf("✓ Deleted history entry for ref: %s\n", deleteRef)
+	fmt.Printf("≡ Deleted history entry for ref: %s\n", deleteRef)
 
 	// Check if history is now empty and prompt for file removal in interactive mode
 	if len(h.Entries) == 0 {
@@ -160,6 +160,6 @@ func promptForHistoryFileRemoval(cmd *cobra.Command) error {
 		return fmt.Errorf("failed to remove history file: %w", err)
 	}
 
-	fmt.Println("✓ History file removed")
+	fmt.Println("≡ History file removed")
 	return nil
 }

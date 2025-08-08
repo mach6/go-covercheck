@@ -127,7 +127,7 @@ func Test_run_SaveHistory(t *testing.T) {
 	require.Empty(t, stdErr)
 
 	// For JSON format, a success message should NOT be present
-	require.NotContains(t, stdOut, "✓ Saved history entry")
+	require.NotContains(t, stdOut, "≡ Saved history entry")
 
 	// Extract JSON part from the output for parsing
 	jsonOutput := extractJSONFromOutput(stdOut)
@@ -162,7 +162,7 @@ func Test_run_SaveHistory_NoPreviousFile(t *testing.T) {
 	require.Empty(t, stdErr)
 
 	// For JSON format, a success message should NOT be present
-	require.NotContains(t, stdOut, "✓ Saved history entry")
+	require.NotContains(t, stdOut, "≡ Saved history entry")
 
 	// Extract JSON part from the output for parsing
 	jsonOutput := extractJSONFromOutput(stdOut)
@@ -197,7 +197,7 @@ func Test_run_SaveHistory_TableFormat(t *testing.T) {
 	require.Empty(t, stdErr)
 
 	// For table format, success message SHOULD be present
-	require.Contains(t, stdOut, "✓ Saved history entry")
+	require.Contains(t, stdOut, "≡ Saved history entry")
 
 	// open the history file and confirm it has new content
 	h, err := history.Load(path)
@@ -365,7 +365,7 @@ func Test_run_DeleteHistory(t *testing.T) {
 	stdOut, stdErr, err := runCmdForTest(t, cmd)
 	require.NoError(t, err)
 	require.Empty(t, stdErr)
-	require.Contains(t, stdOut, "✓ Deleted history entry for ref: main")
+	require.Contains(t, stdOut, "≡ Deleted history entry for ref: main")
 
 	// Verify the entry was actually deleted
 	h, err := history.Load(path)
