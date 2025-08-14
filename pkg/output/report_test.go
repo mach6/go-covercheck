@@ -1,7 +1,7 @@
 package output_test
 
 import (
-	"fmt"
+	"errors"
 	"testing"
 
 	"github.com/fatih/color"
@@ -320,7 +320,7 @@ func TestFormatAndReport_EmptyResults_NoSummary(t *testing.T) {
 
 func TestPrintDiffWarning(t *testing.T) {
 	cfg := &config.Config{}
-	err := fmt.Errorf("test error")
+	err := errors.New("test error")
 
 	t.Run("table format", func(t *testing.T) {
 		stdout, stderr := test.RepipeStdOutAndErrForTest(func() {
