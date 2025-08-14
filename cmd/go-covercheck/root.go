@@ -102,11 +102,8 @@ const (
 	InitFlag      = "init"
 	InitFlagUsage = "create a sample .go-covercheck.yml config file in the current directory"
 
-	DiffOnlyFlag      = "diff-only"
-	DiffOnlyFlagUsage = "enforce thresholds only on files changed in git diff"
-
-	AgainstFlag      = "against"
-	AgainstFlagUsage = "git reference (commit/branch/tag) to diff against [default: HEAD~1]"
+	DiffAgainstFlag      = "diff-against"
+	DiffAgainstFlagUsage = "git reference (commit/branch/tag) to diff against; enables diff-only mode [default: HEAD~1]"
 
 	// ConfigFilePermissions permissions.
 	ConfigFilePermissions = 0600
@@ -254,8 +251,8 @@ func filter(profiles []*cover.Profile, cfg *config.Config) []*cover.Profile {
 	}
 
 	// Then apply diff filtering if enabled
-	if cfg.DiffOnly {
-		changedFiles, err := gitdiff.GetChangedFiles(".", cfg.Against)
+	if cfg.DiffAgainst != "" {
+		changedFiles, err := gitdiff.GetChangedFiles(".", cfg.DiffAgainst)
 		if err != nil {
 			// Log error but don't fail - fall back to normal behavior
 			fmt.Fprintf(os.Stderr, "Warning: Failed to get changed files for diff mode: %v\n", err)
@@ -466,8 +463,7 @@ func applyConfigOverrides(cfg *config.Config, cmd *cobra.Command, noConfigFile b
 	applyBoolFlagOverride(cmd, NoColorFlag, &cfg.NoColor, noConfigFile)
 	applyIntFlagOverride(cmd, TerminalWidthFlag, &cfg.TerminalWidth, noConfigFile)
 	applyStringFlagOverride(cmd, ModuleNameFlag, &cfg.ModuleName, noConfigFile)
-	applyBoolFlagOverride(cmd, DiffOnlyFlag, &cfg.DiffOnly, noConfigFile)
-	applyStringFlagOverride(cmd, AgainstFlag, &cfg.Against, noConfigFile)
+	applyDiffAgainstFlagOverride(cmd, DiffAgainstFlag, &cfg.DiffAgainst, noConfigFile)
 
 	// set cfg.Total thresholds to the global values, iff no override was specified for each.
 	if v, _ := cmd.Flags().GetFloat64(StatementThresholdFlag); !cmd.Flags().Changed(TotalStatementThresholdFlag) &&
@@ -489,6 +485,12 @@ func applyFloat64FlagOverride(cmd *cobra.Command, flagName string, target *float
 func applyFloat64TotalFlagOverride(cmd *cobra.Command, flagName string, section string, target map[string]float64) {
 	if v, _ := cmd.Flags().GetFloat64(flagName); cmd.Flags().Changed(flagName) {
 		target[section] = v
+	}
+}
+
+func applyDiffAgainstFlagOverride(cmd *cobra.Command, flagName string, target *string, noConfigFile bool) {
+	if v, _ := cmd.Flags().GetString(flagName); cmd.Flags().Changed(flagName) || noConfigFile {
+		*target = v
 	}
 }
 
@@ -683,17 +685,12 @@ func initFlags(cmd *cobra.Command) {
 		InitFlagUsage,
 	)
 
-	cmd.Flags().Bool(
-		DiffOnlyFlag,
-		false,
-		DiffOnlyFlagUsage,
-	)
-
 	cmd.Flags().String(
-		AgainstFlag,
+		DiffAgainstFlag,
 		"",
-		AgainstFlagUsage,
+		DiffAgainstFlagUsage,
 	)
+	cmd.Flags().Lookup(DiffAgainstFlag).NoOptDefVal = "HEAD~1"
 }
 
 func shouldSkip(filename string, skip []string) bool {

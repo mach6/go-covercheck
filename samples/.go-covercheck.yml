@@ -80,10 +80,6 @@ total:
 skip:
 #  - cmd/root.go
 
-# enable diff-only mode to only check coverage for changed files
-# default false
-diffOnly: false
-
-# git reference to diff against when using diff-only mode
-# default "" (uses HEAD~1)
-against: ""
+# git reference to diff against (enables diff-only mode)
+# default "" (disabled; when set enables diff mode and defaults to HEAD~1)
+diffAgainst: ""
