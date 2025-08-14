@@ -1,6 +1,7 @@
 package output_test
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/fatih/color"
@@ -315,4 +316,71 @@ func TestFormatAndReport_EmptyResults_NoSummary(t *testing.T) {
 	require.NotContains(t, stdout, "✔ All good")
 	require.NotContains(t, stdout, "STATEMENTS")
 	require.NotContains(t, stdout, "BLOCKS")
+}
+
+func TestPrintDiffWarning(t *testing.T) {
+	cfg := &config.Config{}
+	err := fmt.Errorf("test error")
+
+	t.Run("table format", func(t *testing.T) {
+		stdout, stderr := test.RepipeStdOutAndErrForTest(func() {
+			output.PrintDiffWarning(err, cfg)
+		})
+		require.Empty(t, stderr)
+		require.Contains(t, stdout, "Warning: Failed to get changed files for diff mode: test error")
+		require.Contains(t, stdout, "Falling back to checking all files.")
+	})
+
+	t.Run("JSON format", func(t *testing.T) {
+		cfg.Format = config.FormatJSON
+		stdout, stderr := test.RepipeStdOutAndErrForTest(func() {
+			output.PrintDiffWarning(err, cfg)
+		})
+		require.Empty(t, stdout)
+		require.Empty(t, stderr)
+	})
+}
+
+func TestPrintNoDiffChanges(t *testing.T) {
+	cfg := &config.Config{}
+
+	t.Run("table format", func(t *testing.T) {
+		stdout, stderr := test.RepipeStdOutAndErrForTest(func() {
+			output.PrintNoDiffChanges(cfg)
+		})
+		require.Empty(t, stderr)
+		require.Contains(t, stdout, "No files changed in diff. No coverage to check.")
+	})
+
+	t.Run("JSON format", func(t *testing.T) {
+		cfg.Format = config.FormatJSON
+		stdout, stderr := test.RepipeStdOutAndErrForTest(func() {
+			output.PrintNoDiffChanges(cfg)
+		})
+		require.Empty(t, stdout)
+		require.Empty(t, stderr)
+	})
+}
+
+func TestPrintDiffModeInfo(t *testing.T) {
+	cfg := &config.Config{}
+	changedCount := 5
+	totalCount := 10
+
+	t.Run("table format", func(t *testing.T) {
+		stdout, stderr := test.RepipeStdOutAndErrForTest(func() {
+			output.PrintDiffModeInfo(changedCount, totalCount, cfg)
+		})
+		require.Empty(t, stderr)
+		require.Contains(t, stdout, "Diff mode: Checking coverage for 5 changed files (out of 10 total files)")
+	})
+
+	t.Run("JSON format", func(t *testing.T) {
+		cfg.Format = config.FormatJSON
+		stdout, stderr := test.RepipeStdOutAndErrForTest(func() {
+			output.PrintDiffModeInfo(changedCount, totalCount, cfg)
+		})
+		require.Empty(t, stdout)
+		require.Empty(t, stderr)
+	})
 }
