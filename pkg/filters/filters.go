@@ -47,18 +47,18 @@ func filterByGitDiff(profiles []*cover.Profile, cfg *config.Config) []*cover.Pro
 	changedFiles, err := gitdiff.GetChangedFiles(defaultRepoPath, cfg.DiffFrom)
 	if err != nil {
 		// Log error but don't fail - fall back to normal behavior
-		output.PrintDiffWarning(err)
+		output.PrintDiffWarning(err, cfg)
 		return profiles
 	}
 
 	// If no files changed, return empty result
 	if len(changedFiles) == 0 {
-		output.PrintNoDiffChanges()
+		output.PrintNoDiffChanges(cfg)
 		return []*cover.Profile{}
 	}
 
 	diffFiltered := gitdiff.FilterProfilesByChangedFiles(profiles, changedFiles, cfg.ModuleName)
-	output.PrintDiffModeInfo(len(diffFiltered), len(profiles))
+	output.PrintDiffModeInfo(len(diffFiltered), len(profiles), cfg)
 	return diffFiltered
 }
 

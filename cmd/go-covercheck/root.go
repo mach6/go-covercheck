@@ -238,7 +238,6 @@ func showCoverage(args []string, cfg *config.Config) (compute.Results, bool, err
 	return results, failed, nil
 }
 
-
 func getCoverProfileData(args []string) ([]*cover.Profile, error) {
 	var coveragePath string
 	if len(args) > 0 {
@@ -655,8 +654,6 @@ func initFlags(cmd *cobra.Command) {
 		DiffFromFlagUsage,
 	)
 }
-
-
 
 func initConfigFile(cmd *cobra.Command) error {
 	configPath, _ := cmd.Flags().GetString(ConfigFlag)

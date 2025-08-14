@@ -61,5 +61,3 @@ func TestExecute_DiffMode_WithJSON(t *testing.T) {
 	require.Contains(t, result, "byPackage")
 	require.Contains(t, result, "byTotal")
 }
-
-

@@ -37,10 +37,10 @@ func TestFilterBySkipped_MatchesPrefix(t *testing.T) {
 		{FileName: "src/main.go"},
 	}
 	cfg := &config.Config{}
-	cfg.ApplyDefaults() // Apply defaults first
+	cfg.ApplyDefaults()            // Apply defaults first
 	cfg.Skip = []string{"vendor/"} // Then set skip patterns
 	filtered := filters.FilterProfiles(profiles, cfg)
-	
+
 	require.Len(t, filtered, 1)
 	require.Equal(t, "src/main.go", filtered[0].FileName)
 }
@@ -51,7 +51,7 @@ func TestFilterBySkipped_MatchesExact(t *testing.T) {
 		{FileName: "src/main.go"},
 	}
 	cfg := &config.Config{}
-	cfg.ApplyDefaults() // Apply defaults first
+	cfg.ApplyDefaults()             // Apply defaults first
 	cfg.Skip = []string{"_test.go"} // Then set skip patterns
 	filtered := filters.FilterProfiles(profiles, cfg)
 	require.Len(t, filtered, 1)
@@ -64,7 +64,7 @@ func TestFilterBySkipped_NoMatches(t *testing.T) {
 		{FileName: "src/foo/bar.go"},
 	}
 	cfg := &config.Config{}
-	cfg.ApplyDefaults() // Apply defaults first
+	cfg.ApplyDefaults()                 // Apply defaults first
 	cfg.Skip = []string{"generated.go"} // Then set skip patterns
 	filtered := filters.FilterProfiles(profiles, cfg)
 	require.Len(t, filtered, 2)

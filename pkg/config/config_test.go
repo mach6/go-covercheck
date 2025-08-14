@@ -138,7 +138,7 @@ sortOrder: invalid-order
 			defer os.Remove(tmpFile) //nolint:errcheck
 
 			cfg, err := config.Load(tmpFile)
-			
+
 			if tt.shouldError {
 				require.Error(t, err)
 				require.Nil(t, cfg)

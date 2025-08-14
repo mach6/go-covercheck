@@ -21,18 +21,30 @@ func bailOnError(err error) {
 }
 
 // PrintDiffWarning prints a warning message when git diff operations fail.
-func PrintDiffWarning(err error) {
+func PrintDiffWarning(err error, cfg *config.Config) {
+	// Don't print warnings in JSON/YAML mode as they would contaminate the output
+	if cfg.Format == config.FormatJSON || cfg.Format == config.FormatYAML {
+		return
+	}
 	fmt.Printf("Warning: Failed to get changed files for diff mode: %v\n", err)
 	fmt.Println("Falling back to checking all files.")
 }
 
 // PrintNoDiffChanges prints a message when no files have changed in diff mode.
-func PrintNoDiffChanges() {
+func PrintNoDiffChanges(cfg *config.Config) {
+	// Don't print messages in JSON/YAML mode as they would contaminate the output
+	if cfg.Format == config.FormatJSON || cfg.Format == config.FormatYAML {
+		return
+	}
 	fmt.Println("No files changed in diff. No coverage to check.")
 }
 
 // PrintDiffModeInfo prints information about how many files are being checked in diff mode.
-func PrintDiffModeInfo(changedCount, totalCount int) {
+func PrintDiffModeInfo(changedCount, totalCount int, cfg *config.Config) {
+	// Don't print info messages in JSON/YAML mode as they would contaminate the output
+	if cfg.Format == config.FormatJSON || cfg.Format == config.FormatYAML {
+		return
+	}
 	fmt.Printf("Diff mode: Checking coverage for %d changed files (out of %d total files)\n",
 		changedCount, totalCount)
 }
