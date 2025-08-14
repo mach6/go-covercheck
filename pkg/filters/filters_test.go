@@ -1,4 +1,4 @@
-package filters
+package filters //nolint:testpackage
 
 import (
 	"path/filepath"
@@ -99,7 +99,7 @@ func Test_filterByGitDiff(t *testing.T) {
 		cfg := &config.Config{DiffFrom: "HEAD~1"} // No changes relative to HEAD~1
 		result := filterByGitDiff(profiles, cfg)
 
-		require.Len(t, result, 0)
+		require.Empty(t, result)
 	})
 
 	t.Run("GetChangedFiles returns error", func(t *testing.T) {
