@@ -8,6 +8,7 @@ import (
 
 	"github.com/go-git/go-git/v6"
 	"github.com/go-git/go-git/v6/plumbing"
+	"github.com/go-git/go-git/v6/plumbing/format/diff"
 	"golang.org/x/tools/cover"
 )
 
@@ -27,7 +28,6 @@ func GetChangedFiles(repoPath, targetRef string) (map[string]bool, error) {
 		return nil, fmt.Errorf("failed to open git repository at %s: %w", repoPath, err)
 	}
 
-	// Get HEAD commit
 	head, err := repo.Head()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get HEAD: %w", err)
@@ -38,7 +38,6 @@ func GetChangedFiles(repoPath, targetRef string) (map[string]bool, error) {
 		return nil, fmt.Errorf("failed to get HEAD commit: %w", err)
 	}
 
-	// Resolve target reference
 	targetHash, err := resolveReference(repo, targetRef)
 	if err != nil {
 		return nil, fmt.Errorf("failed to resolve target reference %q: %w", targetRef, err)
@@ -49,7 +48,6 @@ func GetChangedFiles(repoPath, targetRef string) (map[string]bool, error) {
 		return nil, fmt.Errorf("failed to get target commit: %w", err)
 	}
 
-	// Get the diff between target and HEAD
 	patch, err := targetCommit.Patch(headCommit)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get patch: %w", err)
@@ -57,34 +55,36 @@ func GetChangedFiles(repoPath, targetRef string) (map[string]bool, error) {
 
 	changedFiles := make(map[string]bool)
 	for _, filePatch := range patch.FilePatches() {
-		from, to := filePatch.Files()
-
-		// Handle file additions
-		if from == nil && to != nil {
-			changedFiles[to.Path()] = true
-		}
-		// Handle file modifications
-		if from != nil && to != nil {
-			changedFiles[to.Path()] = true
-			// If the file was renamed, include both paths
-			if from.Path() != to.Path() {
-				changedFiles[from.Path()] = true
-			}
-		}
-		// Handle file deletions (we might still want to track these)
-		if from != nil && to == nil {
-			changedFiles[from.Path()] = true
-		}
+		addChangedFilesFromPatch(filePatch, changedFiles)
 	}
 
 	return changedFiles, nil
+}
+
+// addChangedFilesFromPatch handles the logic for extracting changed file paths from a diff.FilePatch.
+func addChangedFilesFromPatch(filePatch diff.FilePatch, changedFiles map[string]bool) {
+	from, to := filePatch.Files()
+	switch {
+	case from == nil && to != nil:
+		changedFiles[to.Path()] = true
+		return
+	case from != nil && to != nil:
+		changedFiles[to.Path()] = true
+		if from.Path() != to.Path() {
+			changedFiles[from.Path()] = true
+		}
+		return
+	default:
+		changedFiles[from.Path()] = true
+		return
+	}
 }
 
 // resolveReference resolves a git reference (branch, tag, commit) to a hash.
 func resolveReference(repo *git.Repository, ref string) (plumbing.Hash, error) {
 	// Try to resolve as a hash first
 	if len(ref) >= 7 && len(ref) <= 40 {
-		if hash := plumbing.NewHash(ref); !hash.IsZero() {
+		if hash, _ := plumbing.FromHex(ref); !hash.IsZero() {
 			// Verify the hash exists
 			if _, err := repo.CommitObject(hash); err == nil {
 				return hash, nil

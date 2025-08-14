@@ -1,4 +1,4 @@
-package gitdiff
+package gitdiff //nolint:testpackage
 
 import (
 	"path/filepath"
@@ -28,7 +28,7 @@ func TestFilterProfilesByChangedFiles(t *testing.T) {
 
 	// Test with empty changed files - should return empty slice
 	filtered := FilterProfilesByChangedFiles(profiles, map[string]bool{}, "github.com/test")
-	require.Len(t, filtered, 0)
+	require.Empty(t, filtered)
 
 	// Test with some changed files
 	changedFiles := map[string]bool{
