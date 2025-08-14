@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"regexp"
 	"strconv"
 	"strings"
 
@@ -13,7 +12,7 @@ import (
 	"github.com/jedib0t/go-pretty/v6/text"
 	"github.com/mach6/go-covercheck/pkg/compute"
 	"github.com/mach6/go-covercheck/pkg/config"
-	"github.com/mach6/go-covercheck/pkg/gitdiff"
+	"github.com/mach6/go-covercheck/pkg/filters"
 	"github.com/mach6/go-covercheck/pkg/output"
 	"github.com/mach6/go-covercheck/samples"
 	"github.com/spf13/cobra"
@@ -102,8 +101,8 @@ const (
 	InitFlag      = "init"
 	InitFlagUsage = "create a sample .go-covercheck.yml config file in the current directory"
 
-	DiffAgainstFlag      = "diff-against"
-	DiffAgainstFlagUsage = "git reference (commit/branch/tag) to diff against; enables diff-only mode [default: HEAD~1]"
+	DiffFromFlag      = "diff-from"
+	DiffFromFlagUsage = "git reference (commit/branch/tag) to diff from; enables diff-only mode"
 
 	// ConfigFilePermissions permissions.
 	ConfigFilePermissions = 0600
@@ -232,48 +231,13 @@ func showCoverage(args []string, cfg *config.Config) (compute.Results, bool, err
 	if err != nil {
 		return compute.Results{}, false, err
 	}
-	filtered := filter(profiles, cfg)
+	filtered := filters.FilterProfiles(profiles, cfg)
 
 	results, failed := compute.CollectResults(filtered, cfg)
 	output.FormatAndReport(results, cfg, failed)
 	return results, failed, nil
 }
 
-// filter profiles.
-func filter(profiles []*cover.Profile, cfg *config.Config) []*cover.Profile {
-	// First apply skip patterns
-	filtered := make([]*cover.Profile, 0)
-	for _, p := range profiles {
-		if shouldSkip(p.FileName, cfg.Skip) {
-			continue
-		}
-		filtered = append(filtered, p)
-	}
-
-	// Then apply diff filtering if enabled
-	if cfg.DiffAgainst != "" {
-		changedFiles, err := gitdiff.GetChangedFiles(".", cfg.DiffAgainst)
-		if err != nil {
-			// Log error but don't fail - fall back to normal behavior
-			fmt.Fprintf(os.Stderr, "Warning: Failed to get changed files for diff mode: %v\n", err)
-			fmt.Fprintf(os.Stderr, "Falling back to checking all files.\n")
-			return filtered
-		}
-
-		// If no files changed, return empty result
-		if len(changedFiles) == 0 {
-			fmt.Fprintf(os.Stderr, "No files changed in diff. No coverage to check.\n")
-			return []*cover.Profile{}
-		}
-
-		diffFiltered := gitdiff.FilterProfilesByChangedFiles(filtered, changedFiles, cfg.ModuleName)
-		fmt.Fprintf(os.Stderr, "Diff mode: Checking coverage for %d changed files (out of %d total files)\n",
-			len(diffFiltered), len(filtered))
-		return diffFiltered
-	}
-
-	return filtered
-}
 
 func getCoverProfileData(args []string) ([]*cover.Profile, error) {
 	var coveragePath string
@@ -463,7 +427,7 @@ func applyConfigOverrides(cfg *config.Config, cmd *cobra.Command, noConfigFile b
 	applyBoolFlagOverride(cmd, NoColorFlag, &cfg.NoColor, noConfigFile)
 	applyIntFlagOverride(cmd, TerminalWidthFlag, &cfg.TerminalWidth, noConfigFile)
 	applyStringFlagOverride(cmd, ModuleNameFlag, &cfg.ModuleName, noConfigFile)
-	applyDiffAgainstFlagOverride(cmd, DiffAgainstFlag, &cfg.DiffAgainst, noConfigFile)
+	applyDiffFromFlagOverride(cmd, DiffFromFlag, &cfg.DiffFrom, noConfigFile)
 
 	// set cfg.Total thresholds to the global values, iff no override was specified for each.
 	if v, _ := cmd.Flags().GetFloat64(StatementThresholdFlag); !cmd.Flags().Changed(TotalStatementThresholdFlag) &&
@@ -488,7 +452,7 @@ func applyFloat64TotalFlagOverride(cmd *cobra.Command, flagName string, section 
 	}
 }
 
-func applyDiffAgainstFlagOverride(cmd *cobra.Command, flagName string, target *string, noConfigFile bool) {
+func applyDiffFromFlagOverride(cmd *cobra.Command, flagName string, target *string, noConfigFile bool) {
 	if v, _ := cmd.Flags().GetString(flagName); cmd.Flags().Changed(flagName) || noConfigFile {
 		*target = v
 	}
@@ -686,22 +650,13 @@ func initFlags(cmd *cobra.Command) {
 	)
 
 	cmd.Flags().String(
-		DiffAgainstFlag,
+		DiffFromFlag,
 		"",
-		DiffAgainstFlagUsage,
+		DiffFromFlagUsage,
 	)
-	cmd.Flags().Lookup(DiffAgainstFlag).NoOptDefVal = "HEAD~1"
 }
 
-func shouldSkip(filename string, skip []string) bool {
-	for _, s := range skip {
-		regex := regexp.MustCompile(s)
-		if regex.MatchString(filename) {
-			return true
-		}
-	}
-	return false
-}
+
 
 func initConfigFile(cmd *cobra.Command) error {
 	configPath, _ := cmd.Flags().GetString(ConfigFlag)

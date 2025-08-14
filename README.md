@@ -252,17 +252,17 @@ go-covercheck integration-coverage.out
 ### 🚀 Basic Usage
 
 ```shell
-# Check coverage only on files changed since last commit
-go-covercheck --diff-only
+# Check coverage only on files changed since a specific commit
+go-covercheck --diff-from HEAD~1
 
 # Compare against a specific commit
-go-covercheck --diff-only --against HEAD~3
+go-covercheck --diff-from HEAD~3
 
 # Compare against a branch
-go-covercheck --diff-only --against main
+go-covercheck --diff-from main
 
 # Compare against a tag
-go-covercheck --diff-only --against v1.0.0
+go-covercheck --diff-from v1.0.0
 ```
 
 ### ⚙️ Configuration
@@ -270,11 +270,8 @@ go-covercheck --diff-only --against v1.0.0
 You can also configure diff mode in your `.go-covercheck.yml`:
 
 ```yaml
-# Enable diff-only mode by default
-diffOnly: true
-
-# Set the default reference to compare against
-against: "main"  # or "HEAD~1", "v1.0.0", etc.
+# Set the reference to compare against
+diffFrom: "main"  # or "HEAD~1", "v1.0.0", etc.
 
 # Set thresholds that only apply to changed files
 statementThreshold: 80.0
@@ -289,13 +286,13 @@ If git operations fail (e.g., not in a git repository, invalid reference), `go-c
 
 ```shell
 # CI/CD: Check coverage for PR changes
-go-covercheck --diff-only --against origin/main
+go-covercheck --diff-from origin/main
 
 # Local development: Check changes since last push
-go-covercheck --diff-only --against @{upstream}
+go-covercheck --diff-from @{upstream}
 
 # Release validation: Check changes since last tag
-go-covercheck --diff-only --against $(git describe --tags --abbrev=0)
+go-covercheck --diff-from $(git describe --tags --abbrev=0)
 ```
 
 ## 🕰️ History

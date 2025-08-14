@@ -13,14 +13,13 @@ import (
 )
 
 // GetChangedFiles returns a list of files that have changed between the target reference and HEAD.
-// If targetRef is empty, it defaults to "HEAD~1".
 // Returns a map where keys are file paths and values are true.
 func GetChangedFiles(repoPath, targetRef string) (map[string]bool, error) {
 	if repoPath == "" {
 		repoPath = "."
 	}
 	if targetRef == "" {
-		targetRef = "HEAD~1"
+		return nil, fmt.Errorf("target reference cannot be empty")
 	}
 
 	repo, err := git.PlainOpen(repoPath)

@@ -15,7 +15,7 @@ func TestExecute_DiffMode(t *testing.T) {
 	stdOut, stdErr, err := runCmdForTest(t, cmd)
 	require.NoError(t, err)
 	require.Empty(t, stdErr)
-	require.Contains(t, stdOut, "--diff-against")
+	require.Contains(t, stdOut, "--diff-from")
 }
 
 func TestExecute_DiffMode_InvalidRepo(t *testing.T) {
@@ -27,12 +27,12 @@ func TestExecute_DiffMode_InvalidRepo(t *testing.T) {
 
 	// Run diff mode in non-git directory
 	cmd := setupTestCmd()
-	cmd.SetArgs([]string{"--diff-against=HEAD~1", "--no-color", coverageFile})
-	stdOut, stdErr, err := runCmdForTest(t, cmd)
+	cmd.SetArgs([]string{"--diff-from=HEAD~1", "--no-color", coverageFile})
+	stdOut, _, err := runCmdForTest(t, cmd)
 	require.NoError(t, err) // Should not fail, just fall back
-	require.Contains(t, stdErr, "Warning: Failed to get changed files")
-	require.Contains(t, stdErr, "Falling back to checking all files")
-	require.Equal(t, "⚠ No coverage results to display\n", stdOut)
+	require.Contains(t, stdOut, "Warning: Failed to get changed files")
+	require.Contains(t, stdOut, "Falling back to checking all files")
+	require.Contains(t, stdOut, "No coverage results to display")
 }
 
 func TestExecute_DiffMode_WithJSON(t *testing.T) {
@@ -44,14 +44,16 @@ func TestExecute_DiffMode_WithJSON(t *testing.T) {
 
 	// Run diff mode with JSON output
 	cmd := setupTestCmd()
-	cmd.SetArgs([]string{"--diff-against=HEAD~1", "--format", "json", "--no-color", coverageFile})
-	stdOut, stdErr, err := runCmdForTest(t, cmd)
+	cmd.SetArgs([]string{"--diff-from=HEAD~1", "--format", "json", "--no-color", coverageFile})
+	stdOut, _, err := runCmdForTest(t, cmd)
 	require.NoError(t, err)
-	require.Contains(t, stdErr, "Warning: Failed to get changed files")
+
+	// Extract JSON part from the output (after any warning messages)
+	jsonOutput := extractJSONFromOutput(stdOut)
 
 	// Should output valid JSON
 	var result map[string]interface{}
-	err = json.Unmarshal([]byte(stdOut), &result)
+	err = json.Unmarshal([]byte(jsonOutput), &result)
 	require.NoError(t, err)
 
 	// Verify structure
@@ -60,20 +62,4 @@ func TestExecute_DiffMode_WithJSON(t *testing.T) {
 	require.Contains(t, result, "byTotal")
 }
 
-func TestExecute_DiffMode_DefaultValue(t *testing.T) {
-	// Create a fake coverage file
-	coverageFile := test.CreateTempCoverageFile(t, "mode: set")
 
-	// Change to the temp directory
-	t.Chdir(filepath.Dir(coverageFile))
-
-	// Run diff mode without specifying value (should default to HEAD~1)
-	cmd := setupTestCmd()
-	cmd.SetArgs([]string{"--diff-against", "--no-color", coverageFile})
-	stdOut, stdErr, err := runCmdForTest(t, cmd)
-	require.NoError(t, err) // Should not fail, just fall back
-	require.Contains(t, stdErr, "Warning: Failed to get changed files")
-	require.Contains(t, stdErr, "Falling back to checking all files")
-	// Use Contains instead of Equal to avoid color code issues
-	require.Contains(t, stdOut, "No coverage results to display")
-}

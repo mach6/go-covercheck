@@ -80,6 +80,6 @@ total:
 skip:
 #  - cmd/root.go
 
-# git reference to diff against (enables diff-only mode)
-# default "" (disabled; when set enables diff mode and defaults to HEAD~1)
-diffAgainst: ""
+# git reference to diff from (enables diff-only mode)
+# default "" (disabled)
+diffFrom: ""
