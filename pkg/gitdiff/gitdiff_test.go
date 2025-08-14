@@ -1,13 +1,13 @@
 package gitdiff
 
 import (
-	"os"
 	"path/filepath"
 	"testing"
 	"time"
 
 	"github.com/go-git/go-git/v6"
 	"github.com/go-git/go-git/v6/plumbing/object"
+	"github.com/mach6/go-covercheck/pkg/test"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/tools/cover"
 )
@@ -103,10 +103,7 @@ func TestGetChangedFiles_WithGitRepo(t *testing.T) {
 	require.NoError(t, err)
 
 	// Create and commit the first file
-	file1Path := filepath.Join(repoDir, "file1.go")
-	err = os.WriteFile(file1Path, []byte("package main\n\nfunc main() {}\n"), 0644)
-	require.NoError(t, err)
-
+	test.CreateFile(t, filepath.Join(repoDir, "file1.go"), "package main\n\nfunc main() {}\n")
 	_, err = w.Add("file1.go")
 	require.NoError(t, err)
 
@@ -120,10 +117,7 @@ func TestGetChangedFiles_WithGitRepo(t *testing.T) {
 	require.NoError(t, err)
 
 	// Create and commit a second file
-	file2Path := filepath.Join(repoDir, "file2.go")
-	err = os.WriteFile(file2Path, []byte("package main\n\nfunc hello() {}\n"), 0644)
-	require.NoError(t, err)
-
+	test.CreateFile(t, filepath.Join(repoDir, "file2.go"), "package main\n\nfunc hello() {}\n")
 	_, err = w.Add("file2.go")
 	require.NoError(t, err)
 

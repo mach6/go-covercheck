@@ -58,7 +58,7 @@ func GetChangedFiles(repoPath, targetRef string) (map[string]bool, error) {
 	changedFiles := make(map[string]bool)
 	for _, filePatch := range patch.FilePatches() {
 		from, to := filePatch.Files()
-		
+
 		// Handle file additions
 		if from == nil && to != nil {
 			changedFiles[to.Path()] = true
@@ -116,7 +116,8 @@ func resolveReference(repo *git.Repository, ref string) (plumbing.Hash, error) {
 }
 
 // FilterProfilesByChangedFiles filters coverage profiles to only include files that have changed.
-func FilterProfilesByChangedFiles(profiles []*cover.Profile, changedFiles map[string]bool, moduleName string) []*cover.Profile {
+func FilterProfilesByChangedFiles(profiles []*cover.Profile, changedFiles map[string]bool,
+	moduleName string) []*cover.Profile {
 	if len(changedFiles) == 0 {
 		return []*cover.Profile{}
 	}
@@ -124,7 +125,7 @@ func FilterProfilesByChangedFiles(profiles []*cover.Profile, changedFiles map[st
 	filtered := make([]*cover.Profile, 0)
 	for _, profile := range profiles {
 		fileName := profile.FileName
-		
+
 		// Try to match the file name directly
 		if changedFiles[fileName] {
 			filtered = append(filtered, profile)
