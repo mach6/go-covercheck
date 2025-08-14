@@ -79,8 +79,8 @@ type Config struct {
 	NoColor            bool                 `yaml:"noColor,omitempty"`
 	Format             string               `yaml:"format,omitempty"`
 	TerminalWidth      int                  `yaml:"terminalWidth,omitempty"`
-	ModuleName    string               `yaml:"moduleName,omitempty"`
-	DiffFrom      string               `yaml:"diffFrom,omitempty"`
+	ModuleName         string               `yaml:"moduleName,omitempty"`
+	DiffFrom           string               `yaml:"diffFrom,omitempty"`
 }
 
 // Load a Config from a path or produce an error.

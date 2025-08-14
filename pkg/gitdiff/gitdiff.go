@@ -2,6 +2,7 @@
 package gitdiff
 
 import (
+	"errors"
 	"fmt"
 	"path/filepath"
 	"strings"
@@ -19,7 +20,7 @@ func GetChangedFiles(repoPath, targetRef string) (map[string]bool, error) {
 		repoPath = "."
 	}
 	if targetRef == "" {
-		return nil, fmt.Errorf("target reference cannot be empty")
+		return nil, errors.New("target reference cannot be empty")
 	}
 
 	repo, err := git.PlainOpen(repoPath)

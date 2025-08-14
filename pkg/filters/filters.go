@@ -10,12 +10,19 @@ import (
 	"golang.org/x/tools/cover"
 )
 
+var (
+	// defaultRepoPath is the default path to the git repository.
+	// It is used when no specific path is provided.
+	// Typically, it is the current working directory.
+	//
+	// Defined as a package variable to allow testing with different paths.
+	defaultRepoPath = "."
+)
+
 // FilterProfiles applies all filtering logic to the given profiles.
 func FilterProfiles(profiles []*cover.Profile, cfg *config.Config) []*cover.Profile {
-	// First apply skip patterns
 	filtered := filterBySkipped(profiles, cfg.Skip)
 
-	// Then apply diff filtering if enabled
 	if cfg.DiffFrom != "" {
 		return filterByGitDiff(filtered, cfg)
 	}
@@ -37,7 +44,7 @@ func filterBySkipped(profiles []*cover.Profile, skip []string) []*cover.Profile 
 
 // filterByGitDiff filters profiles to only include files that have changed in git diff.
 func filterByGitDiff(profiles []*cover.Profile, cfg *config.Config) []*cover.Profile {
-	changedFiles, err := gitdiff.GetChangedFiles(".", cfg.DiffFrom)
+	changedFiles, err := gitdiff.GetChangedFiles(defaultRepoPath, cfg.DiffFrom)
 	if err != nil {
 		// Log error but don't fail - fall back to normal behavior
 		output.PrintDiffWarning(err)
