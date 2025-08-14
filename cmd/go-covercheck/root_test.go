@@ -7,10 +7,12 @@ import (
 
 	"github.com/mach6/go-covercheck/pkg/compute"
 	"github.com/mach6/go-covercheck/pkg/config"
+	"github.com/mach6/go-covercheck/pkg/filters"
 	"github.com/mach6/go-covercheck/pkg/history"
 	"github.com/mach6/go-covercheck/pkg/test"
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/require"
+	"golang.org/x/tools/cover"
 	"gopkg.in/yaml.v3"
 )
 
@@ -29,18 +31,43 @@ func runCmdForTest(t *testing.T, cmd *cobra.Command) (string, string, error) {
 	return stdOut, stdErr, err
 }
 
-func TestShouldSkip_MatchesPrefix(t *testing.T) {
-	require.True(t, shouldSkip("vendor/foo.go", []string{"vendor/"}))
-	require.True(t, shouldSkip("gen/code.go", []string{"gen/"}))
+func TestFilterBySkipped_MatchesPrefix(t *testing.T) {
+	profiles := []*cover.Profile{
+		{FileName: "vendor/foo.go"},
+		{FileName: "src/main.go"},
+	}
+	cfg := &config.Config{}
+	cfg.ApplyDefaults()            // Apply defaults first
+	cfg.Skip = []string{"vendor/"} // Then set skip patterns
+	filtered := filters.FilterProfiles(profiles, cfg)
+
+	require.Len(t, filtered, 1)
+	require.Equal(t, "src/main.go", filtered[0].FileName)
 }
 
-func TestShouldSkip_MatchesExact(t *testing.T) {
-	require.True(t, shouldSkip("internal/tmp_test.go", []string{"internal/tmp_test.go"}))
+func TestFilterBySkipped_MatchesExact(t *testing.T) {
+	profiles := []*cover.Profile{
+		{FileName: "internal/tmp_test.go"},
+		{FileName: "src/main.go"},
+	}
+	cfg := &config.Config{}
+	cfg.ApplyDefaults()             // Apply defaults first
+	cfg.Skip = []string{"_test.go"} // Then set skip patterns
+	filtered := filters.FilterProfiles(profiles, cfg)
+	require.Len(t, filtered, 1)
+	require.Equal(t, "src/main.go", filtered[0].FileName)
 }
 
-func TestShouldSkip_NoMatches(t *testing.T) {
-	require.False(t, shouldSkip("main.go", []string{"generated.go"}))
-	require.False(t, shouldSkip("src/foo/bar.go", nil))
+func TestFilterBySkipped_NoMatches(t *testing.T) {
+	profiles := []*cover.Profile{
+		{FileName: "main.go"},
+		{FileName: "src/foo/bar.go"},
+	}
+	cfg := &config.Config{}
+	cfg.ApplyDefaults()                 // Apply defaults first
+	cfg.Skip = []string{"generated.go"} // Then set skip patterns
+	filtered := filters.FilterProfiles(profiles, cfg)
+	require.Len(t, filtered, 2)
 }
 
 func Test_run_ShowCoverageFails(t *testing.T) {
@@ -96,16 +123,24 @@ func Test_run_ShowHistoryFails(t *testing.T) {
 }
 
 func extractJSONFromOutput(output string) string {
-	// The output format is: JSON + success message
-	// We need to find where the JSON ends and extract just that part
+	// The output format might have warning messages before JSON
+	// Find the first line that starts with { (JSON start)
 	lines := strings.Split(output, "\n")
 	jsonLines := make([]string, 0)
+	startFound := false
 
 	for _, line := range lines {
-		if strings.HasPrefix(strings.TrimSpace(line), "✓") {
-			break
+		trimmed := strings.TrimSpace(line)
+		if !startFound && strings.HasPrefix(trimmed, "{") {
+			startFound = true
 		}
-		jsonLines = append(jsonLines, line)
+		if startFound {
+			// Stop if we hit a success message marker
+			if strings.HasPrefix(trimmed, "✓") {
+				break
+			}
+			jsonLines = append(jsonLines, line)
+		}
 	}
 
 	return strings.Join(jsonLines, "\n")

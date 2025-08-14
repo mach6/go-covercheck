@@ -6,11 +6,10 @@ import (
 	"testing"
 )
 
-// CreateTempFile creates a temporary file with the given filename and content.
-// The file will be automatically cleaned up after the test finishes.
-func CreateTempFile(t *testing.T, filename string, content string) string {
+// CreateFile crates a file at the given path with content.
+// The file will be automatically cleanedett up after the test finishes.
+func CreateFile(t *testing.T, path string, content string) string {
 	t.Helper()
-	path := t.TempDir() + "/" + filename
 	_ = os.WriteFile(path, []byte(content), 0600) //nolint:mnd
 
 	t.Cleanup(func() {
@@ -18,6 +17,14 @@ func CreateTempFile(t *testing.T, filename string, content string) string {
 	})
 
 	return path
+}
+
+// CreateTempFile creates a temporary file with the given filename and content.
+// The file will be automatically cleaned up after the test finishes.
+func CreateTempFile(t *testing.T, filename string, content string) string {
+	t.Helper()
+	path := t.TempDir() + "/" + filename
+	return CreateFile(t, path, content)
 }
 
 // CreateTempCoverageFile creates a temporary 'coverage.out' file with the given content.

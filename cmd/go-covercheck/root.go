@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"regexp"
 	"strconv"
 	"strings"
 
@@ -13,6 +12,7 @@ import (
 	"github.com/jedib0t/go-pretty/v6/text"
 	"github.com/mach6/go-covercheck/pkg/compute"
 	"github.com/mach6/go-covercheck/pkg/config"
+	"github.com/mach6/go-covercheck/pkg/filters"
 	"github.com/mach6/go-covercheck/pkg/output"
 	"github.com/mach6/go-covercheck/samples"
 	"github.com/spf13/cobra"
@@ -100,6 +100,9 @@ const (
 
 	InitFlag      = "init"
 	InitFlagUsage = "create a sample .go-covercheck.yml config file in the current directory"
+
+	DiffFromFlag      = "diff-from"
+	DiffFromFlagUsage = "git reference (commit/branch/tag) to diff from; enables diff-only mode"
 
 	// ConfigFilePermissions permissions.
 	ConfigFilePermissions = 0600
@@ -228,23 +231,11 @@ func showCoverage(args []string, cfg *config.Config) (compute.Results, bool, err
 	if err != nil {
 		return compute.Results{}, false, err
 	}
-	filtered := filter(profiles, cfg)
+	filtered := filters.FilterProfiles(profiles, cfg)
 
 	results, failed := compute.CollectResults(filtered, cfg)
 	output.FormatAndReport(results, cfg, failed)
 	return results, failed, nil
-}
-
-// filter profiles.
-func filter(profiles []*cover.Profile, cfg *config.Config) []*cover.Profile {
-	filtered := make([]*cover.Profile, 0)
-	for _, p := range profiles {
-		if shouldSkip(p.FileName, cfg.Skip) {
-			continue
-		}
-		filtered = append(filtered, p)
-	}
-	return filtered
 }
 
 func getCoverProfileData(args []string) ([]*cover.Profile, error) {
@@ -421,58 +412,21 @@ func getConfig(cmd *cobra.Command) (*config.Config, error) {
 	return cfg, nil
 }
 
-func applyConfigOverrides(cfg *config.Config, cmd *cobra.Command, noConfigFile bool) { //nolint:cyclop
-	// CLI overrides when a config file exists or values to use when it does not exist.
-	if v, _ := cmd.Flags().GetFloat64(StatementThresholdFlag); cmd.Flags().Changed(StatementThresholdFlag) ||
-		noConfigFile {
-		cfg.StatementThreshold = v
-	}
-	if v, _ := cmd.Flags().GetFloat64(BlockThresholdFlag); cmd.Flags().Changed(BlockThresholdFlag) ||
-		noConfigFile {
-		cfg.BlockThreshold = v
-	}
-	if v, _ := cmd.Flags().GetFloat64(TotalStatementThresholdFlag); cmd.Flags().Changed(TotalStatementThresholdFlag) {
-		cfg.Total[config.StatementsSection] = v
-	}
-	if v, _ := cmd.Flags().GetFloat64(TotalBlockThresholdFlag); cmd.Flags().Changed(TotalBlockThresholdFlag) {
-		cfg.Total[config.BlocksSection] = v
-	}
-	if v, _ := cmd.Flags().GetString(SortByFlag); cmd.Flags().Changed(SortByFlag) ||
-		noConfigFile {
-		cfg.SortBy = v
-	}
-	if v, _ := cmd.Flags().GetString(SortOrderFlag); cmd.Flags().Changed(SortOrderFlag) ||
-		noConfigFile {
-		cfg.SortOrder = v
-	}
-	if v, _ := cmd.Flags().GetStringArray(SkipFlag); cmd.Flags().Changed(SkipFlag) ||
-		noConfigFile {
-		cfg.Skip = v
-	}
-	if v, _ := cmd.Flags().GetString(FormatFlag); cmd.Flags().Changed(FormatFlag) ||
-		noConfigFile {
-		cfg.Format = v
-	}
-	if v, _ := cmd.Flags().GetBool(NoTableFlag); cmd.Flags().Changed(NoTableFlag) ||
-		noConfigFile {
-		cfg.NoTable = v
-	}
-	if v, _ := cmd.Flags().GetBool(NoSummaryFlag); cmd.Flags().Changed(NoSummaryFlag) ||
-		noConfigFile {
-		cfg.NoSummary = v
-	}
-	if v, _ := cmd.Flags().GetBool(NoColorFlag); cmd.Flags().Changed(NoColorFlag) ||
-		noConfigFile {
-		cfg.NoColor = v
-	}
-	if v, _ := cmd.Flags().GetInt(TerminalWidthFlag); cmd.Flags().Changed(TerminalWidthFlag) ||
-		noConfigFile {
-		cfg.TerminalWidth = v
-	}
-	if v, _ := cmd.Flags().GetString(ModuleNameFlag); cmd.Flags().Changed(ModuleNameFlag) ||
-		noConfigFile {
-		cfg.ModuleName = v
-	}
+func applyConfigOverrides(cfg *config.Config, cmd *cobra.Command, noConfigFile bool) {
+	applyFloat64FlagOverride(cmd, StatementThresholdFlag, &cfg.StatementThreshold, noConfigFile)
+	applyFloat64FlagOverride(cmd, BlockThresholdFlag, &cfg.BlockThreshold, noConfigFile)
+	applyFloat64TotalFlagOverride(cmd, TotalStatementThresholdFlag, config.StatementsSection, cfg.Total)
+	applyFloat64TotalFlagOverride(cmd, TotalBlockThresholdFlag, config.BlocksSection, cfg.Total)
+	applyStringFlagOverride(cmd, SortByFlag, &cfg.SortBy, noConfigFile)
+	applyStringFlagOverride(cmd, SortOrderFlag, &cfg.SortOrder, noConfigFile)
+	applyStringArrayFlagOverride(cmd, SkipFlag, &cfg.Skip, noConfigFile)
+	applyStringFlagOverride(cmd, FormatFlag, &cfg.Format, noConfigFile)
+	applyBoolFlagOverride(cmd, NoTableFlag, &cfg.NoTable, noConfigFile)
+	applyBoolFlagOverride(cmd, NoSummaryFlag, &cfg.NoSummary, noConfigFile)
+	applyBoolFlagOverride(cmd, NoColorFlag, &cfg.NoColor, noConfigFile)
+	applyIntFlagOverride(cmd, TerminalWidthFlag, &cfg.TerminalWidth, noConfigFile)
+	applyStringFlagOverride(cmd, ModuleNameFlag, &cfg.ModuleName, noConfigFile)
+	applyDiffFromFlagOverride(cmd, DiffFromFlag, &cfg.DiffFrom, noConfigFile)
 
 	// set cfg.Total thresholds to the global values, iff no override was specified for each.
 	if v, _ := cmd.Flags().GetFloat64(StatementThresholdFlag); !cmd.Flags().Changed(TotalStatementThresholdFlag) &&
@@ -482,6 +436,48 @@ func applyConfigOverrides(cfg *config.Config, cmd *cobra.Command, noConfigFile b
 	if v, _ := cmd.Flags().GetFloat64(BlockThresholdFlag); !cmd.Flags().Changed(TotalBlockThresholdFlag) &&
 		cfg.Total[config.BlocksSection] == config.BlockThresholdDefault {
 		cfg.Total[config.BlocksSection] = v
+	}
+}
+
+func applyFloat64FlagOverride(cmd *cobra.Command, flagName string, target *float64, noConfigFile bool) {
+	if v, _ := cmd.Flags().GetFloat64(flagName); cmd.Flags().Changed(flagName) || noConfigFile {
+		*target = v
+	}
+}
+
+func applyFloat64TotalFlagOverride(cmd *cobra.Command, flagName string, section string, target map[string]float64) {
+	if v, _ := cmd.Flags().GetFloat64(flagName); cmd.Flags().Changed(flagName) {
+		target[section] = v
+	}
+}
+
+func applyDiffFromFlagOverride(cmd *cobra.Command, flagName string, target *string, noConfigFile bool) {
+	if v, _ := cmd.Flags().GetString(flagName); cmd.Flags().Changed(flagName) || noConfigFile {
+		*target = v
+	}
+}
+
+func applyStringFlagOverride(cmd *cobra.Command, flagName string, target *string, noConfigFile bool) {
+	if v, _ := cmd.Flags().GetString(flagName); cmd.Flags().Changed(flagName) || noConfigFile {
+		*target = v
+	}
+}
+
+func applyStringArrayFlagOverride(cmd *cobra.Command, flagName string, target *[]string, noConfigFile bool) {
+	if v, _ := cmd.Flags().GetStringArray(flagName); cmd.Flags().Changed(flagName) || noConfigFile {
+		*target = v
+	}
+}
+
+func applyBoolFlagOverride(cmd *cobra.Command, flagName string, target *bool, noConfigFile bool) {
+	if v, _ := cmd.Flags().GetBool(flagName); cmd.Flags().Changed(flagName) || noConfigFile {
+		*target = v
+	}
+}
+
+func applyIntFlagOverride(cmd *cobra.Command, flagName string, target *int, noConfigFile bool) {
+	if v, _ := cmd.Flags().GetInt(flagName); cmd.Flags().Changed(flagName) || noConfigFile {
+		*target = v
 	}
 }
 
@@ -651,16 +647,12 @@ func initFlags(cmd *cobra.Command) {
 		false,
 		InitFlagUsage,
 	)
-}
 
-func shouldSkip(filename string, skip []string) bool {
-	for _, s := range skip {
-		regex := regexp.MustCompile(s)
-		if regex.MatchString(filename) {
-			return true
-		}
-	}
-	return false
+	cmd.Flags().String(
+		DiffFromFlag,
+		"",
+		DiffFromFlagUsage,
+	)
 }
 
 func initConfigFile(cmd *cobra.Command) error {

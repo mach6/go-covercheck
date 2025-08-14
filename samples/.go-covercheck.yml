@@ -79,3 +79,7 @@ total:
 # default []
 skip:
 #  - cmd/root.go
+
+# git reference to diff from (enables diff-only mode)
+# default "" (disabled)
+diffFrom: ""
