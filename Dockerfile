@@ -1,4 +1,4 @@
-FROM golang:1.24 AS builder
+FROM golang:1.25 AS builder
 
 RUN true \
   && apt-get update && apt-get install -y ca-certificates git binutils make \
