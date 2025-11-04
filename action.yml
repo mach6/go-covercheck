@@ -1,0 +1,147 @@
+name: 'go-covercheck'
+description: 'Enforce test coverage thresholds in Go projects'
+author: 'mach6'
+branding:
+  icon: 'shield'
+  color: 'green'
+
+inputs:
+  coverage-file:
+    description: 'Path to the coverage profile file'
+    required: false
+    default: 'coverage.out'
+  config-file:
+    description: 'Path to the go-covercheck config file'
+    required: false
+    default: ''
+  statement-threshold:
+    description: 'Global statement threshold to enforce (0=disabled)'
+    required: false
+    default: ''
+  block-threshold:
+    description: 'Global block threshold to enforce (0=disabled)'
+    required: false
+    default: ''
+  total-statement-threshold:
+    description: 'Total statement threshold to enforce (0=disabled)'
+    required: false
+    default: ''
+  total-block-threshold:
+    description: 'Total block threshold to enforce (0=disabled)'
+    required: false
+    default: ''
+  format:
+    description: 'Output format (table|json|yaml|md|html|csv|tsv)'
+    required: false
+    default: ''
+  skip:
+    description: 'Regex patterns of files/packages to skip (comma-separated)'
+    required: false
+    default: ''
+  no-color:
+    description: 'Disable color output'
+    required: false
+    default: 'false'
+  save-history:
+    description: 'Save coverage result to history'
+    required: false
+    default: 'false'
+  history-file:
+    description: 'Path to the history file'
+    required: false
+    default: ''
+  label:
+    description: 'Optional label for history entry'
+    required: false
+    default: ''
+  version:
+    description: 'Version of go-covercheck to install'
+    required: false
+    default: 'latest'
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Install go-covercheck
+      shell: bash
+      run: |
+        echo "Installing go-covercheck..."
+        if [ "${{ inputs.version }}" == "latest" ]; then
+          go install github.com/mach6/go-covercheck/cmd/go-covercheck@latest
+        else
+          go install github.com/mach6/go-covercheck/cmd/go-covercheck@${{ inputs.version }}
+        fi
+        
+        # Add Go bin directory to PATH
+        echo "$HOME/go/bin" >> $GITHUB_PATH
+    
+    - name: Run go-covercheck
+      shell: bash
+      run: |
+        # Build arguments array
+        args=()
+        
+        # Add coverage file (positional argument)
+        if [ -f "${{ inputs.coverage-file }}" ]; then
+          args+=("${{ inputs.coverage-file }}")
+        else
+          echo "Error: Coverage file '${{ inputs.coverage-file }}' not found"
+          exit 1
+        fi
+        
+        # Add optional flags with values
+        if [ -n "${{ inputs.config-file }}" ]; then
+          args+=("--config=${{ inputs.config-file }}")
+        fi
+        
+        if [ -n "${{ inputs.statement-threshold }}" ]; then
+          args+=("--statement-threshold=${{ inputs.statement-threshold }}")
+        fi
+        
+        if [ -n "${{ inputs.block-threshold }}" ]; then
+          args+=("--block-threshold=${{ inputs.block-threshold }}")
+        fi
+        
+        if [ -n "${{ inputs.total-statement-threshold }}" ]; then
+          args+=("--total-statement-threshold=${{ inputs.total-statement-threshold }}")
+        fi
+        
+        if [ -n "${{ inputs.total-block-threshold }}" ]; then
+          args+=("--total-block-threshold=${{ inputs.total-block-threshold }}")
+        fi
+        
+        if [ -n "${{ inputs.format }}" ]; then
+          args+=("--format=${{ inputs.format }}")
+        fi
+        
+        if [ -n "${{ inputs.skip }}" ]; then
+          # Split comma-separated skip patterns and add each as separate --skip argument
+          IFS=',' read -ra SKIP_PATTERNS <<< "${{ inputs.skip }}"
+          for pattern in "${SKIP_PATTERNS[@]}"; do
+            pattern=$(echo "$pattern" | xargs)  # trim whitespace
+            if [ -n "$pattern" ]; then
+              args+=("--skip=$pattern")
+            fi
+          done
+        fi
+        
+        # Add boolean flags
+        if [ "${{ inputs.no-color }}" == "true" ]; then
+          args+=("--no-color")
+        fi
+        
+        if [ "${{ inputs.save-history }}" == "true" ]; then
+          args+=("--save-history")
+        fi
+        
+        if [ -n "${{ inputs.history-file }}" ]; then
+          args+=("--history-file=${{ inputs.history-file }}")
+        fi
+        
+        if [ -n "${{ inputs.label }}" ]; then
+          args+=("--label=${{ inputs.label }}")
+        fi
+        
+        # Run go-covercheck
+        echo "Running go-covercheck with arguments: ${args[*]}"
+        go-covercheck "${args[@]}"
