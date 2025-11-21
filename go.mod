@@ -7,7 +7,7 @@ require (
 	github.com/go-git/go-git/v6 v6.0.0-20250711134917-1f24ae85fe16
 	github.com/goccy/go-yaml v1.18.0
 	github.com/hokaccha/go-prettyjson v0.0.0-20211117102719-0474bc63780f
-	github.com/jedib0t/go-pretty/v6 v6.7.1
+	github.com/jedib0t/go-pretty/v6 v6.7.5
 	github.com/mattn/go-colorable v0.1.14
 	github.com/spf13/cobra v1.10.1
 	github.com/stretchr/testify v1.11.1
