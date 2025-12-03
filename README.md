@@ -91,6 +91,70 @@ Or you can use a tag which maps to a specific version:
 docker pull ghcr.io/mach6/go-covercheck:0.6.1
 ```
 
+### 🚀 GitHub Action
+
+You can use the official GitHub Action to run go-covercheck in your CI/CD workflows:
+
+```yaml
+- name: Run coverage check
+  uses: mach6/go-covercheck@v1
+  with:
+    coverage-file: coverage.out
+```
+
+#### GitHub Action Inputs
+
+| Input | Description | Required | Default |
+|-------|-------------|----------|---------|
+| `coverage-file` | Path to the coverage profile file | No | `coverage.out` |
+| `config-file` | Path to the go-covercheck config file | No | _(uses default config)_ |
+| `statement-threshold` | Global statement threshold to enforce (0=disabled) | No | _(uses config default)_ | 
+| `block-threshold` | Global block threshold to enforce (0=disabled) | No | _(uses config default)_ |
+| `total-statement-threshold` | Total statement threshold to enforce (0=disabled) | No | _(uses config default)_ |
+| `total-block-threshold` | Total block threshold to enforce (0=disabled) | No | _(uses config default)_ |
+| `format` | Output format (table\|json\|yaml\|md\|html\|csv\|tsv) | No | _(uses config default)_ |
+| `skip` | Regex patterns of files/packages to skip (comma-separated) | No | |
+| `no-color` | Disable color output (true/false) | No | `false` |
+| `save-history` | Save coverage result to history (true/false) | No | `false` |
+| `history-file` | Path to the history file | No | _(uses config default)_ |
+| `label` | Optional label for history entry | No | |
+| `version` | Version of go-covercheck to install | No | `latest` |
+
+#### GitHub Action Examples
+
+**Basic usage:**
+```yaml
+steps:
+  - uses: actions/checkout@v4
+  - uses: actions/setup-go@v5
+    with:
+      go-version: '1.24'
+  - run: go test -v -coverprofile=coverage.out ./...
+  - uses: mach6/go-covercheck@v1
+    with:
+      coverage-file: coverage.out
+```
+
+**With custom thresholds:**
+```yaml
+- uses: mach6/go-covercheck@v1
+  with:
+    coverage-file: coverage.out
+    statement-threshold: "80"
+    block-threshold: "70"
+    format: json
+```
+
+**With skip patterns and history:**
+```yaml
+- uses: mach6/go-covercheck@v1
+  with:
+    coverage-file: coverage.out
+    skip: "mocks,testdata,cmd"
+    save-history: "true"
+    label: "v1.2.3"
+```
+
 ## 📋 Usage
 
 ### ⚙️ Configure
