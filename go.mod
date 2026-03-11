@@ -1,6 +1,6 @@
 module github.com/mach6/go-covercheck
 
-go 1.24.0
+go 1.25.0
 
 require (
 	github.com/fatih/color v1.18.0
@@ -11,7 +11,7 @@ require (
 	github.com/mattn/go-colorable v0.1.14
 	github.com/spf13/cobra v1.10.2
 	github.com/stretchr/testify v1.11.1
-	golang.org/x/term v0.40.0
+	golang.org/x/term v0.41.0
 	golang.org/x/tools v0.41.0
 	gopkg.in/yaml.v3 v3.0.1
 )
@@ -39,6 +39,6 @@ require (
 	golang.org/x/crypto v0.47.0 // indirect
 	golang.org/x/exp v0.0.0-20250531010427-b6e5de432a8b // indirect
 	golang.org/x/net v0.49.0 // indirect
-	golang.org/x/sys v0.41.0 // indirect
+	golang.org/x/sys v0.42.0 // indirect
 	golang.org/x/text v0.33.0 // indirect
 )
