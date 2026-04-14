@@ -13,6 +13,40 @@ import (
 	"github.com/mach6/go-covercheck/pkg/history"
 )
 
+// getHistoryTableStyle returns the appropriate table.Style for history tables.
+func getHistoryTableStyle(cfg *config.Config) table.Style {
+	return table.Style{
+		Name:  "Custom",
+		Box:   boxStyleFor(cfg.TableStyle),
+		Color: table.ColorOptionsDefault,
+		Format: table.FormatOptions{
+			Footer:       text.FormatDefault,
+			FooterAlign:  text.AlignRight,
+			FooterVAlign: text.VAlignDefault,
+			Header:       text.FormatUpper,
+			HeaderAlign:  text.AlignCenter,
+			HeaderVAlign: text.VAlignDefault,
+			Row:          text.FormatDefault,
+			RowAlign:     text.AlignRight,
+			RowVAlign:    text.VAlignDefault,
+		},
+		HTML: table.DefaultHTMLOptions,
+		Options: table.Options{
+			DoNotColorBordersAndSeparators: false,
+			DrawBorder:                     true,
+			SeparateColumns:                true,
+			SeparateFooter:                 true,
+			SeparateHeader:                 true,
+			SeparateRows:                   true,
+		},
+		Size: table.SizeOptions{
+			WidthMax: cfg.TerminalWidth,
+			WidthMin: 0,
+		},
+		Title: table.TitleOptionsDefault,
+	}
+}
+
 // CompareHistory shows the comparison output for a ref: and the results.
 func CompareHistory(ref string, refEntry *history.Entry, results compute.Results) {
 	fmt.Printf("\n≡ Comparing against ref: %s [commit %s]\n",
@@ -122,38 +156,7 @@ func ShowHistory(h *history.History, limit int, cfg *config.Config) {
 
 	t := table.NewWriter()
 	t.SetOutputMirror(os.Stdout)
-	t.SetStyle(
-		table.Style{
-			Name:  "Custom",
-			Box:   table.StyleBoxLight,
-			Color: table.ColorOptionsDefault,
-			Format: table.FormatOptions{
-				Footer:       text.FormatDefault,
-				FooterAlign:  text.AlignRight,
-				FooterVAlign: text.VAlignDefault,
-				Header:       text.FormatUpper,
-				HeaderAlign:  text.AlignCenter,
-				HeaderVAlign: text.VAlignDefault,
-				Row:          text.FormatDefault,
-				RowAlign:     text.AlignRight,
-				RowVAlign:    text.VAlignDefault,
-			},
-			HTML: table.DefaultHTMLOptions,
-			Options: table.Options{
-				DoNotColorBordersAndSeparators: false,
-				DrawBorder:                     true,
-				SeparateColumns:                true,
-				SeparateFooter:                 true,
-				SeparateHeader:                 true,
-				SeparateRows:                   true,
-			},
-			Size: table.SizeOptions{
-				WidthMax: cfg.TerminalWidth,
-				WidthMin: 0,
-			},
-			Title: table.TitleOptionsDefault,
-		},
-	)
+	t.SetStyle(getHistoryTableStyle(cfg))
 
 	t.AppendHeader(table.Row{"Timestamp", "Commit", "Branch", "Tags", "Label", "Coverage"})
 

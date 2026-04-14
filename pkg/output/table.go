@@ -11,6 +11,57 @@ import (
 	"github.com/jedib0t/go-pretty/v6/text"
 )
 
+// boxStyleFor maps a cfg.TableStyle value to the corresponding go-pretty BoxStyle.
+// Unknown values fall back to the light box to match cfg.ApplyDefaults.
+func boxStyleFor(style string) table.BoxStyle {
+	switch style {
+	case config.TableStyleDefault:
+		return table.StyleBoxDefault
+	case config.TableStyleBold:
+		return table.StyleBoxBold
+	case config.TableStyleRounded:
+		return table.StyleBoxRounded
+	case config.TableStyleDouble:
+		return table.StyleBoxDouble
+	default: // config.TableStyleLight or any other value
+		return table.StyleBoxLight
+	}
+}
+
+// getTableStyle returns the appropriate table.Style based on the config.
+func getTableStyle(cfg *config.Config) table.Style {
+	return table.Style{
+		Name:  "Custom",
+		Box:   boxStyleFor(cfg.TableStyle),
+		Color: table.ColorOptionsDefault,
+		Format: table.FormatOptions{
+			Footer:       text.FormatDefault,
+			FooterAlign:  text.AlignRight,
+			FooterVAlign: text.VAlignDefault,
+			Header:       text.FormatUpper,
+			HeaderAlign:  text.AlignCenter,
+			HeaderVAlign: text.VAlignDefault,
+			Row:          text.FormatDefault,
+			RowAlign:     text.AlignRight,
+			RowVAlign:    text.VAlignDefault,
+		},
+		HTML: table.DefaultHTMLOptions,
+		Options: table.Options{
+			DoNotColorBordersAndSeparators: false,
+			DrawBorder:                     true,
+			SeparateColumns:                true,
+			SeparateFooter:                 true,
+			SeparateHeader:                 true,
+			SeparateRows:                   false,
+		},
+		Size: table.SizeOptions{
+			WidthMax: cfg.TerminalWidth,
+			WidthMin: 0,
+		},
+		Title: table.TitleOptionsDefault,
+	}
+}
+
 func renderTable(results compute.Results, cfg *config.Config) {
 	if cfg.NoTable {
 		return
@@ -19,38 +70,7 @@ func renderTable(results compute.Results, cfg *config.Config) {
 	t := table.NewWriter()
 	t.SetOutputMirror(os.Stdout)
 	t.SetAllowedRowLength(cfg.TerminalWidth)
-	t.SetStyle(
-		table.Style{
-			Name:  "Custom",
-			Box:   table.StyleBoxLight,
-			Color: table.ColorOptionsDefault,
-			Format: table.FormatOptions{
-				Footer:       text.FormatDefault,
-				FooterAlign:  text.AlignRight,
-				FooterVAlign: text.VAlignDefault,
-				Header:       text.FormatUpper,
-				HeaderAlign:  text.AlignCenter,
-				HeaderVAlign: text.VAlignDefault,
-				Row:          text.FormatDefault,
-				RowAlign:     text.AlignRight,
-				RowVAlign:    text.VAlignDefault,
-			},
-			HTML: table.DefaultHTMLOptions,
-			Options: table.Options{
-				DoNotColorBordersAndSeparators: false,
-				DrawBorder:                     true,
-				SeparateColumns:                true,
-				SeparateFooter:                 true,
-				SeparateHeader:                 true,
-				SeparateRows:                   false,
-			},
-			Size: table.SizeOptions{
-				WidthMax: cfg.TerminalWidth,
-				WidthMin: 0,
-			},
-			Title: table.TitleOptionsDefault,
-		},
-	)
+	t.SetStyle(getTableStyle(cfg))
 
 	t.AppendHeader(table.Row{"", "Statements", "Blocks", "Statement %", "Block %"})
 
