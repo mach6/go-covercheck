@@ -375,8 +375,10 @@ func getTerminalWidth() int {
 		return 120 //nolint:mnd
 	}
 	// real tty
-	if term.IsTerminal(int(os.Stdout.Fd())) {
-		if w, _, err := term.GetSize(int(os.Stdout.Fd())); err == nil && w > 0 {
+	//nolint:gosec // fd fits in int on supported platforms
+	fd := int(os.Stdout.Fd())
+	if term.IsTerminal(fd) {
+		if w, _, err := term.GetSize(fd); err == nil && w > 0 {
 			return w
 		}
 	}

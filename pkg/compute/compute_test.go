@@ -68,7 +68,7 @@ func Test_sortResults_ByFile(t *testing.T) {
 }
 
 func TestCollectResults(t *testing.T) {
-	profiles := make([]*cover.Profile, 0)
+	profiles := make([]*cover.Profile, 0, 1)
 	profiles = append(profiles, &cover.Profile{
 		FileName: "foo",
 		Mode:     "set",

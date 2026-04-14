@@ -134,7 +134,7 @@ func deleteHistory(cmd *cobra.Command, deleteRef string, historyLimit int) error
 
 func promptForHistoryFileRemoval(cmd *cobra.Command) error {
 	// Only prompt if stdin is a terminal (interactive mode)
-	if !term.IsTerminal(int(os.Stdin.Fd())) {
+	if !term.IsTerminal(int(os.Stdin.Fd())) { //nolint:gosec // fd fits in int on supported platforms
 		return nil
 	}
 

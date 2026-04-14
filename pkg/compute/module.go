@@ -26,19 +26,13 @@ func longestCommonPrefix(strs []string) string {
 	first := strs[0]
 	last := strs[len(strs)-1]
 
-	// Initialize variables for finding common prefix
-	var commonPrefix string
-	minLength := min(len(first), len(last))
-
 	// Compare characters until mismatch or reaching the end of shorter string
-	for i := range minLength {
-		if first[i] != last[i] {
-			break
-		}
-		commonPrefix += string(first[i])
+	minLength := min(len(first), len(last))
+	end := 0
+	for end < minLength && first[end] == last[end] {
+		end++
 	}
-
-	return commonPrefix
+	return first[:end]
 }
 
 // readModuleNameFromGoMod reads the module name from go.mod in the current working directory.
