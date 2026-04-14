@@ -426,6 +426,7 @@ func applyConfigOverrides(cfg *config.Config, cmd *cobra.Command, noConfigFile b
 	applyStringFlagOverride(cmd, SortOrderFlag, &cfg.SortOrder, noConfigFile)
 	applyStringArrayFlagOverride(cmd, SkipFlag, &cfg.Skip, noConfigFile)
 	applyStringFlagOverride(cmd, FormatFlag, &cfg.Format, noConfigFile)
+	applyStringFlagOverride(cmd, TableStyleFlag, &cfg.TableStyle, noConfigFile)
 	applyBoolFlagOverride(cmd, NoTableFlag, &cfg.NoTable, noConfigFile)
 	applyBoolFlagOverride(cmd, NoSummaryFlag, &cfg.NoSummary, noConfigFile)
 	applyBoolFlagOverride(cmd, NoColorFlag, &cfg.NoColor, noConfigFile)

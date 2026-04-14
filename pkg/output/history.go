@@ -15,24 +15,9 @@ import (
 
 // getHistoryTableStyle returns the appropriate table.Style for history tables.
 func getHistoryTableStyle(cfg *config.Config) table.Style {
-	var boxStyle table.BoxStyle
-	
-	switch cfg.TableStyle {
-	case config.TableStyleDefault:
-		boxStyle = table.StyleBoxDefault
-	case config.TableStyleBold:
-		boxStyle = table.StyleBoxBold
-	case config.TableStyleRounded:
-		boxStyle = table.StyleBoxRounded
-	case config.TableStyleDouble:
-		boxStyle = table.StyleBoxDouble
-	default: // config.TableStyleLight or any other value
-		boxStyle = table.StyleBoxLight
-	}
-
 	return table.Style{
 		Name:  "Custom",
-		Box:   boxStyle,
+		Box:   boxStyleFor(cfg.TableStyle),
 		Color: table.ColorOptionsDefault,
 		Format: table.FormatOptions{
 			Footer:       text.FormatDefault,

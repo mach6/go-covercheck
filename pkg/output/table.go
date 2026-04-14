@@ -11,26 +11,28 @@ import (
 	"github.com/jedib0t/go-pretty/v6/text"
 )
 
+// boxStyleFor maps a cfg.TableStyle value to the corresponding go-pretty BoxStyle.
+// Unknown values fall back to the light box to match cfg.ApplyDefaults.
+func boxStyleFor(style string) table.BoxStyle {
+	switch style {
+	case config.TableStyleDefault:
+		return table.StyleBoxDefault
+	case config.TableStyleBold:
+		return table.StyleBoxBold
+	case config.TableStyleRounded:
+		return table.StyleBoxRounded
+	case config.TableStyleDouble:
+		return table.StyleBoxDouble
+	default: // config.TableStyleLight or any other value
+		return table.StyleBoxLight
+	}
+}
+
 // getTableStyle returns the appropriate table.Style based on the config.
 func getTableStyle(cfg *config.Config) table.Style {
-	var boxStyle table.BoxStyle
-	
-	switch cfg.TableStyle {
-	case config.TableStyleDefault:
-		boxStyle = table.StyleBoxDefault
-	case config.TableStyleBold:
-		boxStyle = table.StyleBoxBold
-	case config.TableStyleRounded:
-		boxStyle = table.StyleBoxRounded
-	case config.TableStyleDouble:
-		boxStyle = table.StyleBoxDouble
-	default: // config.TableStyleLight or any other value
-		boxStyle = table.StyleBoxLight
-	}
-
 	return table.Style{
 		Name:  "Custom",
-		Box:   boxStyle,
+		Box:   boxStyleFor(cfg.TableStyle),
 		Color: table.ColorOptionsDefault,
 		Format: table.FormatOptions{
 			Footer:       text.FormatDefault,

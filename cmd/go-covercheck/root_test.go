@@ -443,3 +443,26 @@ func Test_run_DeleteHistoryFails_BadFile(t *testing.T) {
 	require.ErrorContains(t, err, "failed to load history")
 	require.Contains(t, stdErr, "failed to load history")
 }
+
+func TestApplyConfigOverrides_TableStyleFlag(t *testing.T) {
+	cmd := &cobra.Command{}
+	initFlags(cmd)
+
+	cfg := &config.Config{}
+	cfg.ApplyDefaults()
+	require.Equal(t, config.TableStyleLight, cfg.TableStyle)
+
+	require.NoError(t, cmd.Flags().Set(TableStyleFlag, config.TableStyleRounded))
+	applyConfigOverrides(cfg, cmd, false)
+	require.Equal(t, config.TableStyleRounded, cfg.TableStyle)
+}
+
+func TestApplyConfigOverrides_TableStyleNoConfigFile(t *testing.T) {
+	cmd := &cobra.Command{}
+	initFlags(cmd)
+
+	cfg := &config.Config{TableStyle: config.TableStyleBold}
+	// Flag not explicitly set; default ("light") should take over when there is no config file.
+	applyConfigOverrides(cfg, cmd, true)
+	require.Equal(t, config.TableStyleLight, cfg.TableStyle)
+}

@@ -151,3 +151,51 @@ sortOrder: invalid-order
 		})
 	}
 }
+
+func TestApplyDefaults_TableStyle(t *testing.T) {
+	cfg := &config.Config{}
+	cfg.ApplyDefaults()
+	require.Equal(t, config.TableStyleDefValue, cfg.TableStyle)
+	require.Equal(t, config.TableStyleLight, cfg.TableStyle)
+}
+
+func TestLoad_TableStyleFromYAML(t *testing.T) {
+	yaml := `
+statementThreshold: 70.0
+tableStyle: bold
+`
+	tmpFile := path.Join(t.TempDir(), "test_table_style.yaml")
+	require.NoError(t, os.WriteFile(tmpFile, []byte(yaml), 0600))
+	defer os.Remove(tmpFile) //nolint:errcheck
+
+	cfg, err := config.Load(tmpFile)
+	require.NoError(t, err)
+	require.Equal(t, config.TableStyleBold, cfg.TableStyle)
+}
+
+func TestValidate_TableStyle(t *testing.T) {
+	valid := []string{
+		config.TableStyleDefault,
+		config.TableStyleLight,
+		config.TableStyleBold,
+		config.TableStyleRounded,
+		config.TableStyleDouble,
+	}
+	for _, style := range valid {
+		t.Run("valid/"+style, func(t *testing.T) {
+			cfg := &config.Config{}
+			cfg.ApplyDefaults()
+			cfg.TableStyle = style
+			require.NoError(t, cfg.Validate())
+		})
+	}
+
+	t.Run("invalid style", func(t *testing.T) {
+		cfg := &config.Config{}
+		cfg.ApplyDefaults()
+		cfg.TableStyle = "plaid"
+		err := cfg.Validate()
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "table-style")
+	})
+}
