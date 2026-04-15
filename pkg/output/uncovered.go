@@ -37,8 +37,11 @@ func InspectUncoveredLines(profiles []*cover.Profile, cfg *config.Config) error 
 
 	entries := make([]fileUncovered, 0, len(profilesToShow))
 	for _, p := range profilesToShow {
-		blocks := lines.CollectBlocks(p)
-		uncovered := uncoveredHunks(p, blocks, cfg.InspectContext)
+		// Read the source file once per profile; both CollectBlocks and every
+		// merged hunk's SourceLinesInRange would otherwise re-read it.
+		sourceLines, _ := lines.ReadSourceFile(p.FileName)
+		blocks := lines.CollectBlocksFromSource(p, sourceLines)
+		uncovered := uncoveredHunks(p, sourceLines, blocks, cfg.InspectContext)
 		if len(uncovered) > 0 {
 			entries = append(entries, fileUncovered{filename: p.FileName, blocks: uncovered})
 		}
@@ -54,9 +57,10 @@ func InspectUncoveredLines(profiles []*cover.Profile, cfg *config.Config) error 
 // overlap (including after the requested context expansion would make them
 // visually adjacent) are merged into a single hunk so the rendered output
 // shows 200-205 instead of 200-203 / 201-205. Each hunk is then populated
-// via lines.SourceLinesInRange so every source line in the merged range is
-// present, even lines that weren't attributed to any profile block.
-func uncoveredHunks(p *cover.Profile, blocks []lines.Block, contextSize int) []uncoveredBlock {
+// via lines.SourceLinesInRangeFromSource so every source line in the merged
+// range is present — even lines that weren't attributed to any profile
+// block — without re-reading the source file per hunk.
+func uncoveredHunks(p *cover.Profile, sourceLines []string, blocks []lines.Block, contextSize int) []uncoveredBlock {
 	type span struct{ start, end int }
 	var spans []span
 	for _, block := range blocks {
@@ -96,7 +100,7 @@ func uncoveredHunks(p *cover.Profile, blocks []lines.Block, contextSize int) []u
 		out = append(out, uncoveredBlock{
 			start:   s.start,
 			end:     s.end,
-			context: lines.SourceLinesInRange(p, s.start, s.end, contextSize),
+			context: lines.SourceLinesInRangeFromSource(p, sourceLines, s.start, s.end, contextSize),
 		})
 	}
 	return out

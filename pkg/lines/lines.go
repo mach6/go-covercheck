@@ -57,6 +57,13 @@ func (b *Block) ContextLines(allBlocks []Block, contextSize int) []Line {
 // blocks (blanks, comments, bare braces) would otherwise be missing.
 func SourceLinesInRange(p *cover.Profile, start, end, contextSize int) []Line {
 	sourceLines, _ := ReadSourceFile(p.FileName)
+	return SourceLinesInRangeFromSource(p, sourceLines, start, end, contextSize)
+}
+
+// SourceLinesInRangeFromSource is like SourceLinesInRange but accepts
+// pre-read source lines so callers rendering many hunks against the same
+// file don't read the source file once per hunk.
+func SourceLinesInRangeFromSource(p *cover.Profile, sourceLines []string, start, end, contextSize int) []Line {
 	sourceAvailable := len(sourceLines) > 0
 	rangeStart, rangeEnd := clampRange(start, end, contextSize, len(sourceLines))
 	hits := hitsByLine(p.Blocks, rangeStart, rangeEnd)
@@ -231,8 +238,15 @@ func ReadSourceFile(fileName string) ([]string, error) {
 // line numbers and hit counts only so callers driven purely by profile data
 // (e.g. mocks in tests or stripped binaries) still see them.
 func CollectBlocks(p *cover.Profile) []Block {
-	blocksSlice := make([]Block, 0, len(p.Blocks))
 	sourceLines, _ := ReadSourceFile(p.FileName)
+	return CollectBlocksFromSource(p, sourceLines)
+}
+
+// CollectBlocksFromSource is like CollectBlocks but accepts pre-read source
+// lines so callers that also need the same source for other purposes
+// (e.g. rendering --inspect hunks) don't read the file twice.
+func CollectBlocksFromSource(p *cover.Profile, sourceLines []string) []Block {
+	blocksSlice := make([]Block, 0, len(p.Blocks))
 	sourceAvailable := len(sourceLines) > 0
 
 	for _, b := range p.Blocks {
