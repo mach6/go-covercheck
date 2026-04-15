@@ -333,6 +333,26 @@ func b() {
 	require.True(t, got[4].IsFiltered)
 }
 
+func TestSourceLinesInRange_SourceUnreadableKeepsGutter(t *testing.T) {
+	// Nonexistent file: ReadSourceFile fails, so sourceAvailable is false.
+	// Past-EOF filtering must NOT kick in; uncovered lines stay unfiltered
+	// so --inspect still paints them with the red gutter.
+	profile := &cover.Profile{
+		FileName: "does-not-exist.go",
+		Blocks: []cover.ProfileBlock{
+			{StartLine: 10, EndLine: 12, Count: 0},
+		},
+	}
+	got := SourceLinesInRange(profile, 10, 12, 0)
+	require.Len(t, got, 3)
+	for _, l := range got {
+		require.False(t, l.IsFiltered,
+			"line %d should not be filtered when source is unreadable", l.LineNumber)
+		require.Equal(t, 0, l.Hits)
+		require.Empty(t, l.Content)
+	}
+}
+
 func TestSourceLinesInRange_ContextClamped(t *testing.T) {
 	content := "a\nb\nc\nd\ne\n"
 	file := test.CreateTempFile(t, "clamp.go", content)

@@ -57,12 +57,13 @@ func (b *Block) ContextLines(allBlocks []Block, contextSize int) []Line {
 // blocks (blanks, comments, bare braces) would otherwise be missing.
 func SourceLinesInRange(p *cover.Profile, start, end, contextSize int) []Line {
 	sourceLines, _ := ReadSourceFile(p.FileName)
+	sourceAvailable := len(sourceLines) > 0
 	rangeStart, rangeEnd := clampRange(start, end, contextSize, len(sourceLines))
 	hits := hitsByLine(p.Blocks, rangeStart, rangeEnd)
 
 	out := make([]Line, 0, rangeEnd-rangeStart+1)
 	for ln := rangeStart; ln <= rangeEnd; ln++ {
-		out = append(out, buildSourceLine(ln, sourceLines, hits))
+		out = append(out, buildSourceLine(ln, sourceLines, sourceAvailable, hits))
 	}
 	return out
 }
@@ -94,15 +95,21 @@ func hitsByLine(blocks []cover.ProfileBlock, rangeStart, rangeEnd int) map[int]i
 	return hits
 }
 
-func buildSourceLine(ln int, sourceLines []string, hits map[int]int) Line {
+func buildSourceLine(ln int, sourceLines []string, sourceAvailable bool, hits map[int]int) Line {
 	entry := Line{LineNumber: ln, Hits: hits[ln]}
 	idx := ln - 1
-	if idx >= 0 && idx < len(sourceLines) {
+	switch {
+	case idx >= 0 && idx < len(sourceLines):
 		entry.Content = sourceLines[idx]
 		entry.IsFiltered = shouldSkipLine(sourceLines[idx])
-	} else {
+	case sourceAvailable:
+		// Source was readable but the block references a line past EOF;
+		// filter so --inspect doesn't emit an empty hunk.
 		entry.IsFiltered = true
 	}
+	// Source couldn't be read at all: leave IsFiltered false so the line
+	// renders with its real gutter (red '-' for uncovered, green for
+	// covered) instead of silently collapsing to the neutral gutter.
 	return entry
 }
 
