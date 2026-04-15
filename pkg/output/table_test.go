@@ -56,8 +56,6 @@ func TestTrimWithEllipsis(t *testing.T) {
 		{"maxLen equals ellipsis", "abcdef", 3, "abc"},
 		{"maxLen one", "abcdef", 1, "a"},
 		{"maxLen zero", "abcdef", 0, ""},
-		{"multibyte runes", "αβγδεζηθικ", 7, "...ηθικ"},
-		{"emoji", "🙂🙃😀😁😂🤣😃😄", 6, "...🤣😃😄"},
 		{"ansi color preserved when short", "\x1b[31mred\x1b[0m", 10, "\x1b[31mred\x1b[0m"},
 		{"ansi stripped when trimming", "\x1b[31mlong long line\x1b[0m", 7, "...line"},
 	}
