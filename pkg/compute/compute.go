@@ -144,6 +144,33 @@ func collect(profiles []*cover.Profile, cfg *config.Config) (Results, bool) { //
 		results.ByTotal.Functions.Failed
 }
 
+func applyPackageThresholds(v *ByPackage, cfg *config.Config) {
+	v.StatementThreshold = cfg.StatementThreshold
+	if t, ok := cfg.PerPackage.Statements[v.Package]; ok {
+		v.StatementThreshold = t
+	}
+
+	v.BlockThreshold = cfg.BlockThreshold
+	if t, ok := cfg.PerPackage.Blocks[v.Package]; ok {
+		v.BlockThreshold = t
+	}
+
+	v.LineThreshold = cfg.LineThreshold
+	if t, ok := cfg.PerPackage.Lines[v.Package]; ok {
+		v.LineThreshold = t
+	}
+
+	v.FunctionThreshold = cfg.FunctionThreshold
+	if t, ok := cfg.PerPackage.Functions[v.Package]; ok {
+		v.FunctionThreshold = t
+	}
+
+	v.Failed = v.StatementPercentage < v.StatementThreshold ||
+		v.BlockPercentage < v.BlockThreshold ||
+		v.LinePercentage < v.LineThreshold ||
+		v.FunctionPercentage < v.FunctionThreshold
+}
+
 func collectPackageResults(results *Results, cfg *config.Config) bool {
 	working := make(map[string]ByPackage)
 	for _, v := range results.ByFile {
@@ -175,29 +202,7 @@ func collectPackageResults(results *Results, cfg *config.Config) bool {
 		v.LinePercentage = math.Percent(v.lineHits, v.lines)
 		v.FunctionPercentage = math.Percent(v.functionHits, v.functions)
 
-		v.StatementThreshold = cfg.StatementThreshold
-		if t, ok := cfg.PerPackage.Statements[v.Package]; ok {
-			v.StatementThreshold = t
-		}
-		v.Failed = v.StatementPercentage < v.StatementThreshold
-
-		v.BlockThreshold = cfg.BlockThreshold
-		if t, ok := cfg.PerPackage.Blocks[v.Package]; ok {
-			v.BlockThreshold = t
-		}
-		v.Failed = v.Failed || v.BlockPercentage < v.BlockThreshold
-
-		v.LineThreshold = cfg.LineThreshold
-		if t, ok := cfg.PerPackage.Lines[v.Package]; ok {
-			v.LineThreshold = t
-		}
-		v.Failed = v.Failed || v.LinePercentage < v.LineThreshold
-
-		v.FunctionThreshold = cfg.FunctionThreshold
-		if t, ok := cfg.PerPackage.Functions[v.Package]; ok {
-			v.FunctionThreshold = t
-		}
-		v.Failed = v.Failed || v.FunctionPercentage < v.FunctionThreshold
+		applyPackageThresholds(&v, cfg)
 
 		if v.Failed {
 			hasFailed = true

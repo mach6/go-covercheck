@@ -254,7 +254,9 @@ func renderTable(results compute.Results, cfg *config.Config) {
 	t.SetAllowedRowLength(cfg.TerminalWidth)
 	t.SetStyle(getTableStyle(cfg))
 
-	headers := table.Row{"", "Statements", "Blocks", "Lines", "Functions", "Statement %", "Block %", "Line %", "Function %"}
+	headers := table.Row{
+		"", "Statements", "Blocks", "Lines", "Functions", "Statement %", "Block %", "Line %", "Function %",
+	}
 	columnConfigs := []table.ColumnConfig{
 		{Name: "", Align: text.AlignLeft, AlignFooter: text.AlignLeft},
 		{Name: "Statements", Align: text.AlignRight, AlignHeader: text.AlignLeft, AlignFooter: text.AlignRight},

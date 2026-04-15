@@ -9,12 +9,12 @@ import (
 )
 
 func TestGetFunctionCoverageForFile(t *testing.T) {
-	// Test with a Go file that doesn't exist
+	// Test with a Go file that doesn't exist - error should be propagated
 	total, covered, err := compute.GetFunctionCoverageForFile("nonexistent.go", nil)
-	require.NoError(t, err)
+	require.Error(t, err)
 	require.Equal(t, 0, total)
 	require.Equal(t, 0, covered)
-	
+
 	// Test with a non-Go file
 	total, covered, err = compute.GetFunctionCoverageForFile("readme.txt", nil)
 	require.NoError(t, err)
