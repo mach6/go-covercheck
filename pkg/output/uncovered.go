@@ -107,27 +107,26 @@ func uncoveredHunks(p *cover.Profile, sourceLines []string, blocks []lines.Block
 }
 
 // matchesInspectFile reports whether profileName matches the user-supplied
-// --inspect-file pattern. The pattern matches when it is equal to the profile
-// name, equal to the profile's trailing path segment, or appears as a
-// path-boundary-aligned suffix (e.g. "pkg/foo.go" matches
-// "github.com/acme/mod/pkg/foo.go"). Plain substring matching caused false
-// positives like "foo.go" matching "barfoo.go".
+// --inspect-file pattern. The pattern matches when it is equal to the
+// profile name, equal to the profile's trailing path segment, or appears as
+// a path-boundary-aligned suffix (e.g. "pkg/foo.go" matches
+// "github.com/acme/mod/pkg/foo.go"). Both sides are normalized to forward
+// slashes regardless of runtime OS so Windows-style backslash paths behave
+// identically; plain substring matching caused false positives like
+// "foo.go" matching "barfoo.go".
 func matchesInspectFile(profileName, pattern string) bool {
 	if pattern == "" {
 		return false
 	}
-	if profileName == pattern {
+	pn := strings.ReplaceAll(profileName, `\`, "/")
+	pat := strings.ReplaceAll(pattern, `\`, "/")
+	if pn == pat {
 		return true
 	}
-	if path.Base(profileName) == pattern {
+	if path.Base(pn) == pat {
 		return true
 	}
-	// Suffix match, but only when aligned to a path boundary so "foo.go"
-	// doesn't match "barfoo.go".
-	if strings.HasSuffix(profileName, "/"+pattern) {
-		return true
-	}
-	return false
+	return strings.HasSuffix(pn, "/"+pat)
 }
 
 // blockHasUnfilteredLine reports whether block contains at least one line that
