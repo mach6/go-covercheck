@@ -6,14 +6,17 @@ import (
 	"sort"
 
 	"github.com/mach6/go-covercheck/pkg/config"
+	"github.com/mach6/go-covercheck/pkg/lines"
 	"github.com/mach6/go-covercheck/pkg/math"
 
 	"golang.org/x/tools/cover"
 )
 
-// CollectResults collects all the details from a []*cover.Profile and returns Results.
+// CollectResults collects all the details from a []*cover.Profile and returns
+// Results. Call NormalizeNames(profiles, cfg) beforehand if module-relative
+// filenames are desired in the output; CollectResults does not mutate
+// profile.FileName itself.
 func CollectResults(profiles []*cover.Profile, cfg *config.Config) (Results, bool) {
-	normalizeNames(profiles, cfg)
 	return collect(profiles, cfg)
 }
 
@@ -24,12 +27,18 @@ func collect(profiles []*cover.Profile, cfg *config.Config) (Results, bool) { //
 		ByTotal: Totals{
 			Statements: TotalStatements{},
 			Blocks:     TotalBlocks{},
+			Lines:      TotalLines{},
 		},
 		ByPackage: make([]ByPackage, 0),
 	}
 
 	for _, p := range profiles {
 		stmts, stmtHits, blocks, blockHits := 0, 0, 0, 0
+		// Collect blocks once per profile and reuse for line coverage and
+		// uncovered-line formatting; both walks read/parse the source file.
+		collectedBlocks := lines.CollectBlocks(p)
+		linesCount, lineHits := lines.CoverageFromBlocks(collectedBlocks)
+
 		for _, b := range p.Blocks {
 			stmts += b.NumStmt
 			if b.Count > 0 {
@@ -41,6 +50,7 @@ func collect(profiles []*cover.Profile, cfg *config.Config) (Results, bool) { //
 
 		stmtPct := math.Percent(stmtHits, stmts)
 		blockPct := math.Percent(blockHits, blocks)
+		linePct := math.Percent(lineHits, linesCount)
 
 		stmtThreshold := cfg.StatementThreshold
 		if t, ok := cfg.PerFile.Statements[p.FileName]; ok {
@@ -54,31 +64,50 @@ func collect(profiles []*cover.Profile, cfg *config.Config) (Results, bool) { //
 		}
 		failed = failed || blockPct < blockThreshold
 
+		lineThreshold := cfg.LineThreshold
+		if t, ok := cfg.PerFile.Lines[p.FileName]; ok {
+			lineThreshold = t
+		}
+		failed = failed || linePct < lineThreshold
+
 		if failed {
 			hasFailure = true
 		}
 
-		results.ByFile = append(results.ByFile, ByFile{
+		byFile := ByFile{
 			File: p.FileName,
 			By: By{
 				Statements:          fmt.Sprintf("%d/%d", stmtHits, stmts),
 				Blocks:              fmt.Sprintf("%d/%d", blockHits, blocks),
+				Lines:               fmt.Sprintf("%d/%d", lineHits, linesCount),
 				StatementPercentage: stmtPct,
 				StatementThreshold:  stmtThreshold,
 				BlockPercentage:     blockPct,
 				BlockThreshold:      blockThreshold,
+				LinePercentage:      linePct,
+				LineThreshold:       lineThreshold,
 				Failed:              failed,
 				stmtHits:            stmtHits,
 				blockHits:           blockHits,
+				lineHits:            lineHits,
 				stmts:               stmts,
 				blocks:              blocks,
+				lines:               linesCount,
 			},
-		})
+		}
+
+		if !cfg.NoUncoveredLines {
+			byFile.UncoveredLines = lines.FormatUncoveredFromBlocks(collectedBlocks)
+		}
+
+		results.ByFile = append(results.ByFile, byFile)
 
 		results.ByTotal.Statements.totalStatements += stmts
 		results.ByTotal.Statements.totalCoveredStatements += stmtHits
 		results.ByTotal.Blocks.totalBlocks += blocks
 		results.ByTotal.Blocks.totalCoveredBlocks += blockHits
+		results.ByTotal.Lines.totalLines += linesCount
+		results.ByTotal.Lines.totalCoveredLines += lineHits
 	}
 
 	sortFileResults(results.ByFile, cfg)
@@ -88,7 +117,8 @@ func collect(profiles []*cover.Profile, cfg *config.Config) (Results, bool) { //
 
 	return results, hasFailure || hasPackageFailure ||
 		results.ByTotal.Statements.Failed ||
-		results.ByTotal.Blocks.Failed
+		results.ByTotal.Blocks.Failed ||
+		results.ByTotal.Lines.Failed
 }
 
 func collectPackageResults(results *Results, cfg *config.Config) bool {
@@ -102,8 +132,10 @@ func collectPackageResults(results *Results, cfg *config.Config) bool {
 		}
 		p.stmtHits += v.stmtHits
 		p.blockHits += v.blockHits
+		p.lineHits += v.lineHits
 		p.blocks += v.blocks
 		p.stmts += v.stmts
+		p.lines += v.lines
 		working[path.Dir(v.File)] = p
 	}
 
@@ -111,8 +143,10 @@ func collectPackageResults(results *Results, cfg *config.Config) bool {
 	for _, v := range working {
 		v.Statements = fmt.Sprintf("%d/%d", v.stmtHits, v.stmts)
 		v.Blocks = fmt.Sprintf("%d/%d", v.blockHits, v.blocks)
+		v.Lines = fmt.Sprintf("%d/%d", v.lineHits, v.lines)
 		v.StatementPercentage = math.Percent(v.stmtHits, v.stmts)
 		v.BlockPercentage = math.Percent(v.blockHits, v.blocks)
+		v.LinePercentage = math.Percent(v.lineHits, v.lines)
 
 		v.StatementThreshold = cfg.StatementThreshold
 		if t, ok := cfg.PerPackage.Statements[v.Package]; ok {
@@ -125,6 +159,12 @@ func collectPackageResults(results *Results, cfg *config.Config) bool {
 			v.BlockThreshold = t
 		}
 		v.Failed = v.Failed || v.BlockPercentage < v.BlockThreshold
+
+		v.LineThreshold = cfg.LineThreshold
+		if t, ok := cfg.PerPackage.Lines[v.Package]; ok {
+			v.LineThreshold = t
+		}
+		v.Failed = v.Failed || v.LinePercentage < v.LineThreshold
 
 		if v.Failed {
 			hasFailed = true
@@ -150,45 +190,58 @@ func setTotals(results *Results, cfg *config.Config) {
 	results.ByTotal.Blocks.Percentage = math.Percent(results.ByTotal.Blocks.totalCoveredBlocks,
 		results.ByTotal.Blocks.totalBlocks)
 	results.ByTotal.Blocks.Failed = results.ByTotal.Blocks.Percentage < results.ByTotal.Blocks.Threshold
+
+	results.ByTotal.Lines.Threshold = cfg.Total[config.LinesSection]
+	results.ByTotal.Lines.Coverage =
+		fmt.Sprintf("%d/%d", results.ByTotal.Lines.totalCoveredLines,
+			results.ByTotal.Lines.totalLines)
+	results.ByTotal.Lines.Percentage = math.Percent(results.ByTotal.Lines.totalCoveredLines,
+		results.ByTotal.Lines.totalLines)
+	results.ByTotal.Lines.Failed = results.ByTotal.Lines.Percentage < results.ByTotal.Lines.Threshold
+}
+
+// sortKey returns the numeric value of the configured sort field for a row.
+// The returned float covers both percentage and integer fields.
+func sortKey(by *By, sortBy string) (float64, bool) {
+	switch sortBy {
+	case config.SortByStatementPercent:
+		return by.StatementPercentage, true
+	case config.SortByBlockPercent:
+		return by.BlockPercentage, true
+	case config.SortByLinePercent:
+		return by.LinePercentage, true
+	case config.SortByStatements:
+		return float64(by.stmtHits), true
+	case config.SortByBlocks:
+		return float64(by.blockHits), true
+	case config.SortByLines:
+		return float64(by.lineHits), true
+	default:
+		return 0, false
+	}
 }
 
 func sortBy[T HasBy](results []T, cfg *config.Config) {
+	desc := cfg.SortOrder == config.SortOrderDesc
 	sort.Slice(results, func(i, j int) bool {
-		sortByDesc := cfg.SortOrder == config.SortOrderDesc
-
 		byI := results[i].GetBy()
 		byJ := results[j].GetBy()
-
-		switch cfg.SortBy {
-		case config.SortByStatementPercent:
-			if sortByDesc {
-				return byI.StatementPercentage > byJ.StatementPercentage
-			}
-			return byI.StatementPercentage < byJ.StatementPercentage
-		case config.SortByBlockPercent:
-			if sortByDesc {
-				return byI.BlockPercentage > byJ.BlockPercentage
-			}
-			return byI.BlockPercentage < byJ.BlockPercentage
-		case config.SortByStatements:
-			if sortByDesc {
-				return byI.stmtHits > byJ.stmtHits
-			}
-			return byI.stmtHits < byJ.stmtHits
-		case config.SortByBlocks:
-			if sortByDesc {
-				return byI.blockHits > byJ.blockHits
-			}
-			return byI.blockHits < byJ.blockHits
-		default:
+		vi, ok := sortKey(&byI, cfg.SortBy)
+		if !ok {
 			return false
 		}
+		vj, _ := sortKey(&byJ, cfg.SortBy)
+		if desc {
+			return vi > vj
+		}
+		return vi < vj
 	})
 }
 
 func sortFileResults(results []ByFile, cfg *config.Config) {
 	switch cfg.SortBy {
-	case config.SortByStatementPercent, config.SortByBlockPercent, config.SortByStatements, config.SortByBlocks:
+	case config.SortByStatementPercent, config.SortByBlockPercent, config.SortByLinePercent,
+		config.SortByStatements, config.SortByBlocks, config.SortByLines:
 		sortBy(results, cfg)
 		return
 	default:
@@ -205,7 +258,8 @@ func sortFileResults(results []ByFile, cfg *config.Config) {
 
 func sortPackageResults(results []ByPackage, cfg *config.Config) {
 	switch cfg.SortBy {
-	case config.SortByStatementPercent, config.SortByBlockPercent, config.SortByStatements, config.SortByBlocks:
+	case config.SortByStatementPercent, config.SortByBlockPercent, config.SortByLinePercent,
+		config.SortByStatements, config.SortByBlocks, config.SortByLines:
 		sortBy(results, cfg)
 		return
 	default:

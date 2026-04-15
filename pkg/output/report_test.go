@@ -1,6 +1,7 @@
-package output_test
+package output
 
 import (
+	"encoding/json"
 	"errors"
 	"testing"
 
@@ -8,10 +9,10 @@ import (
 	"github.com/jedib0t/go-pretty/v6/text"
 	"github.com/mach6/go-covercheck/pkg/compute"
 	"github.com/mach6/go-covercheck/pkg/config"
-	"github.com/mach6/go-covercheck/pkg/output"
 	"github.com/mach6/go-covercheck/pkg/test"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/tools/cover"
+	"gopkg.in/yaml.v3"
 )
 
 func TestFormatAndReport_FailsWhenUnderThreshold(t *testing.T) {
@@ -39,7 +40,7 @@ func TestFormatAndReport_FailsWhenUnderThreshold(t *testing.T) {
 	stdout, stderr := test.RepipeStdOutAndErrForTest(func() {
 		results, failed := compute.CollectResults(profiles, cfg)
 		require.True(t, failed)
-		output.FormatAndReport(results, cfg, failed)
+		FormatAndReport(results, cfg, failed)
 	})
 
 	require.Empty(t, stderr)
@@ -71,7 +72,7 @@ func TestFormatAndReport_JSONOutput_NoColor(t *testing.T) {
 	stdout, stderr := test.RepipeStdOutAndErrForTest(func() {
 		results, failed := compute.CollectResults(profiles, cfg)
 		require.False(t, failed)
-		output.FormatAndReport(results, cfg, failed)
+		FormatAndReport(results, cfg, failed)
 	})
 
 	require.Empty(t, stderr)
@@ -100,14 +101,19 @@ func TestFormatAndReport_JSONOutput(t *testing.T) {
 		},
 	}
 
+	jsonString := make([]byte, 0)
 	stdout, stderr := test.RepipeStdOutAndErrForTest(func() {
 		results, failed := compute.CollectResults(profiles, cfg)
 		require.False(t, failed)
-		output.FormatAndReport(results, cfg, failed)
+		FormatAndReport(results, cfg, failed)
+
+		var err error
+		jsonString, err = json.MarshalIndent(results, "", "  ")
+		require.NoError(t, err)
 	})
 
 	require.Empty(t, stderr)
-	require.Contains(t, stdout, color.New(color.FgGreen, color.Bold).Sprint("\"main.go\""))
+	require.Contains(t, stdout, highlightJSONSyntax(string(jsonString), cfg)+"\n")
 }
 
 func TestFormatAndReport_YAMLOutput(t *testing.T) {
@@ -131,14 +137,19 @@ func TestFormatAndReport_YAMLOutput(t *testing.T) {
 		},
 	}
 
+	yamlData := make([]byte, 0)
 	stdout, stderr := test.RepipeStdOutAndErrForTest(func() {
 		results, failed := compute.CollectResults(profiles, cfg)
 		require.False(t, failed)
-		output.FormatAndReport(results, cfg, failed)
+		FormatAndReport(results, cfg, failed)
+
+		var err error
+		yamlData, err = yaml.Marshal(results)
+		require.NoError(t, err)
 	})
 
 	require.Empty(t, stderr)
-	require.Contains(t, stdout, text.FgHiGreen.Sprintf(" main.go"))
+	require.Contains(t, stdout, highlightYAMLSyntax(string(yamlData), cfg)+"\n")
 }
 
 func TestFormatAndReport_YAMLOutput_NoColor(t *testing.T) {
@@ -166,7 +177,7 @@ func TestFormatAndReport_YAMLOutput_NoColor(t *testing.T) {
 	stdout, stderr := test.RepipeStdOutAndErrForTest(func() {
 		results, failed := compute.CollectResults(profiles, cfg)
 		require.False(t, failed)
-		output.FormatAndReport(results, cfg, failed)
+		FormatAndReport(results, cfg, failed)
 	})
 
 	require.Empty(t, stderr)
@@ -186,7 +197,7 @@ func TestFormatAndReport_EmptyResults_Table(t *testing.T) {
 	stdout, stderr := test.RepipeStdOutAndErrForTest(func() {
 		results, failed := compute.CollectResults(profiles, cfg)
 		require.False(t, failed)
-		output.FormatAndReport(results, cfg, failed)
+		FormatAndReport(results, cfg, failed)
 	})
 
 	require.Empty(t, stderr)
@@ -207,7 +218,7 @@ func TestFormatAndReport_EmptyResults_Markdown(t *testing.T) {
 	stdout, stderr := test.RepipeStdOutAndErrForTest(func() {
 		results, failed := compute.CollectResults(profiles, cfg)
 		require.False(t, failed)
-		output.FormatAndReport(results, cfg, failed)
+		FormatAndReport(results, cfg, failed)
 	})
 
 	require.Empty(t, stderr)
@@ -225,7 +236,7 @@ func TestFormatAndReport_EmptyResults_CSV(t *testing.T) {
 	stdout, stderr := test.RepipeStdOutAndErrForTest(func() {
 		results, failed := compute.CollectResults(profiles, cfg)
 		require.False(t, failed)
-		output.FormatAndReport(results, cfg, failed)
+		FormatAndReport(results, cfg, failed)
 	})
 
 	require.Empty(t, stderr)
@@ -243,7 +254,7 @@ func TestFormatAndReport_EmptyResults_JSON(t *testing.T) {
 	stdout, stderr := test.RepipeStdOutAndErrForTest(func() {
 		results, failed := compute.CollectResults(profiles, cfg)
 		require.False(t, failed)
-		output.FormatAndReport(results, cfg, failed)
+		FormatAndReport(results, cfg, failed)
 	})
 
 	require.Empty(t, stderr)
@@ -264,7 +275,7 @@ func TestFormatAndReport_EmptyResults_YAML(t *testing.T) {
 	stdout, stderr := test.RepipeStdOutAndErrForTest(func() {
 		results, failed := compute.CollectResults(profiles, cfg)
 		require.False(t, failed)
-		output.FormatAndReport(results, cfg, failed)
+		FormatAndReport(results, cfg, failed)
 	})
 
 	require.Empty(t, stderr)
@@ -286,7 +297,7 @@ func TestFormatAndReport_EmptyResults_NoTable(t *testing.T) {
 	stdout, stderr := test.RepipeStdOutAndErrForTest(func() {
 		results, failed := compute.CollectResults(profiles, cfg)
 		require.False(t, failed)
-		output.FormatAndReport(results, cfg, failed)
+		FormatAndReport(results, cfg, failed)
 	})
 
 	require.Empty(t, stderr)
@@ -308,7 +319,7 @@ func TestFormatAndReport_EmptyResults_NoSummary(t *testing.T) {
 	stdout, stderr := test.RepipeStdOutAndErrForTest(func() {
 		results, failed := compute.CollectResults(profiles, cfg)
 		require.False(t, failed)
-		output.FormatAndReport(results, cfg, failed)
+		FormatAndReport(results, cfg, failed)
 	})
 
 	require.Empty(t, stderr)
@@ -324,7 +335,7 @@ func TestPrintDiffWarning(t *testing.T) {
 
 	t.Run("table format", func(t *testing.T) {
 		stdout, stderr := test.RepipeStdOutAndErrForTest(func() {
-			output.PrintDiffWarning(err, cfg)
+			PrintDiffWarning(err, cfg)
 		})
 		require.Empty(t, stderr)
 		require.Contains(t, stdout, "Warning: Failed to get changed files for diff mode: test error")
@@ -334,7 +345,7 @@ func TestPrintDiffWarning(t *testing.T) {
 	t.Run("JSON format", func(t *testing.T) {
 		cfg.Format = config.FormatJSON
 		stdout, stderr := test.RepipeStdOutAndErrForTest(func() {
-			output.PrintDiffWarning(err, cfg)
+			PrintDiffWarning(err, cfg)
 		})
 		require.Empty(t, stdout)
 		require.Empty(t, stderr)
@@ -346,7 +357,7 @@ func TestPrintNoDiffChanges(t *testing.T) {
 
 	t.Run("table format", func(t *testing.T) {
 		stdout, stderr := test.RepipeStdOutAndErrForTest(func() {
-			output.PrintNoDiffChanges(cfg)
+			PrintNoDiffChanges(cfg)
 		})
 		require.Empty(t, stderr)
 		require.Contains(t, stdout, "No files changed in diff. No coverage to check.")
@@ -355,7 +366,7 @@ func TestPrintNoDiffChanges(t *testing.T) {
 	t.Run("JSON format", func(t *testing.T) {
 		cfg.Format = config.FormatJSON
 		stdout, stderr := test.RepipeStdOutAndErrForTest(func() {
-			output.PrintNoDiffChanges(cfg)
+			PrintNoDiffChanges(cfg)
 		})
 		require.Empty(t, stdout)
 		require.Empty(t, stderr)
@@ -369,7 +380,7 @@ func TestPrintDiffModeInfo(t *testing.T) {
 
 	t.Run("table format", func(t *testing.T) {
 		stdout, stderr := test.RepipeStdOutAndErrForTest(func() {
-			output.PrintDiffModeInfo(changedCount, totalCount, cfg)
+			PrintDiffModeInfo(changedCount, totalCount, cfg)
 		})
 		require.Empty(t, stderr)
 		require.Contains(t, stdout, "Diff mode: Checking coverage for 5 changed files (out of 10 total files)")
@@ -378,7 +389,7 @@ func TestPrintDiffModeInfo(t *testing.T) {
 	t.Run("JSON format", func(t *testing.T) {
 		cfg.Format = config.FormatJSON
 		stdout, stderr := test.RepipeStdOutAndErrForTest(func() {
-			output.PrintDiffModeInfo(changedCount, totalCount, cfg)
+			PrintDiffModeInfo(changedCount, totalCount, cfg)
 		})
 		require.Empty(t, stdout)
 		require.Empty(t, stderr)

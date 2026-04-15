@@ -17,10 +17,13 @@ const (
     {
       "statementCoverage": "150/150",
       "blockCoverage": "1/1",
+      "lineCoverage": "11/11",
       "statementPercentage": 100,
       "blockPercentage": 100,
+      "linePercentage": 100,
       "statementThreshold": 0,
       "blockThreshold": 0,
+      "lineThreshold": 0,
       "failed": false,
       "file": "foo"
     }
@@ -29,10 +32,13 @@ const (
     {
       "statementCoverage": "150/150",
       "blockCoverage": "1/1",
+      "lineCoverage": "11/11",
       "statementPercentage": 100,
       "blockPercentage": 100,
+      "linePercentage": 100,
       "statementThreshold": 0,
       "blockThreshold": 0,
+      "lineThreshold": 0,
       "failed": false,
       "package": "."
     }
@@ -49,6 +55,12 @@ const (
       "threshold": 0,
       "percentage": 100,
       "failed": false
+    },
+    "lines": {
+      "coverage": "11/11",
+      "threshold": 0,
+      "percentage": 100,
+      "failed": false
     }
   }
 }`
@@ -56,19 +68,25 @@ const (
 	expectYAML = `byFile:
     - statementCoverage: 150/150
       blockCoverage: 1/1
+      lineCoverage: 11/11
       statementPercentage: 100
       blockPercentage: 100
+      linePercentage: 100
       statementThreshold: 0
       blockThreshold: 0
+      lineThreshold: 0
       failed: false
       file: foo
 byPackage:
     - statementCoverage: 150/150
       blockCoverage: 1/1
+      lineCoverage: 11/11
       statementPercentage: 100
       blockPercentage: 100
+      linePercentage: 100
       statementThreshold: 0
       blockThreshold: 0
+      lineThreshold: 0
       failed: false
       package: .
 byTotal:
@@ -79,6 +97,11 @@ byTotal:
         failed: false
     blocks:
         coverage: 1/1
+        threshold: 0
+        percentage: 100
+        failed: false
+    lines:
+        coverage: 11/11
         threshold: 0
         percentage: 100
         failed: false

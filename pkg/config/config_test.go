@@ -199,3 +199,30 @@ func TestValidate_TableStyle(t *testing.T) {
 		require.Contains(t, err.Error(), "table-style")
 	})
 }
+
+func TestValidate_SyntaxStyle(t *testing.T) {
+	valid := []string{
+		config.SyntaxStyleAuto,
+		"github",
+		"github-dark",
+		"monokai",
+		"dracula",
+	}
+	for _, style := range valid {
+		t.Run("valid/"+style, func(t *testing.T) {
+			cfg := &config.Config{}
+			cfg.ApplyDefaults()
+			cfg.SyntaxStyle = style
+			require.NoError(t, cfg.Validate())
+		})
+	}
+
+	t.Run("unknown chroma style is rejected", func(t *testing.T) {
+		cfg := &config.Config{}
+		cfg.ApplyDefaults()
+		cfg.SyntaxStyle = "definitely-not-a-chroma-style"
+		err := cfg.Validate()
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "syntax-style")
+	})
+}

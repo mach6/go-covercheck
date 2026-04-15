@@ -107,7 +107,12 @@ func findModuleName(profiles []*cover.Profile, cfg *config.Config) string {
 	return longestCommonPrefix(names)
 }
 
-func normalizeNames(profiles []*cover.Profile, cfg *config.Config) {
+// NormalizeNames strips the Go module prefix from each profile's FileName so
+// downstream reporting (tables, JSON/YAML, --inspect headers) uses the same
+// short, module-relative paths. CollectResults no longer normalizes names
+// itself; call NormalizeNames exactly once per profile set before handing
+// the profiles to CollectResults or the --inspect path.
+func NormalizeNames(profiles []*cover.Profile, cfg *config.Config) {
 	moduleName := findModuleName(profiles, cfg)
 	for _, profile := range profiles {
 		profile.FileName = strings.Replace(profile.FileName, moduleName, "", 1)

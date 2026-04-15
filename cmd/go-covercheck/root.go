@@ -48,6 +48,10 @@ const (
 	BlockThresholdFlagShort = "b"
 	BlockThresholdFlagUsage = "global block threshold to enforce [0=disabled]"
 
+	LineThresholdFlag      = "line-threshold"
+	LineThresholdFlagShort = "n"
+	LineThresholdFlagUsage = "global line threshold to enforce [0=disabled]"
+
 	TotalStatementThresholdFlag      = "total-statement-threshold"
 	TotalStatementThresholdFlagShort = "S"
 	TotalStatementThresholdFlagUsage = "total statement threshold to enforce [0=disabled]"
@@ -55,6 +59,10 @@ const (
 	TotalBlockThresholdFlag      = "total-block-threshold"
 	TotalBlockThresholdFlagShort = "B"
 	TotalBlockThresholdFlagUsage = "total block threshold to enforce [0=disabled]"
+
+	TotalLineThresholdFlag      = "total-line-threshold"
+	TotalLineThresholdFlagShort = "N"
+	TotalLineThresholdFlagUsage = "total line threshold to enforce [0=disabled]"
 
 	SortByFlag    = "sort-by"
 	SortOrderFlag = "sort-order"
@@ -105,7 +113,31 @@ const (
 	InitFlagUsage = "create a sample .go-covercheck.yml config file in the current directory"
 
 	DiffFromFlag      = "diff-from"
+	DiffFromFlagShort = "d"
 	DiffFromFlagUsage = "git reference (commit/branch/tag) to diff from; enables diff-only mode"
+
+	NoUncoveredLinesFlag      = "no-uncovered-lines"
+	NoUncoveredLinesFlagShort = "Q"
+	NoUncoveredLinesFlagUsage = "omit uncovered line numbers from all outputs (table column and structured " +
+		"json/yaml/md/csv/tsv fields); use --inspect to show them"
+
+	InspectFlag      = "inspect"
+	InspectFlagShort = "U"
+	InspectFlagUsage = "show uncovered source code"
+
+	InspectFileFlag      = "inspect-file"
+	InspectFileFlagShort = "F"
+	InspectFileFlagUsage = "show uncovered source code for specific file (implies --inspect)"
+
+	InspectContextFlag      = "inspect-context"
+	InspectContextFlagShort = "P"
+	InspectContextFlagUsage = "additional context lines to show around uncovered source code"
+
+	SyntaxStyleFlag      = "syntax-style"
+	SyntaxStyleFlagShort = "Y"
+	SyntaxStyleFlagUsage = "syntax highlighting style for code [auto|github|github-dark|" +
+		"monokai|dracula|solarized-dark|vim|emacs|...]; auto picks github or github-dark " +
+		"based on detected terminal background"
 
 	// ConfigFilePermissions permissions.
 	ConfigFilePermissions = 0600
@@ -138,12 +170,14 @@ var (
 	)
 
 	SortByFlagUsage = fmt.Sprintf(
-		"sort-by [%s|%s|%s|%s|%s]",
+		"sort-by [%s|%s|%s|%s|%s|%s|%s]",
 		config.SortByFile,
 		config.SortByBlocks,
 		config.SortByStatements,
+		config.SortByLines,
 		config.SortByStatementPercent,
 		config.SortByBlockPercent,
+		config.SortByLinePercent,
 	)
 
 	SortOrderFlagUsage = fmt.Sprintf("sort order [%s|%s]",
@@ -194,6 +228,11 @@ func run(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
+	// --inspect prints source only; don't run history operations with empty results.
+	if cfg.Inspect {
+		return nil
+	}
+
 	// handle history operations (compare and save)
 	if err := handleHistoryOperations(cmd, results, cfg); err != nil {
 		return err
@@ -235,6 +274,21 @@ func showCoverage(args []string, cfg *config.Config) (compute.Results, bool, err
 		return compute.Results{}, false, err
 	}
 	filtered := filters.FilterProfiles(profiles, cfg)
+
+	// Normalize filenames once up front so the inspect path, the regular
+	// tabular/structured reporting path, and --inspect-file substring
+	// matching all operate on the same module-relative paths.
+	compute.NormalizeNames(filtered, cfg)
+
+	// If inspecting uncovered lines, handle that separately
+	if cfg.Inspect {
+		err := output.InspectUncoveredLines(filtered, cfg)
+		if err != nil {
+			return compute.Results{}, false, err
+		}
+		// For uncovered lines mode, we don't need to return results or failure status
+		return compute.Results{}, false, nil
+	}
 
 	results, failed := compute.CollectResults(filtered, cfg)
 	output.FormatAndReport(results, cfg, failed)
@@ -321,6 +375,9 @@ func isCIEnvWithColor(env []string) bool {
 func setupColor(cfg *config.Config) {
 	_, noColor := os.LookupEnv("NO_COLOR")
 	if cfg.NoColor || noColor {
+		// Mirror the decision onto cfg.NoColor so code paths that consult cfg
+		// (e.g. chroma syntax highlighting in pkg/output) also honor NO_COLOR.
+		cfg.NoColor = true
 		color.NoColor = true
 		text.DisableColors()
 		return
@@ -420,19 +477,29 @@ func getConfig(cmd *cobra.Command) (*config.Config, error) {
 func applyConfigOverrides(cfg *config.Config, cmd *cobra.Command, noConfigFile bool) {
 	applyFloat64FlagOverride(cmd, StatementThresholdFlag, &cfg.StatementThreshold, noConfigFile)
 	applyFloat64FlagOverride(cmd, BlockThresholdFlag, &cfg.BlockThreshold, noConfigFile)
+	applyFloat64FlagOverride(cmd, LineThresholdFlag, &cfg.LineThreshold, noConfigFile)
 	applyFloat64TotalFlagOverride(cmd, TotalStatementThresholdFlag, config.StatementsSection, cfg.Total)
 	applyFloat64TotalFlagOverride(cmd, TotalBlockThresholdFlag, config.BlocksSection, cfg.Total)
+	applyFloat64TotalFlagOverride(cmd, TotalLineThresholdFlag, config.LinesSection, cfg.Total)
 	applyStringFlagOverride(cmd, SortByFlag, &cfg.SortBy, noConfigFile)
 	applyStringFlagOverride(cmd, SortOrderFlag, &cfg.SortOrder, noConfigFile)
 	applyStringArrayFlagOverride(cmd, SkipFlag, &cfg.Skip, noConfigFile)
 	applyStringFlagOverride(cmd, FormatFlag, &cfg.Format, noConfigFile)
 	applyStringFlagOverride(cmd, TableStyleFlag, &cfg.TableStyle, noConfigFile)
+	applyStringArrayFlagOverride(cmd, InspectFileFlag, &cfg.InspectFiles, noConfigFile)
+	applyStringFlagOverride(cmd, SyntaxStyleFlag, &cfg.SyntaxStyle, noConfigFile)
 	applyBoolFlagOverride(cmd, NoTableFlag, &cfg.NoTable, noConfigFile)
 	applyBoolFlagOverride(cmd, NoSummaryFlag, &cfg.NoSummary, noConfigFile)
 	applyBoolFlagOverride(cmd, NoColorFlag, &cfg.NoColor, noConfigFile)
+	applyBoolFlagOverride(cmd, NoUncoveredLinesFlag, &cfg.NoUncoveredLines, noConfigFile)
+	applyBoolFlagOverride(cmd, InspectFlag, &cfg.Inspect, true)
+	if len(cfg.InspectFiles) > 0 {
+		cfg.Inspect = true
+	}
 	applyIntFlagOverride(cmd, TerminalWidthFlag, &cfg.TerminalWidth, noConfigFile)
+	applyIntFlagOverride(cmd, InspectContextFlag, &cfg.InspectContext, noConfigFile)
 	applyStringFlagOverride(cmd, ModuleNameFlag, &cfg.ModuleName, noConfigFile)
-	applyDiffFromFlagOverride(cmd, DiffFromFlag, &cfg.DiffFrom, noConfigFile)
+	applyStringFlagOverride(cmd, DiffFromFlag, &cfg.DiffFrom, noConfigFile)
 
 	// set cfg.Total thresholds to the global values, iff no override was specified for each.
 	if v, _ := cmd.Flags().GetFloat64(StatementThresholdFlag); !cmd.Flags().Changed(TotalStatementThresholdFlag) &&
@@ -442,6 +509,10 @@ func applyConfigOverrides(cfg *config.Config, cmd *cobra.Command, noConfigFile b
 	if v, _ := cmd.Flags().GetFloat64(BlockThresholdFlag); !cmd.Flags().Changed(TotalBlockThresholdFlag) &&
 		cfg.Total[config.BlocksSection] == config.BlockThresholdDefault {
 		cfg.Total[config.BlocksSection] = v
+	}
+	if v, _ := cmd.Flags().GetFloat64(LineThresholdFlag); !cmd.Flags().Changed(TotalLineThresholdFlag) &&
+		cfg.Total[config.LinesSection] == config.LineThresholdDefault {
+		cfg.Total[config.LinesSection] = v
 	}
 }
 
@@ -454,12 +525,6 @@ func applyFloat64FlagOverride(cmd *cobra.Command, flagName string, target *float
 func applyFloat64TotalFlagOverride(cmd *cobra.Command, flagName string, section string, target map[string]float64) {
 	if v, _ := cmd.Flags().GetFloat64(flagName); cmd.Flags().Changed(flagName) {
 		target[section] = v
-	}
-}
-
-func applyDiffFromFlagOverride(cmd *cobra.Command, flagName string, target *string, noConfigFile bool) {
-	if v, _ := cmd.Flags().GetString(flagName); cmd.Flags().Changed(flagName) || noConfigFile {
-		*target = v
 	}
 }
 
@@ -561,6 +626,13 @@ func initFlags(cmd *cobra.Command) {
 	)
 
 	cmd.Flags().Float64P(
+		LineThresholdFlag,
+		LineThresholdFlagShort,
+		config.LineThresholdDefault,
+		LineThresholdFlagUsage,
+	)
+
+	cmd.Flags().Float64P(
 		TotalStatementThresholdFlag,
 		TotalStatementThresholdFlagShort,
 		0,
@@ -572,6 +644,13 @@ func initFlags(cmd *cobra.Command) {
 		TotalBlockThresholdFlagShort,
 		0,
 		TotalBlockThresholdFlagUsage,
+	)
+
+	cmd.Flags().Float64P(
+		TotalLineThresholdFlag,
+		TotalLineThresholdFlagShort,
+		0,
+		TotalLineThresholdFlagUsage,
 	)
 
 	cmd.Flags().String(
@@ -660,8 +739,44 @@ func initFlags(cmd *cobra.Command) {
 		InitFlagUsage,
 	)
 
-	cmd.Flags().String(
+	cmd.Flags().BoolP(
+		NoUncoveredLinesFlag,
+		NoUncoveredLinesFlagShort,
+		false,
+		NoUncoveredLinesFlagUsage,
+	)
+
+	cmd.Flags().BoolP(
+		InspectFlag,
+		InspectFlagShort,
+		false,
+		InspectFlagUsage,
+	)
+
+	cmd.Flags().StringArrayP(
+		InspectFileFlag,
+		InspectFileFlagShort,
+		[]string{},
+		InspectFileFlagUsage,
+	)
+
+	cmd.Flags().IntP(
+		InspectContextFlag,
+		InspectContextFlagShort,
+		config.InspectContextDefault,
+		InspectContextFlagUsage,
+	)
+
+	cmd.Flags().StringP(
+		SyntaxStyleFlag,
+		SyntaxStyleFlagShort,
+		config.SyntaxStyleDefault,
+		SyntaxStyleFlagUsage,
+	)
+
+	cmd.Flags().StringP(
 		DiffFromFlag,
+		DiffFromFlagShort,
 		"",
 		DiffFromFlagUsage,
 	)

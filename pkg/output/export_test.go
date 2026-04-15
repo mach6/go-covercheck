@@ -6,4 +6,8 @@ var (
 	BoxStyleFor          = boxStyleFor
 	GetTableStyle        = getTableStyle
 	GetHistoryTableStyle = getHistoryTableStyle
+	TrimWithEllipsis     = trimWithEllipsis
+	ApplyTableWidths     = applyTableWidths
 )
+
+const FixedColumnWidth = fixedColumnWidth
