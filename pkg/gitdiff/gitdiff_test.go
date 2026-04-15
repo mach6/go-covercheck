@@ -18,6 +18,12 @@ func TestGetChangedFiles_InvalidRepo(t *testing.T) {
 	require.Contains(t, err.Error(), "failed to open git repository")
 }
 
+func TestGetChangedFiles_EmptyTargetRef(t *testing.T) {
+	_, err := GetChangedFiles(".", "")
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "target reference cannot be empty")
+}
+
 func TestFilterProfilesByChangedFiles(t *testing.T) {
 	// Create test profiles
 	profiles := []*cover.Profile{
@@ -78,6 +84,12 @@ func TestMatchFilePaths(t *testing.T) {
 			name:        "base name match with similar directory",
 			profilePath: "github.com/test/pkg/file.go",
 			changedPath: "test/pkg/file.go",
+			expected:    true,
+		},
+		{
+			name:        "cleaned path match",
+			profilePath: "pkg/../pkg/file.go",
+			changedPath: "pkg/file.go",
 			expected:    true,
 		},
 	}

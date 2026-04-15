@@ -63,6 +63,7 @@ func CompareHistory(ref string, refEntry *history.Entry, results compute.Results
 	}
 }
 
+//nolint:dupl,gocognit,cyclop // structurally parallel to compareByFile but operates on different types
 func compareByPackage(results compute.Results, refEntry *history.Entry) bool {
 	// ByPackage
 	bPrintedPkg := false
@@ -71,7 +72,13 @@ func compareByPackage(results compute.Results, refEntry *history.Entry) bool {
 			if curr.Package == prev.Package { //nolint:nestif
 				s, ss := formatDelta(curr.StatementPercentage - prev.StatementPercentage)
 				b, sb := formatDelta(curr.BlockPercentage - prev.BlockPercentage)
-				if ss || sb {
+				// Handle case where historical data might not have line coverage
+				// Only show line comparison if historical data has line coverage fields
+				l, sl := "", false
+				if prev.Lines != "" {
+					l, sl = formatDelta(curr.LinePercentage - prev.LinePercentage)
+				}
+				if ss || sb || sl {
 					if !bPrintedPkg {
 						fmt.Printf(" → By Package\n")
 						bPrintedPkg = true
@@ -85,6 +92,10 @@ func compareByPackage(results compute.Results, refEntry *history.Entry) bool {
 						compareShowB()
 						fmt.Printf("%s [%s]\n", curr.Package, b)
 					}
+					if sl {
+						compareShowL()
+						fmt.Printf("%s [%s]\n", curr.Package, l)
+					}
 				}
 			}
 		}
@@ -97,8 +108,14 @@ func compareByTotal(results compute.Results, refEntry *history.Entry) bool {
 	bPrintedTotal := false
 	deltaS, okS := formatDelta(results.ByTotal.Statements.Percentage - refEntry.Results.ByTotal.Statements.Percentage)
 	deltaB, okB := formatDelta(results.ByTotal.Blocks.Percentage - refEntry.Results.ByTotal.Blocks.Percentage)
+	// Handle case where historical data might not have line coverage
+	// Only show line comparison if historical data has line coverage fields
+	deltaL, okL := "", false
+	if refEntry.Results.ByTotal.Lines.Coverage != "" {
+		deltaL, okL = formatDelta(results.ByTotal.Lines.Percentage - refEntry.Results.ByTotal.Lines.Percentage)
+	}
 
-	if okS || okB {
+	if okS || okB || okL {
 		fmt.Printf(" → By Total\n")
 		bPrintedTotal = true
 		if okS {
@@ -109,10 +126,15 @@ func compareByTotal(results compute.Results, refEntry *history.Entry) bool {
 			compareShowB()
 			fmt.Printf("total [%s]\n", deltaB)
 		}
+		if okL {
+			compareShowL()
+			fmt.Printf("total [%s]\n", deltaL)
+		}
 	}
 	return bPrintedTotal
 }
 
+//nolint:dupl,gocognit,cyclop // structurally parallel to compareByPackage but operates on different types
 func compareByFile(results compute.Results, refEntry *history.Entry) bool {
 	// ByFile
 	bPrintedFile := false
@@ -121,7 +143,13 @@ func compareByFile(results compute.Results, refEntry *history.Entry) bool {
 			if curr.File == prev.File { //nolint:nestif
 				s, ss := formatDelta(curr.StatementPercentage - prev.StatementPercentage)
 				b, sb := formatDelta(curr.BlockPercentage - prev.BlockPercentage)
-				if ss || sb {
+				// Handle case where historical data might not have line coverage
+				// Only show line comparison if historical data has line coverage fields
+				l, sl := "", false
+				if prev.Lines != "" {
+					l, sl = formatDelta(curr.LinePercentage - prev.LinePercentage)
+				}
+				if ss || sb || sl {
 					if !bPrintedFile {
 						fmt.Printf(" → By File\n")
 						bPrintedFile = true
@@ -134,6 +162,10 @@ func compareByFile(results compute.Results, refEntry *history.Entry) bool {
 					if sb {
 						compareShowB()
 						fmt.Printf("%s [%s]\n", curr.File, b)
+					}
+					if sl {
+						compareShowL()
+						fmt.Printf("%s [%s]\n", curr.File, l)
 					}
 				}
 			}
@@ -176,16 +208,25 @@ func ShowHistory(h *history.History, limit int, cfg *config.Config) {
 			entry.Results.ByTotal.Statements.Threshold)
 		blockColor := severityColor(entry.Results.ByTotal.Blocks.Percentage,
 			entry.Results.ByTotal.Blocks.Threshold)
+		lineColor := severityColor(entry.Results.ByTotal.Lines.Percentage,
+			entry.Results.ByTotal.Lines.Threshold)
 
 		wrapTextWidth := 20
+
+		// Build coverage display string - show line coverage only if data exists
+		coverageDisplay := stmtColor(fmt.Sprintf("%-7s", entry.Results.ByTotal.Statements.Coverage)) + " [S]\n" +
+			blockColor(fmt.Sprintf("%-7s", entry.Results.ByTotal.Blocks.Coverage)) + " [B]"
+		if entry.Results.ByTotal.Lines.Coverage != "" {
+			coverageDisplay += "\n" + lineColor(fmt.Sprintf("%-7s", entry.Results.ByTotal.Lines.Coverage)) + " [L]"
+		}
+
 		t.AppendRow(table.Row{
 			fmt.Sprintf("%-10s", entry.Timestamp.Format("2006-01-02")),
 			fmt.Sprintf("%-7s", entry.Commit[:7]),
 			fmt.Sprintf("%-15s", entry.Branch),
 			fmt.Sprintf("%-15s", wrapText(strings.Join(entry.Tags, ", "), wrapTextWidth)),
 			wrapText(fmt.Sprintf("%-15s", entry.Label), wrapTextWidth),
-			stmtColor(fmt.Sprintf("%-7s", entry.Results.ByTotal.Statements.Coverage)) + " [S]\n" +
-				blockColor(fmt.Sprintf("%-7s", entry.Results.ByTotal.Blocks.Coverage)) + " [B]",
+			coverageDisplay,
 		})
 	}
 
@@ -236,4 +277,8 @@ func compareShowS() {
 
 func compareShowB() {
 	fmt.Printf("    [%s] ", color.New(color.FgHiMagenta).Sprint("B"))
+}
+
+func compareShowL() {
+	fmt.Printf("    [%s] ", color.New(color.FgYellow).Sprint("L"))
 }

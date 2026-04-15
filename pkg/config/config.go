@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/alecthomas/chroma/v2/styles"
 	"gopkg.in/yaml.v3"
 )
 
@@ -23,8 +24,10 @@ const (
 	SortByFile             = "file"
 	SortByStatements       = "statements"
 	SortByBlocks           = "blocks"
+	SortByLines            = "lines"
 	SortByStatementPercent = "statement-percent"
 	SortByBlockPercent     = "block-percent"
+	SortByLinePercent      = "line-percent"
 	SortByDefault          = SortByFile
 
 	SortOrderAsc     = "asc"
@@ -40,11 +43,11 @@ const (
 	FormatMD      = "md"
 	FormatDefault = FormatTable
 
-	TableStyleDefault = "default"
-	TableStyleLight   = "light"
-	TableStyleBold    = "bold"
-	TableStyleRounded = "rounded"
-	TableStyleDouble  = "double"
+	TableStyleDefault  = "default"
+	TableStyleLight    = "light"
+	TableStyleBold     = "bold"
+	TableStyleRounded  = "rounded"
+	TableStyleDouble   = "double"
 	TableStyleDefValue = TableStyleLight
 
 	thresholdOff = 0
@@ -58,23 +61,45 @@ const (
 	BlockThresholdOff     = thresholdOff
 	BlockThresholdMax     = thresholdMax
 
+	LineThresholdDefault = 50
+	LineThresholdOff     = thresholdOff
+	LineThresholdMax     = thresholdMax
+
+	// InspectContextDefault is the default number of context lines shown around
+	// uncovered blocks by --inspect.
+	InspectContextDefault = 2
+
+	// SyntaxStyleDefault is the default chroma syntax style used by --inspect.
+	// The value "auto" defers the choice to runtime terminal-background
+	// detection so dark terminals get github-dark and light terminals get
+	// github. Any concrete chroma style name (e.g. "monokai") short-circuits
+	// detection and is used as-is.
+	SyntaxStyleDefault = SyntaxStyleAuto
+
+	// SyntaxStyleAuto selects github or github-dark based on detected
+	// terminal background.
+	SyntaxStyleAuto = "auto"
+
 	StatementsSection = "statements"
 	BlocksSection     = "blocks"
+	LinesSection      = "lines"
 )
 
 // PerOverride holds override per thresholds.
 type PerOverride map[string]float64
 
-// PerThresholdOverride holds PerOverride's for Statements and Blocks.
+// PerThresholdOverride holds PerOverride's for Statements, Blocks, and Lines.
 type PerThresholdOverride struct {
 	Statements PerOverride `yaml:"statements"`
 	Blocks     PerOverride `yaml:"blocks"`
+	Lines      PerOverride `yaml:"lines"`
 }
 
 // Config for application.
 type Config struct {
 	StatementThreshold float64              `yaml:"statementThreshold,omitempty"`
 	BlockThreshold     float64              `yaml:"blockThreshold,omitempty"`
+	LineThreshold      float64              `yaml:"lineThreshold,omitempty"`
 	SortBy             string               `yaml:"sortBy,omitempty"`
 	SortOrder          string               `yaml:"sortOrder,omitempty"`
 	Skip               []string             `yaml:"skip,omitempty"`
@@ -89,6 +114,12 @@ type Config struct {
 	TerminalWidth      int                  `yaml:"terminalWidth,omitempty"`
 	ModuleName         string               `yaml:"moduleName,omitempty"`
 	DiffFrom           string               `yaml:"diffFrom,omitempty"`
+	NoUncoveredLines   bool                 `yaml:"noUncoveredLines,omitempty"`
+	InspectContext     int                  `yaml:"inspectContext,omitempty"`
+	SyntaxStyle        string               `yaml:"syntaxStyle,omitempty"`
+	// not configurable via YAML
+	InspectFiles []string `yaml:"-"`
+	Inspect      bool     `yaml:"-"`
 }
 
 // Load a Config from a path or produce an error.
@@ -115,15 +146,19 @@ func Load(path string) (*Config, error) {
 func (c *Config) ApplyDefaults() {
 	c.StatementThreshold = StatementThresholdDefault
 	c.BlockThreshold = BlockThresholdDefault
+	c.LineThreshold = LineThresholdDefault
 	c.SortBy = SortByDefault
 	c.SortOrder = SortOrderDefault
 	c.Skip = []string{}
+	c.InspectFiles = []string{}
 	c.Format = FormatDefault
 	c.TableStyle = TableStyleDefValue
+	c.SyntaxStyle = SyntaxStyleDefault
+	c.InspectContext = InspectContextDefault
 
 	c.initPerFileWhenNil()
 	c.initPerPackageWhenNil()
-	c.setTotalThresholds(StatementThresholdDefault, BlockThresholdDefault)
+	c.setTotalThresholds(StatementThresholdDefault, BlockThresholdDefault, LineThresholdDefault)
 }
 
 // Validate the config or return an error if it is not valid.
@@ -134,13 +169,28 @@ func (c *Config) Validate() error { //nolint:cyclop
 	if c.BlockThreshold < BlockThresholdOff || c.BlockThreshold > BlockThresholdMax {
 		return errors.New("block threshold must be between 0 and 100")
 	}
+	if c.LineThreshold < LineThresholdOff || c.LineThreshold > LineThresholdMax {
+		return errors.New("line threshold must be between 0 and 100")
+	}
+	if c.InspectContext < 0 {
+		return errors.New("inspect-context must be greater than or equal to 0")
+	}
+	// styles.Get returns styles.Fallback (not nil) for unknown names, so compare
+	// against Fallback to reject typos at config-load time rather than silently
+	// falling back at render time.
+	if c.SyntaxStyle != "" && c.SyntaxStyle != SyntaxStyleAuto && styles.Get(c.SyntaxStyle) == styles.Fallback {
+		return fmt.Errorf("syntax-style %q is not a known chroma style; use %q or a bundled style name",
+			c.SyntaxStyle, SyntaxStyleAuto)
+	}
 
 	switch c.SortBy {
-	case SortByFile, SortByStatements, SortByBlocks, SortByStatementPercent, SortByBlockPercent:
+	case SortByFile, SortByStatements, SortByBlocks, SortByLines,
+		SortByStatementPercent, SortByBlockPercent, SortByLinePercent:
 		break
 	default:
-		return fmt.Errorf("sort-by must be one of %s|%s|%s|%s|%s",
-			SortByFile, SortByStatements, SortByBlocks, SortByStatementPercent, SortByBlockPercent)
+		return fmt.Errorf("sort-by must be one of %s|%s|%s|%s|%s|%s|%s",
+			SortByFile, SortByStatements, SortByBlocks, SortByLines,
+			SortByStatementPercent, SortByBlockPercent, SortByLinePercent)
 	}
 
 	switch c.SortOrder {
@@ -176,7 +226,7 @@ func (c *Config) Validate() error { //nolint:cyclop
 
 	c.initPerFileWhenNil()
 	c.initPerPackageWhenNil()
-	c.setTotalThresholds(c.StatementThreshold, c.BlockThreshold)
+	c.setTotalThresholds(c.StatementThreshold, c.BlockThreshold, c.LineThreshold)
 
 	return nil
 }
@@ -188,6 +238,9 @@ func (c *Config) initPerFileWhenNil() {
 	if c.PerFile.Statements == nil {
 		c.PerFile.Statements = PerOverride{}
 	}
+	if c.PerFile.Lines == nil {
+		c.PerFile.Lines = PerOverride{}
+	}
 }
 
 func (c *Config) initPerPackageWhenNil() {
@@ -197,9 +250,12 @@ func (c *Config) initPerPackageWhenNil() {
 	if c.PerPackage.Statements == nil {
 		c.PerPackage.Statements = PerOverride{}
 	}
+	if c.PerPackage.Lines == nil {
+		c.PerPackage.Lines = PerOverride{}
+	}
 }
 
-func (c *Config) setTotalThresholds(totalStatement, totalBlock float64) {
+func (c *Config) setTotalThresholds(totalStatement, totalBlock, totalLine float64) {
 	if c.Total == nil {
 		c.Total = PerOverride{}
 	}
@@ -208,5 +264,8 @@ func (c *Config) setTotalThresholds(totalStatement, totalBlock float64) {
 	}
 	if _, exists := c.Total[BlocksSection]; !exists {
 		c.Total[BlocksSection] = totalBlock
+	}
+	if _, exists := c.Total[LinesSection]; !exists {
+		c.Total[LinesSection] = totalLine
 	}
 }

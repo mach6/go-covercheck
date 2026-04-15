@@ -15,8 +15,14 @@ statementThreshold: 65.0
 # disabled with 0
 blockThreshold: 60.0
 
+# global threshold % for line coverage.
+# global default for per file %, per package %, and total %
+# default 50.
+# disabled with 0
+lineThreshold: 50.0
+
 # sortBy condition for table output formats.
-# file|blocks|statements|statement-percent|block-percent
+# file|blocks|statements|lines|statement-percent|block-percent|line-percent
 # default file
 sortBy: statement-percent
 
@@ -53,7 +59,7 @@ tableStyle: light
 terminalWidth: 0
 
 # per-file threshold overrides
-# default {"statements": {}, "blocks": {}}
+# default {"statements": {}, "blocks": {}, "lines": {}}
 # disabled with 0
 perFile:
   statements:
@@ -62,9 +68,11 @@ perFile:
   blocks:
 #    main.go: 0
 #    cmd/root.go: 20
+  lines:
+#    main.go: 0
 
 # per-package threshold overrides
-# default {"statements": {}, "blocks": {}}
+# default {"statements": {}, "blocks": {}, "lines": {}}
 # disabled with 0
 perPackage:
   statements:
@@ -72,13 +80,17 @@ perPackage:
   blocks:
 #    pkg/config: 10
 #    pkg/formatter: 0
+  lines:
+#    pkg/config: 10
 
-# total threshold overrides
-# default {"statements": statementThreshold, "blocks": blockThreshold}
+
+# the total threshold overrides
+# default {"statements": statementThreshold, "blocks": blockThreshold, "lines": lineThreshold}
 # disabled with 0
 total:
   statements: 65.0
   blocks: 60
+  lines: 70.0
 
 # skip package(s) and/or file(s) regex
 # default []

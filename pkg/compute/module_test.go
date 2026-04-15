@@ -10,7 +10,7 @@ import (
 	"golang.org/x/tools/cover"
 )
 
-func Test_normalizeNames(t *testing.T) {
+func Test_NormalizeNames(t *testing.T) {
 	names := []string{
 		"do.main/pkg/main.go",
 		"do.main/pkg/utils/utils.go",
@@ -34,7 +34,7 @@ func Test_normalizeNames(t *testing.T) {
 	}
 
 	cfg := &config.Config{}
-	normalizeNames(profiles, cfg)
+	NormalizeNames(profiles, cfg)
 	for i, profile := range profiles {
 		require.Equal(t, expect[i], profile.FileName)
 	}
@@ -58,7 +58,7 @@ func Test_findModuleName_withCommonParent(t *testing.T) {
 	moduleName := findModuleName(profiles, cfg)
 	require.Equal(t, "github.com/mach6/go-covercheck/pkg/", moduleName)
 
-	normalizeNames(profiles, cfg)
+	NormalizeNames(profiles, cfg)
 	require.Equal(t, "foo/foo.go", profiles[0].FileName)
 	require.Equal(t, "bar/bar.go", profiles[1].FileName)
 }
@@ -84,7 +84,7 @@ func Test_findModuleName_withConfiguredModuleName(t *testing.T) {
 	moduleName := findModuleName(profiles, cfg)
 	require.Equal(t, "github.com/mach6/go-covercheck/", moduleName)
 
-	normalizeNames(profiles, cfg)
+	NormalizeNames(profiles, cfg)
 	require.Equal(t, "pkg/foo/foo.go", profiles[0].FileName)
 	require.Equal(t, "pkg/bar/bar.go", profiles[1].FileName)
 }

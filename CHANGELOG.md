@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Breaking
+
+* `compute.CollectResults` no longer normalizes `profile.FileName` internally.
+  Callers that relied on the implicit normalization must now call
+  `compute.NormalizeNames(profiles, cfg)` themselves before invoking
+  `CollectResults`. The `go-covercheck` CLI does this automatically; only
+  direct API consumers are affected. This removes a double-normalization
+  bug when the same profile set is routed through both the `--inspect` path
+  and the regular reporting path.
+
 ## [v0.6.1] - 2025-08-05
 
 ## What's Changed

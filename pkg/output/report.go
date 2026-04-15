@@ -7,7 +7,6 @@ import (
 	"os"
 
 	"github.com/fatih/color"
-	"github.com/hokaccha/go-prettyjson"
 	"github.com/mach6/go-covercheck/pkg/compute"
 	"github.com/mach6/go-covercheck/pkg/config"
 	"gopkg.in/yaml.v3"
@@ -75,18 +74,18 @@ func FormatAndReport(results compute.Results, cfg *config.Config, hasFailure boo
 			err := enc.Encode(results)
 			bailOnError(err)
 		} else {
-			s, err := prettyjson.Marshal(results)
+			jsonString, err := json.MarshalIndent(results, "", "  ")
 			bailOnError(err)
-			fmt.Println(string(s))
+			fmt.Println(highlightJSONSyntax(string(jsonString), cfg))
 		}
 	case config.FormatYAML:
 		if cfg.NoColor {
 			err := yaml.NewEncoder(os.Stdout).Encode(results)
 			bailOnError(err)
 		} else {
-			y, err := yaml.Marshal(results)
+			yamlData, err := yaml.Marshal(results)
 			bailOnError(err)
-			yamlColor(y)
+			fmt.Println(highlightYAMLSyntax(string(yamlData), cfg))
 		}
 	default:
 		bailOnError(errors.New(color.RedString("Unsupported format: %s", cfg.Format)))
