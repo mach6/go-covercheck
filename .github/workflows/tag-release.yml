@@ -12,7 +12,7 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Install GitHub CLI
         run: |
@@ -25,7 +25,7 @@ jobs:
           git config --global user.email "actions@github.com"
 
       - name: Setup Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@v6
         with:
           go-version: '1.24'
 
@@ -38,7 +38,7 @@ jobs:
         run: make dist
 
       - name: Upload Dist Binaries to GitHub Release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           files: dist/*
 
@@ -46,7 +46,7 @@ jobs:
         run: make docker
 
       - name: Log in to GitHub Container Registry
-        uses: docker/login-action@v3
+        uses: docker/login-action@v4
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
@@ -95,12 +95,12 @@ jobs:
           cd homebrew-tap
 
           # Update the formula
-          sed -i "s|url \".*\"|url \"https://github.com/mach6/go-covercheck/archive/refs/tags/${TAG}.tar.gz\"|" go-covercheck/go-covercheck.rb
-          sed -i "s|sha256 \".*\"|sha256 \"${SHA256}\"|" go-covercheck/go-covercheck.rb
+          sed -i "s|url \".*\"|url \"https://github.com/mach6/go-covercheck/archive/refs/tags/${TAG}.tar.gz\"|" go-covercheck.rb
+          sed -i "s|sha256 \".*\"|sha256 \"${SHA256}\"|" go-covercheck.rb
 
           # Commit and push changes
           git checkout -b update-go-covercheck-${TAG}
-          git add go-covercheck/go-covercheck.rb
+          git add go-covercheck.rb
           git commit -m "Update go-covercheck formula for ${TAG}"
           git push origin update-go-covercheck-${TAG}
 

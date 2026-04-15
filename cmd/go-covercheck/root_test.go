@@ -7,10 +7,12 @@ import (
 
 	"github.com/mach6/go-covercheck/pkg/compute"
 	"github.com/mach6/go-covercheck/pkg/config"
+	"github.com/mach6/go-covercheck/pkg/filters"
 	"github.com/mach6/go-covercheck/pkg/history"
 	"github.com/mach6/go-covercheck/pkg/test"
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/require"
+	"golang.org/x/tools/cover"
 	"gopkg.in/yaml.v3"
 )
 
@@ -29,18 +31,43 @@ func runCmdForTest(t *testing.T, cmd *cobra.Command) (string, string, error) {
 	return stdOut, stdErr, err
 }
 
-func TestShouldSkip_MatchesPrefix(t *testing.T) {
-	require.True(t, shouldSkip("vendor/foo.go", []string{"vendor/"}))
-	require.True(t, shouldSkip("gen/code.go", []string{"gen/"}))
+func TestFilterBySkipped_MatchesPrefix(t *testing.T) {
+	profiles := []*cover.Profile{
+		{FileName: "vendor/foo.go"},
+		{FileName: "src/main.go"},
+	}
+	cfg := &config.Config{}
+	cfg.ApplyDefaults()            // Apply defaults first
+	cfg.Skip = []string{"vendor/"} // Then set skip patterns
+	filtered := filters.FilterProfiles(profiles, cfg)
+
+	require.Len(t, filtered, 1)
+	require.Equal(t, "src/main.go", filtered[0].FileName)
 }
 
-func TestShouldSkip_MatchesExact(t *testing.T) {
-	require.True(t, shouldSkip("internal/tmp_test.go", []string{"internal/tmp_test.go"}))
+func TestFilterBySkipped_MatchesExact(t *testing.T) {
+	profiles := []*cover.Profile{
+		{FileName: "internal/tmp_test.go"},
+		{FileName: "src/main.go"},
+	}
+	cfg := &config.Config{}
+	cfg.ApplyDefaults()             // Apply defaults first
+	cfg.Skip = []string{"_test.go"} // Then set skip patterns
+	filtered := filters.FilterProfiles(profiles, cfg)
+	require.Len(t, filtered, 1)
+	require.Equal(t, "src/main.go", filtered[0].FileName)
 }
 
-func TestShouldSkip_NoMatches(t *testing.T) {
-	require.False(t, shouldSkip("main.go", []string{"generated.go"}))
-	require.False(t, shouldSkip("src/foo/bar.go", nil))
+func TestFilterBySkipped_NoMatches(t *testing.T) {
+	profiles := []*cover.Profile{
+		{FileName: "main.go"},
+		{FileName: "src/foo/bar.go"},
+	}
+	cfg := &config.Config{}
+	cfg.ApplyDefaults()                 // Apply defaults first
+	cfg.Skip = []string{"generated.go"} // Then set skip patterns
+	filtered := filters.FilterProfiles(profiles, cfg)
+	require.Len(t, filtered, 2)
 }
 
 func Test_run_ShowCoverageFails(t *testing.T) {
@@ -96,16 +123,24 @@ func Test_run_ShowHistoryFails(t *testing.T) {
 }
 
 func extractJSONFromOutput(output string) string {
-	// The output format is: JSON + success message
-	// We need to find where the JSON ends and extract just that part
+	// The output format might have warning messages before JSON
+	// Find the first line that starts with { (JSON start)
 	lines := strings.Split(output, "\n")
 	jsonLines := make([]string, 0)
+	startFound := false
 
 	for _, line := range lines {
-		if strings.HasPrefix(strings.TrimSpace(line), "✓") {
-			break
+		trimmed := strings.TrimSpace(line)
+		if !startFound && strings.HasPrefix(trimmed, "{") {
+			startFound = true
 		}
-		jsonLines = append(jsonLines, line)
+		if startFound {
+			// Stop if we hit a success message marker
+			if strings.HasPrefix(trimmed, "✓") {
+				break
+			}
+			jsonLines = append(jsonLines, line)
+		}
 	}
 
 	return strings.Join(jsonLines, "\n")
@@ -127,7 +162,7 @@ func Test_run_SaveHistory(t *testing.T) {
 	require.Empty(t, stdErr)
 
 	// For JSON format, a success message should NOT be present
-	require.NotContains(t, stdOut, "✓ Saved history entry")
+	require.NotContains(t, stdOut, "≡ Saved history entry")
 
 	// Extract JSON part from the output for parsing
 	jsonOutput := extractJSONFromOutput(stdOut)
@@ -162,7 +197,7 @@ func Test_run_SaveHistory_NoPreviousFile(t *testing.T) {
 	require.Empty(t, stdErr)
 
 	// For JSON format, a success message should NOT be present
-	require.NotContains(t, stdOut, "✓ Saved history entry")
+	require.NotContains(t, stdOut, "≡ Saved history entry")
 
 	// Extract JSON part from the output for parsing
 	jsonOutput := extractJSONFromOutput(stdOut)
@@ -197,7 +232,7 @@ func Test_run_SaveHistory_TableFormat(t *testing.T) {
 	require.Empty(t, stdErr)
 
 	// For table format, success message SHOULD be present
-	require.Contains(t, stdOut, "✓ Saved history entry")
+	require.Contains(t, stdOut, "≡ Saved history entry")
 
 	// open the history file and confirm it has new content
 	h, err := history.Load(path)
@@ -365,7 +400,7 @@ func Test_run_DeleteHistory(t *testing.T) {
 	stdOut, stdErr, err := runCmdForTest(t, cmd)
 	require.NoError(t, err)
 	require.Empty(t, stdErr)
-	require.Contains(t, stdOut, "✓ Deleted history entry for ref: main")
+	require.Contains(t, stdOut, "≡ Deleted history entry for ref: main")
 
 	// Verify the entry was actually deleted
 	h, err := history.Load(path)
@@ -407,4 +442,27 @@ func Test_run_DeleteHistoryFails_BadFile(t *testing.T) {
 	require.NotEmpty(t, stdErr)
 	require.ErrorContains(t, err, "failed to load history")
 	require.Contains(t, stdErr, "failed to load history")
+}
+
+func TestApplyConfigOverrides_TableStyleFlag(t *testing.T) {
+	cmd := &cobra.Command{}
+	initFlags(cmd)
+
+	cfg := &config.Config{}
+	cfg.ApplyDefaults()
+	require.Equal(t, config.TableStyleLight, cfg.TableStyle)
+
+	require.NoError(t, cmd.Flags().Set(TableStyleFlag, config.TableStyleRounded))
+	applyConfigOverrides(cfg, cmd, false)
+	require.Equal(t, config.TableStyleRounded, cfg.TableStyle)
+}
+
+func TestApplyConfigOverrides_TableStyleNoConfigFile(t *testing.T) {
+	cmd := &cobra.Command{}
+	initFlags(cmd)
+
+	cfg := &config.Config{TableStyle: config.TableStyleBold}
+	// Flag not explicitly set; default ("light") should take over when there is no config file.
+	applyConfigOverrides(cfg, cmd, true)
+	require.Equal(t, config.TableStyleLight, cfg.TableStyle)
 }

@@ -68,7 +68,7 @@ func Test_sortResults_ByFile(t *testing.T) {
 }
 
 func TestCollectResults(t *testing.T) {
-	profiles := make([]*cover.Profile, 0)
+	profiles := make([]*cover.Profile, 0, 1)
 	profiles = append(profiles, &cover.Profile{
 		FileName: "foo",
 		Mode:     "set",
@@ -171,6 +171,9 @@ func TestCollectResults_WithPerPackageThresholds(t *testing.T) {
 	cfg.PerPackage.Statements["special"] = 75.0 // higher threshold for special package only
 	cfg.PerPackage.Blocks["special"] = 75.0     // higher threshold for special package only
 
+	// CollectResults no longer normalizes; do it explicitly so the common
+	// "pkg/" prefix is stripped and the per-package keys match.
+	NormalizeNames(profiles, cfg)
 	r, failed := CollectResults(profiles, cfg)
 	require.True(t, failed)
 

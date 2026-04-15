@@ -7,13 +7,17 @@
 
 A fast, flexible CLI tool for enforcing test coverage thresholds in Go projects.
 
-> Fail builds when coverage drops below acceptable thresholds — by file, statement, or block level.
+> Fail builds when coverage drops below acceptable thresholds — by file, statement, block, or line level.
 
 ## ✨ Features
 
 - Enforce minimum coverage thresholds for files, packages, and the entire project.
-- Supports statement and block coverage separately.
+- Check coverage only on changed files in git diff.
+- Supports statement, block, and 🆕 line coverage separately.
+- 🆕 Inspect uncovered source code with syntax highlighting (`--inspect`).
+- 🆕 Show uncovered line numbers inline in the coverage table.
 - Native `table`|`json`|`yaml`|`md`|`html`|`csv`|`tsv` output.
+- Configurable table styles (`default`|`light`|`bold`|`rounded`|`double`).
 - Configurable via a `.go-covercheck.yml` or CLI flags.
 - Sorting and colored table output.
 - Colored `json` and `yaml` output.
@@ -27,9 +31,8 @@ The following items are noteworthy and not (currently) supported.
 
 - Does not support configurable profile block count (how many times a section of code was hit) thresholds. The assumption
   is any value `>=1` is enough.
-- Table style is not configurable.
-- Color codes (see [Color Legend](#🎨-color-legend)) are not configurable.
-- Severity weights (see [Color Legend](#🎨-color-legend)) are not configurable.
+- Color codes (see [Color Legend](#-color-legend)) are not configurable.
+- Severity weights (see [Color Legend](#-color-legend)) are not configurable.
 
 ## 📖 Background
 
@@ -87,7 +90,7 @@ docker pull ghcr.io/mach6/go-covercheck:latest
 Or you can use a tag which maps to a specific version:
 
 ```shell
-docker pull ghcr.io/mach6/go-covercheck:0.6.0
+docker pull ghcr.io/mach6/go-covercheck:0.6.1
 ```
 
 ## 📋 Usage
@@ -107,14 +110,19 @@ go-covercheck --init
 Here is a sample `.go-covercheck.yml` configuration file:
 
 ```yaml
-# Optional, global thresholds overriding the default (70 statements, 50 blocks)
+# Optional, global thresholds overriding the defaults (70 statements, 50 blocks, 50 lines)
 statementThreshold: 65.0
 blockThreshold: 60.0
+lineThreshold: 55.0
+
+# Optional, table style for table output format (default: light)
+tableStyle: bold
 
 # Optional, by total thresholds overriding the global values above
 total:
   statements: 75.0
   blocks: 70.0
+  lines: 80.0
 ```
 
 ### 🧪 Run Tests
@@ -131,34 +139,38 @@ Use the `go-covercheck` CLI to check the coverage against the thresholds defined
 
 ```text
 $ go-covercheck coverage.out
-┌───────────────┬────────────┬───────────┬─────────────┬───────────┐
-│               │ STATEMENTS │  BLOCKS   │ STATEMENT % │  BLOCK %  │
-├───────────────┼────────────┼───────────┼─────────────┼───────────┤
-│ BY FILE       │            │           │             │           │
-├───────────────┼────────────┼───────────┼─────────────┼───────────┤
-│ cmd/foo.go    │        0/1 │       0/1 │         0.0 │       0.0 │
-│ cmd/bar.go    │     20/110 │      7/80 │        18.2 │       8.8 │
-├───────────────┼────────────┼───────────┼─────────────┼───────────┤
-│ BY PACKAGE    │            │           │             │           │
-├───────────────┼────────────┼───────────┼─────────────┼───────────┤
-│ cmd           │     20/111 │      7/81 │        18.0 │       8.6 │
-├───────────────┼────────────┼───────────┼─────────────┼───────────┤
-│ BY TOTAL      │            │           │             │           │
-├───────────────┼────────────┼───────────┼─────────────┼───────────┤
-│               │     20/111 │      7/81 │        18.0 │      8.6  │
-└───────────────┴────────────┴───────────┴─────────────┴───────────┘
+┌────────────┬────────────┬─────────┬──────────┬─────────────┬──────────┬─────────┬─────────────────┐
+│            │ STATEMENTS │ BLOCKS  │  LINES   │ STATEMENT % │ BLOCK %  │ LINE %  │ UNCOVERED LINES │
+├────────────┼────────────┼─────────┼──────────┼─────────────┼──────────┼─────────┼─────────────────┤
+│ BY FILE    │            │         │          │             │          │         │                 │
+├────────────┼────────────┼─────────┼──────────┼─────────────┼──────────┼─────────┼─────────────────┤
+│ cmd/foo.go │        0/1 │     0/1 │      0/3 │         0.0 │      0.0 │     0.0 │ 1-3             │
+│ cmd/bar.go │     20/110 │    7/80 │   25/140 │        18.2 │      8.8 │    17.9 │ 3-8,12,15-22... │
+├────────────┼────────────┼─────────┼──────────┼─────────────┼──────────┼─────────┼─────────────────┤
+│ BY PACKAGE │            │         │          │             │          │         │                 │
+├────────────┼────────────┼─────────┼──────────┼─────────────┼──────────┼─────────┼─────────────────┤
+│ cmd        │     20/111 │    7/81 │   25/143 │        18.0 │      8.6 │    17.5 │                 │
+├────────────┼────────────┼─────────┼──────────┼─────────────┼──────────┼─────────┼─────────────────┤
+│ BY TOTAL   │            │         │          │             │          │         │                 │
+├────────────┼────────────┼─────────┼──────────┼─────────────┼──────────┼─────────┼─────────────────┤
+│            │     20/111 │    7/81 │   25/143 │        18.0 │      8.6 │    17.5 │                 │
+└────────────┴────────────┴─────────┴──────────┴─────────────┴──────────┴─────────┴─────────────────┘
 ✘ Coverage check failed
  → By File
     [S] cmd/foo.go [+70.0% required for 70.0% threshold]
     [B] cmd/foo.go [+50.0% required for 50.0% threshold]
+    [L] cmd/foo.go [+50.0% required for 50.0% threshold]
     [S] cmd/bar.go [+51.8% required for 70.0% threshold]
     [B] cmd/bar.go [+41.2% required for 50.0% threshold]
+    [L] cmd/bar.go [+32.1% required for 50.0% threshold]
  → By Package
     [S] cmd [+52.0% required for 70.0% threshold]
     [B] cmd [+41.4% required for 50.0% threshold]
+    [L] cmd [+32.5% required for 50.0% threshold]
  → By Total
     [S] total [+52.0% required for 70.0% threshold]
     [B] total [+41.4% required for 50.0% threshold]
+    [L] total [+32.5% required for 50.0% threshold]
 ```
 
 Note: if the file `coverage.out` is not specified, `go-covercheck` will look for a file named `coverage.out` in the current directory.
@@ -180,26 +192,161 @@ Flags:
   -C, --compare-history string            compare current coverage against historical ref [commit|branch|tag|label]
   -c, --config string                     path to YAML config file (default ".go-covercheck.yml")
   -D, --delete-history string             delete historical entry by ref [commit|branch|tag|label]
+  -d, --diff-from string                  git reference (commit/branch/tag) to diff from; enables diff-only mode
   -f, --format string                     output format [table|json|yaml|md|html|csv|tsv] (default "table")
   -h, --help                              help for go-covercheck
       --history-file string               path to go-covercheck history file (default ".go-covercheck.history.json")
       --init                              create a sample .go-covercheck.yml config file in the current directory
+  -U, --inspect                           show uncovered source code
+  -P, --inspect-context int               additional context lines to show around uncovered source code (default 2)
+  -F, --inspect-file stringArray          show uncovered source code for a specific file; match is exact path, basename, or path-boundary suffix (implies --inspect)
   -l, --label string                      optional label name for history entry
+  -n, --line-threshold float              global line threshold to enforce [0=disabled] (default 50)
   -L, --limit-history int                 limit number of historical entries to save or display [0=no limit]
   -m, --module-name string                explicitly set module name for path normalization (overrides module inference)
   -w, --no-color                          disable color output
   -u, --no-summary                        suppress failure summary and only show tabular output [disabled for json|yaml]
   -t, --no-table                          suppress tabular output and only show failure summary [disabled for json|yaml]
+  -Q, --no-uncovered-lines                omit uncovered line numbers from all outputs (table column and structured json/yaml/md/csv/tsv fields); use --inspect to show them
   -H, --save-history                      add coverage result to history
   -I, --show-history                      show historical entries in tabular format
   -k, --skip stringArray                  regex string of file(s) and/or package(s) to skip
-      --sort-by string                    sort-by [file|blocks|statements|statement-percent|block-percent] (default "file")
+      --sort-by string                    sort-by [file|blocks|statements|lines|statement-percent|block-percent|line-percent] (default "file")
       --sort-order string                 sort order [asc|desc] (default "asc")
   -s, --statement-threshold float         global statement threshold to enforce [0=disabled] (default 70)
+  -Y, --syntax-style string               syntax highlighting style for code [auto|github|github-dark|monokai|dracula|solarized-dark|vim|emacs|...]; auto picks github or github-dark based on detected terminal background (default "auto")
       --term-width int                    force output to specified column width [0=autodetect]
   -B, --total-block-threshold float       total block threshold to enforce [0=disabled]
+  -N, --total-line-threshold float        total line threshold to enforce [0=disabled]
   -S, --total-statement-threshold float   total statement threshold to enforce [0=disabled]
   -v, --version                           version for go-covercheck
+```
+
+### 🔧 Integration with `go tool covdata`
+
+For integration tests or when collecting coverage from running binaries, you can use `go tool covdata` to work with coverage data directories and convert them to the standard coverage profile format that `go-covercheck` understands.
+
+
+#### 🏗️ Integration Testing Scenario
+
+This workflow is particularly useful for integration tests where you want to assert coverage from a running binary:
+
+```shell
+# 1. Build your binary with coverage support
+go build -cover -o myapp ./cmd/myapp
+
+# 2. Set environment variable for coverage data directory
+export GOCOVERDIR=./coverdata
+mkdir -p $GOCOVERDIR
+
+# 3. Run your binary (coverage data will be written to GOCOVERDIR)
+./myapp &
+APP_PID=$!
+
+# 4. Run your integration tests against the running binary
+curl http://localhost:8080/health
+curl http://localhost:8080/api/users
+# ... more integration test calls
+
+# 5. Stop the binary (this flushes coverage data)
+kill $APP_PID
+
+# 6. Convert coverage data to standard format
+go tool covdata textfmt -i=./coverdata -o=integration-coverage.out
+
+# 7. Check coverage with go-covercheck
+go-covercheck integration-coverage.out
+```
+
+## 🧬 Diff Mode (Changed Files Only)
+
+Enforce coverage thresholds only on files that have changed in your git diff. This is perfect for gradually improving coverage in large codebases without being penalized by legacy code.
+
+### 🎯 Use Cases
+
+- **Pull Request Validation**: Ensure new code meets coverage standards without failing on existing legacy code
+- **Incremental Coverage Improvement**: Gradually increase coverage standards for new development
+- **CI/CD Integration**: Gate deployments based on coverage of changes, not entire codebase
+
+### 🚀 Basic Usage
+
+```shell
+# Check coverage only on files changed since a specific commit
+go-covercheck --diff-from HEAD~1
+
+# Compare against a specific commit
+go-covercheck --diff-from HEAD~3
+
+# Compare against a branch
+go-covercheck --diff-from main
+
+# Compare against a tag
+go-covercheck --diff-from v1.0.0
+
+# CI/CD: Check coverage for PR changes
+go-covercheck --diff-from origin/main
+
+# Local development: Check changes since last push
+go-covercheck --diff-from @{upstream}
+
+# Release validation: Check changes since last tag
+go-covercheck --diff-from $(git describe --tags --abbrev=0)
+```
+
+### 🛡️ Fallback Behavior
+
+If git operations fail (e.g., not in a git repository, invalid reference), `go-covercheck` will automatically fall back to checking all files with a warning message.
+
+## 🔬 Inspect Uncovered Code
+
+Use `--inspect` (`-U`) to print the uncovered source code with syntax highlighting instead of
+the coverage table. This is helpful when you want to see *exactly* what code needs tests.
+
+```shell
+# Show uncovered code for all files in the coverage profile
+go-covercheck --inspect coverage.out
+
+# Limit to specific files (exact path, basename, or path-boundary suffix; implies --inspect)
+go-covercheck --inspect-file pkg/compute/compute.go coverage.out
+
+# Show more context lines around each uncovered block (default 2)
+go-covercheck --inspect --inspect-context 5 coverage.out
+
+# Pick a chroma syntax highlighting style
+go-covercheck --inspect --syntax-style monokai coverage.out
+```
+
+The default `auto` picks `github` or `github-dark` based on the detected
+terminal background. Any chroma style name is accepted; see
+[chroma](https://github.com/alecthomas/chroma) for the full list (e.g.
+`monokai`, `dracula`, `solarized-dark`, `vim`, `emacs`).
+
+## 📏 Line Coverage
+
+In addition to statement and block coverage, `go-covercheck` enforces line coverage thresholds.
+Configure with `lineThreshold` in `.go-covercheck.yml`, `--line-threshold` (`-n`) on the CLI,
+and `--total-line-threshold` (`-N`) for the project total. Per-file and per-package overrides
+go under a `lines:` map alongside `statements:` and `blocks:`. Failures are reported with the
+`[L]` prefix in the summary.
+
+### 🎨 Table Styles
+
+You can customize the appearance of table output using the `--table-style` flag or by configuring `tableStyle` in your `.go-covercheck.yml` file.
+
+Available table styles:
+- `default` - ASCII characters (compatible with all terminals)
+- `light` - Unicode light box drawing characters (default)
+- `bold` - Unicode bold box drawing characters
+- `rounded` - Unicode rounded corner characters
+- `double` - Unicode double line characters
+
+**Example:**
+```shell
+# Use bold table style via CLI
+go-covercheck --table-style=bold
+
+# Use rounded table style via config file
+echo "tableStyle: rounded" >> .go-covercheck.yml
 ```
 
 ## 🕰️ History
@@ -308,7 +455,7 @@ When a history entry is successfully deleted, you'll see a confirmation message:
 
 ```text
 $ go-covercheck --delete-history main
-✓ Deleted history entry for ref: main
+≡ Deleted history entry for ref: main
 ```
 
 If the reference is not found, an error message will be displayed:
@@ -339,25 +486,27 @@ details by file, package, and total. The table is sorted by file name by default
 field using the `--sort-by` and `--sort-order` flags.
 
 ```text
-$ go-covercheck -f table coverage.out -u
-┌───────────────┬────────────┬───────────┬─────────────┬───────────┐
-│               │ STATEMENTS │  BLOCKS   │ STATEMENT % │  BLOCK %  │
-├───────────────┼────────────┼───────────┼─────────────┼───────────┤
-│ BY FILE       │            │           │             │           │
-├───────────────┼────────────┼───────────┼─────────────┼───────────┤
-│ cmd/foo.go    │        0/1 │       0/1 │         0.0 │       0.0 │
-│ cmd/bar.go    │     20/110 │      7/80 │        18.2 │       8.8 │
-├───────────────┼────────────┼───────────┼─────────────┼───────────┤
-│ BY PACKAGE    │            │           │             │           │
-├───────────────┼────────────┼───────────┼─────────────┼───────────┤
-│ cmd           │     20/111 │      7/81 │        18.0 │       8.6 │
-├───────────────┼────────────┼───────────┼─────────────┼───────────┤
-│ BY TOTAL      │            │           │             │           │
-├───────────────┼────────────┼───────────┼─────────────┼───────────┤
-│               │     20/111 │      7/81 │        18.0 │      8.6  │
-└───────────────┴────────────┴───────────┴─────────────┴───────────┘
+$ go-covercheck -f table coverage.out -uQ
+┌────────────┬────────────┬─────────┬──────────┬─────────────┬──────────┬─────────┐
+│            │ STATEMENTS │ BLOCKS  │  LINES   │ STATEMENT % │ BLOCK %  │ LINE %  │
+├────────────┼────────────┼─────────┼──────────┼─────────────┼──────────┼─────────┤
+│ BY FILE    │            │         │          │             │          │         │
+├────────────┼────────────┼─────────┼──────────┼─────────────┼──────────┼─────────┤
+│ cmd/foo.go │        0/1 │     0/1 │      0/3 │         0.0 │      0.0 │     0.0 │
+│ cmd/bar.go │     20/110 │    7/80 │   25/140 │        18.2 │      8.8 │    17.9 │
+├────────────┼────────────┼─────────┼──────────┼─────────────┼──────────┼─────────┤
+│ BY PACKAGE │            │         │          │             │          │         │
+├────────────┼────────────┼─────────┼──────────┼─────────────┼──────────┼─────────┤
+│ cmd        │     20/111 │    7/81 │   25/143 │        18.0 │      8.6 │    17.5 │
+├────────────┼────────────┼─────────┼──────────┼─────────────┼──────────┼─────────┤
+│ BY TOTAL   │            │         │          │             │          │         │
+├────────────┼────────────┼─────────┼──────────┼─────────────┼──────────┼─────────┤
+│            │     20/111 │    7/81 │   25/143 │        18.0 │      8.6 │    17.5 │
+└────────────┴────────────┴─────────┴──────────┴─────────────┴──────────┴─────────┘
 ```
-Note: Here the `-u` flag was used to suppress the summary lines.
+Note: `-u` (`--no-summary`) suppresses the failure summary, and `-Q`
+(`--no-uncovered-lines`) drops the "Uncovered Lines" column that is
+rendered by default.
 
 
 ### 📑 Other Tabular Formats
@@ -381,10 +530,13 @@ $ go-covercheck -f json coverage.out
     {
       "statementCoverage": "150/150",
       "blockCoverage": "1/1",
+      "lineCoverage": "200/200",
       "statementPercentage": 100,
       "blockPercentage": 100,
+      "linePercentage": 100,
       "statementThreshold": 0,
       "blockThreshold": 0,
+      "lineThreshold": 0,
       "failed": false,
       "file": "foo"
     }
@@ -393,10 +545,13 @@ $ go-covercheck -f json coverage.out
     {
       "statementCoverage": "150/150",
       "blockCoverage": "1/1",
+      "lineCoverage": "200/200",
       "statementPercentage": 100,
       "blockPercentage": 100,
+      "linePercentage": 100,
       "statementThreshold": 0,
       "blockThreshold": 0,
+      "lineThreshold": 0,
       "failed": false,
       "package": "."
     }
@@ -410,6 +565,12 @@ $ go-covercheck -f json coverage.out
     },
     "blocks": {
       "coverage": "1/1",
+      "threshold": 0,
+      "percentage": 100,
+      "failed": false
+    },
+    "lines": {
+      "coverage": "200/200",
       "threshold": 0,
       "percentage": 100,
       "failed": false
@@ -429,19 +590,25 @@ $ go-covercheck -f yaml coverage.out
 byFile:
   - statementCoverage: 150/150
     blockCoverage: 1/1
+    lineCoverage: 200/200
     statementPercentage: 100
     blockPercentage: 100
+    linePercentage: 100
     statementThreshold: 0
     blockThreshold: 0
+    lineThreshold: 0
     failed: false
     file: foo
 byPackage:
   - statementCoverage: 150/150
     blockCoverage: 1/1
+    lineCoverage: 200/200
     statementPercentage: 100
     blockPercentage: 100
+    linePercentage: 100
     statementThreshold: 0
     blockThreshold: 0
+    lineThreshold: 0
     failed: false
     package: .
 byTotal:
@@ -452,6 +619,11 @@ byTotal:
     failed: false
   blocks:
     coverage: 1/1
+    threshold: 0
+    percentage: 100
+    failed: false
+  lines:
+    coverage: 200/200
     threshold: 0
     percentage: 100
     failed: false

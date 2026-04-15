@@ -1,6 +1,9 @@
 package compute
 
 import (
+	"bufio"
+	"bytes"
+	"os"
 	"sort"
 	"strings"
 
@@ -23,19 +26,55 @@ func longestCommonPrefix(strs []string) string {
 	first := strs[0]
 	last := strs[len(strs)-1]
 
-	// Initialize variables for finding common prefix
-	var commonPrefix string
-	minLength := min(len(first), len(last))
-
 	// Compare characters until mismatch or reaching the end of shorter string
-	for i := range minLength {
-		if first[i] != last[i] {
-			break
-		}
-		commonPrefix += string(first[i])
+	minLength := min(len(first), len(last))
+	end := 0
+	for end < minLength && first[end] == last[end] {
+		end++
+	}
+	return first[:end]
+}
+
+// readModuleNameFromGoMod reads the module name from go.mod in the current working directory.
+// Returns empty string if the go.mod file doesn't exist, or module name cannot be extracted.
+func readModuleNameFromGoMod() string {
+	readFile, err := os.ReadFile("go.mod")
+	if err != nil {
+		return ""
 	}
 
-	return commonPrefix
+	file := bytes.NewReader(readFile)
+	scanner := bufio.NewScanner(file)
+	for scanner.Scan() {
+		line := strings.TrimSpace(scanner.Text())
+		if strings.HasPrefix(line, "module ") {
+			parts := strings.Fields(line)
+			if len(parts) >= 2 { //nolint:mnd
+				return parts[1]
+			}
+		}
+	}
+	return ""
+}
+
+// validateModuleNameMatchesFilePaths checks if the given module name is a prefix
+// for all file paths in the profiles.
+func validateModuleNameMatchesFilePaths(moduleName string, profiles []*cover.Profile) bool {
+	if moduleName == "" || len(profiles) == 0 {
+		return false
+	}
+
+	// Ensure module name has trailing slash for proper prefix matching
+	if !strings.HasSuffix(moduleName, "/") {
+		moduleName += "/"
+	}
+
+	for _, profile := range profiles {
+		if !strings.HasPrefix(profile.FileName, moduleName) {
+			return false
+		}
+	}
+	return true
 }
 
 func findModuleName(profiles []*cover.Profile, cfg *config.Config) string {
@@ -49,6 +88,17 @@ func findModuleName(profiles []*cover.Profile, cfg *config.Config) string {
 		return moduleName
 	}
 
+	// Try to read module name from go.mod if it exists and matches all file paths
+	if goModModuleName := readModuleNameFromGoMod(); goModModuleName != "" {
+		if validateModuleNameMatchesFilePaths(goModModuleName, profiles) {
+			// Ensure module name ends with "/" for proper prefix replacement
+			if !strings.HasSuffix(goModModuleName, "/") {
+				goModModuleName += "/"
+			}
+			return goModModuleName
+		}
+	}
+
 	// Fallback to the longest common prefix logic
 	names := make([]string, 0, len(profiles))
 	for _, profile := range profiles {
@@ -57,7 +107,12 @@ func findModuleName(profiles []*cover.Profile, cfg *config.Config) string {
 	return longestCommonPrefix(names)
 }
 
-func normalizeNames(profiles []*cover.Profile, cfg *config.Config) {
+// NormalizeNames strips the Go module prefix from each profile's FileName so
+// downstream reporting (tables, JSON/YAML, --inspect headers) uses the same
+// short, module-relative paths. CollectResults no longer normalizes names
+// itself; call NormalizeNames exactly once per profile set before handing
+// the profiles to CollectResults or the --inspect path.
+func NormalizeNames(profiles []*cover.Profile, cfg *config.Config) {
 	moduleName := findModuleName(profiles, cfg)
 	for _, profile := range profiles {
 		profile.FileName = strings.Replace(profile.FileName, moduleName, "", 1)

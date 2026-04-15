@@ -13,6 +13,40 @@ import (
 	"github.com/mach6/go-covercheck/pkg/history"
 )
 
+// getHistoryTableStyle returns the appropriate table.Style for history tables.
+func getHistoryTableStyle(cfg *config.Config) table.Style {
+	return table.Style{
+		Name:  "Custom",
+		Box:   boxStyleFor(cfg.TableStyle),
+		Color: table.ColorOptionsDefault,
+		Format: table.FormatOptions{
+			Footer:       text.FormatDefault,
+			FooterAlign:  text.AlignRight,
+			FooterVAlign: text.VAlignDefault,
+			Header:       text.FormatUpper,
+			HeaderAlign:  text.AlignCenter,
+			HeaderVAlign: text.VAlignDefault,
+			Row:          text.FormatDefault,
+			RowAlign:     text.AlignRight,
+			RowVAlign:    text.VAlignDefault,
+		},
+		HTML: table.DefaultHTMLOptions,
+		Options: table.Options{
+			DoNotColorBordersAndSeparators: false,
+			DrawBorder:                     true,
+			SeparateColumns:                true,
+			SeparateFooter:                 true,
+			SeparateHeader:                 true,
+			SeparateRows:                   true,
+		},
+		Size: table.SizeOptions{
+			WidthMax: cfg.TerminalWidth,
+			WidthMin: 0,
+		},
+		Title: table.TitleOptionsDefault,
+	}
+}
+
 // CompareHistory shows the comparison output for a ref: and the results.
 func CompareHistory(ref string, refEntry *history.Entry, results compute.Results) {
 	fmt.Printf("\n≡ Comparing against ref: %s [commit %s]\n",
@@ -29,6 +63,7 @@ func CompareHistory(ref string, refEntry *history.Entry, results compute.Results
 	}
 }
 
+//nolint:dupl,gocognit,cyclop // structurally parallel to compareByFile but operates on different types
 func compareByPackage(results compute.Results, refEntry *history.Entry) bool {
 	// ByPackage
 	bPrintedPkg := false
@@ -37,8 +72,14 @@ func compareByPackage(results compute.Results, refEntry *history.Entry) bool {
 			if curr.Package == prev.Package { //nolint:nestif
 				s, ss := formatDelta(curr.StatementPercentage - prev.StatementPercentage)
 				b, sb := formatDelta(curr.BlockPercentage - prev.BlockPercentage)
+				// Handle case where historical data might not have line coverage
+				// Only show line comparison if historical data has line coverage fields
+				l, sl := "", false
+				if prev.Lines != "" {
+					l, sl = formatDelta(curr.LinePercentage - prev.LinePercentage)
+				}
 				f, sf := formatDelta(curr.FunctionPercentage - prev.FunctionPercentage)
-				if ss || sb || sf {
+				if ss || sb || sl || sf {
 					if !bPrintedPkg {
 						fmt.Printf(" → By Package\n")
 						bPrintedPkg = true
@@ -51,6 +92,10 @@ func compareByPackage(results compute.Results, refEntry *history.Entry) bool {
 					if sb {
 						compareShowB()
 						fmt.Printf("%s [%s]\n", curr.Package, b)
+					}
+					if sl {
+						compareShowL()
+						fmt.Printf("%s [%s]\n", curr.Package, l)
 					}
 					if sf {
 						compareShowF()
@@ -68,9 +113,16 @@ func compareByTotal(results compute.Results, refEntry *history.Entry) bool {
 	bPrintedTotal := false
 	deltaS, okS := formatDelta(results.ByTotal.Statements.Percentage - refEntry.Results.ByTotal.Statements.Percentage)
 	deltaB, okB := formatDelta(results.ByTotal.Blocks.Percentage - refEntry.Results.ByTotal.Blocks.Percentage)
+	// Handle case where historical data might not have line coverage
+	// Only show line comparison if historical data has line coverage fields
+	deltaL, okL := "", false
+	if refEntry.Results.ByTotal.Lines.Coverage != "" {
+		deltaL, okL = formatDelta(results.ByTotal.Lines.Percentage - refEntry.Results.ByTotal.Lines.Percentage)
+	}
+
 	deltaF, okF := formatDelta(results.ByTotal.Functions.Percentage - refEntry.Results.ByTotal.Functions.Percentage)
 
-	if okS || okB || okF {
+	if okS || okB || okL || okF {
 		fmt.Printf(" → By Total\n")
 		bPrintedTotal = true
 		if okS {
@@ -81,6 +133,10 @@ func compareByTotal(results compute.Results, refEntry *history.Entry) bool {
 			compareShowB()
 			fmt.Printf("total [%s]\n", deltaB)
 		}
+		if okL {
+			compareShowL()
+			fmt.Printf("total [%s]\n", deltaL)
+		}
 		if okF {
 			compareShowF()
 			fmt.Printf("total [%s]\n", deltaF)
@@ -89,6 +145,7 @@ func compareByTotal(results compute.Results, refEntry *history.Entry) bool {
 	return bPrintedTotal
 }
 
+//nolint:dupl,gocognit,cyclop // structurally parallel to compareByPackage but operates on different types
 func compareByFile(results compute.Results, refEntry *history.Entry) bool {
 	// ByFile
 	bPrintedFile := false
@@ -97,8 +154,14 @@ func compareByFile(results compute.Results, refEntry *history.Entry) bool {
 			if curr.File == prev.File { //nolint:nestif
 				s, ss := formatDelta(curr.StatementPercentage - prev.StatementPercentage)
 				b, sb := formatDelta(curr.BlockPercentage - prev.BlockPercentage)
+				// Handle case where historical data might not have line coverage
+				// Only show line comparison if historical data has line coverage fields
+				l, sl := "", false
+				if prev.Lines != "" {
+					l, sl = formatDelta(curr.LinePercentage - prev.LinePercentage)
+				}
 				f, sf := formatDelta(curr.FunctionPercentage - prev.FunctionPercentage)
-				if ss || sb || sf {
+				if ss || sb || sl || sf {
 					if !bPrintedFile {
 						fmt.Printf(" → By File\n")
 						bPrintedFile = true
@@ -111,6 +174,10 @@ func compareByFile(results compute.Results, refEntry *history.Entry) bool {
 					if sb {
 						compareShowB()
 						fmt.Printf("%s [%s]\n", curr.File, b)
+					}
+					if sl {
+						compareShowL()
+						fmt.Printf("%s [%s]\n", curr.File, l)
 					}
 					if sf {
 						compareShowF()
@@ -137,38 +204,7 @@ func ShowHistory(h *history.History, limit int, cfg *config.Config) {
 
 	t := table.NewWriter()
 	t.SetOutputMirror(os.Stdout)
-	t.SetStyle(
-		table.Style{
-			Name:  "Custom",
-			Box:   table.StyleBoxLight,
-			Color: table.ColorOptionsDefault,
-			Format: table.FormatOptions{
-				Footer:       text.FormatDefault,
-				FooterAlign:  text.AlignRight,
-				FooterVAlign: text.VAlignDefault,
-				Header:       text.FormatUpper,
-				HeaderAlign:  text.AlignCenter,
-				HeaderVAlign: text.VAlignDefault,
-				Row:          text.FormatDefault,
-				RowAlign:     text.AlignRight,
-				RowVAlign:    text.VAlignDefault,
-			},
-			HTML: table.DefaultHTMLOptions,
-			Options: table.Options{
-				DoNotColorBordersAndSeparators: false,
-				DrawBorder:                     true,
-				SeparateColumns:                true,
-				SeparateFooter:                 true,
-				SeparateHeader:                 true,
-				SeparateRows:                   true,
-			},
-			Size: table.SizeOptions{
-				WidthMax: cfg.TerminalWidth,
-				WidthMin: 0,
-			},
-			Title: table.TitleOptionsDefault,
-		},
-	)
+	t.SetStyle(getHistoryTableStyle(cfg))
 
 	t.AppendHeader(table.Row{"Timestamp", "Commit", "Branch", "Tags", "Label", "Coverage"})
 
@@ -188,19 +224,28 @@ func ShowHistory(h *history.History, limit int, cfg *config.Config) {
 			entry.Results.ByTotal.Statements.Threshold)
 		blockColor := severityColor(entry.Results.ByTotal.Blocks.Percentage,
 			entry.Results.ByTotal.Blocks.Threshold)
+		lineColor := severityColor(entry.Results.ByTotal.Lines.Percentage,
+			entry.Results.ByTotal.Lines.Threshold)
 		funcColor := severityColor(entry.Results.ByTotal.Functions.Percentage,
 			entry.Results.ByTotal.Functions.Threshold)
 
 		wrapTextWidth := 20
+
+		// Build coverage display string - functions always shown, lines shown only if data exists
+		coverageDisplay := stmtColor(fmt.Sprintf("%-7s", entry.Results.ByTotal.Statements.Coverage)) + " [S]\n" +
+			blockColor(fmt.Sprintf("%-7s", entry.Results.ByTotal.Blocks.Coverage)) + " [B]\n" +
+			funcColor(fmt.Sprintf("%-7s", entry.Results.ByTotal.Functions.Coverage)) + " [F]"
+		if entry.Results.ByTotal.Lines.Coverage != "" {
+			coverageDisplay += "\n" + lineColor(fmt.Sprintf("%-7s", entry.Results.ByTotal.Lines.Coverage)) + " [L]"
+		}
+
 		t.AppendRow(table.Row{
 			fmt.Sprintf("%-10s", entry.Timestamp.Format("2006-01-02")),
 			fmt.Sprintf("%-7s", entry.Commit[:7]),
 			fmt.Sprintf("%-15s", entry.Branch),
 			fmt.Sprintf("%-15s", wrapText(strings.Join(entry.Tags, ", "), wrapTextWidth)),
 			wrapText(fmt.Sprintf("%-15s", entry.Label), wrapTextWidth),
-			stmtColor(fmt.Sprintf("%-7s", entry.Results.ByTotal.Statements.Coverage)) + " [S]\n" +
-				blockColor(fmt.Sprintf("%-7s", entry.Results.ByTotal.Blocks.Coverage)) + " [B]\n" +
-				funcColor(fmt.Sprintf("%-7s", entry.Results.ByTotal.Functions.Coverage)) + " [F]",
+			coverageDisplay,
 		})
 	}
 
@@ -251,6 +296,10 @@ func compareShowS() {
 
 func compareShowB() {
 	fmt.Printf("    [%s] ", color.New(color.FgHiMagenta).Sprint("B"))
+}
+
+func compareShowL() {
+	fmt.Printf("    [%s] ", color.New(color.FgYellow).Sprint("L"))
 }
 
 func compareShowF() {
