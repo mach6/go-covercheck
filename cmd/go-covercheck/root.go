@@ -127,7 +127,8 @@ const (
 
 	InspectFileFlag      = "inspect-file"
 	InspectFileFlagShort = "F"
-	InspectFileFlagUsage = "show uncovered source code for specific file (implies --inspect)"
+	InspectFileFlagUsage = "show uncovered source code for a specific file; match is exact path, " +
+		"basename, or path-boundary suffix (implies --inspect)"
 
 	InspectContextFlag      = "inspect-context"
 	InspectContextFlagShort = "P"
@@ -273,12 +274,12 @@ func showCoverage(args []string, cfg *config.Config) (compute.Results, bool, err
 	if err != nil {
 		return compute.Results{}, false, err
 	}
+	// Normalize filenames once up front so skip regexes, diff-from filtering,
+	// per-file/per-package threshold overrides, the tabular/structured
+	// reporting path, and --inspect/--inspect-file matching all operate on
+	// the same module-relative paths.
+	compute.NormalizeNames(profiles, cfg)
 	filtered := filters.FilterProfiles(profiles, cfg)
-
-	// Normalize filenames once up front so the inspect path, the regular
-	// tabular/structured reporting path, and --inspect-file substring
-	// matching all operate on the same module-relative paths.
-	compute.NormalizeNames(filtered, cfg)
 
 	// If inspecting uncovered lines, handle that separately
 	if cfg.Inspect {

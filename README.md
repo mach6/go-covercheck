@@ -199,7 +199,7 @@ Flags:
       --init                              create a sample .go-covercheck.yml config file in the current directory
   -U, --inspect                           show uncovered source code
   -P, --inspect-context int               additional context lines to show around uncovered source code (default 2)
-  -F, --inspect-file stringArray          show uncovered source code for specific file (implies --inspect)
+  -F, --inspect-file stringArray          show uncovered source code for a specific file; match is exact path, basename, or path-boundary suffix (implies --inspect)
   -l, --label string                      optional label name for history entry
   -n, --line-threshold float              global line threshold to enforce [0=disabled] (default 50)
   -L, --limit-history int                 limit number of historical entries to save or display [0=no limit]
@@ -306,8 +306,8 @@ the coverage table. This is helpful when you want to see *exactly* what code nee
 # Show uncovered code for all files in the coverage profile
 go-covercheck --inspect coverage.out
 
-# Limit to specific files (substring match; implies --inspect)
-go-covercheck --inspect-file pkg/compute coverage.out
+# Limit to specific files (exact path, basename, or path-boundary suffix; implies --inspect)
+go-covercheck --inspect-file pkg/compute/compute.go coverage.out
 
 # Show more context lines around each uncovered block (default 2)
 go-covercheck --inspect --inspect-context 5 coverage.out
