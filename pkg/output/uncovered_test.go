@@ -272,6 +272,30 @@ func testFunc() {
 	}
 }
 
+func TestMatchesInspectFile(t *testing.T) {
+	tests := []struct {
+		name     string
+		profile  string
+		pattern  string
+		expected bool
+	}{
+		{"empty pattern", "pkg/foo.go", "", false},
+		{"exact match", "pkg/foo.go", "pkg/foo.go", true},
+		{"basename match", "github.com/acme/mod/pkg/foo.go", "foo.go", true},
+		{"boundary suffix", "github.com/acme/mod/pkg/foo.go", "pkg/foo.go", true},
+		{"no substring false positive", "github.com/acme/mod/pkg/barfoo.go", "foo.go", false},
+		{"windows profile path exact", `C:\repo\pkg\foo.go`, `C:\repo\pkg\foo.go`, true},
+		{"windows profile, forward-slash pattern boundary", `C:\repo\pkg\foo.go`, "pkg/foo.go", true},
+		{"forward-slash profile, windows pattern boundary", "github.com/acme/mod/pkg/foo.go", `pkg\foo.go`, true},
+		{"windows both sides basename", `C:\repo\pkg\foo.go`, "foo.go", true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			require.Equal(t, tt.expected, output.MatchesInspectFile(tt.profile, tt.pattern))
+		})
+	}
+}
+
 func TestInspectUncoveredLines_DarkStyle(t *testing.T) {
 	restoreNoColor(t)
 	// Create a test file

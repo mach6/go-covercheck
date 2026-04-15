@@ -8,6 +8,7 @@ var (
 	GetHistoryTableStyle = getHistoryTableStyle
 	TrimWithEllipsis     = trimWithEllipsis
 	ApplyTableWidths     = applyTableWidths
+	MatchesInspectFile   = matchesInspectFile
 )
 
 const FixedColumnWidth = fixedColumnWidth
