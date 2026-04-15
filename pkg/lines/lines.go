@@ -7,7 +7,6 @@ package lines
 import (
 	"bufio"
 	"os"
-	"path/filepath"
 	"slices"
 	"strconv"
 	"strings"
@@ -213,18 +212,18 @@ func ReadSourceFile(fileName string) ([]string, error) {
 		return lines, nil
 	}
 	// Coverage data often has full package paths; try successively shorter
-	// suffixes of the path relative to the current directory. Normalize to
-	// forward slashes so Windows-style paths (\) are handled too.
-	normalized := filepath.ToSlash(fileName)
+	// suffixes of the path relative to the current directory. Normalize
+	// backslashes to forward slashes regardless of runtime OS — filepath.ToSlash
+	// is a no-op on Linux builds, so profiles written on Windows would escape
+	// suffix lookup otherwise. Joining with "/" also avoids filepath.Join's
+	// drive-relative surprise on paths like "C:/Users/..." where
+	// Join("C:", "Users", ...) yields "C:Users\..." instead of "C:\Users\...".
+	normalized := strings.ReplaceAll(fileName, `\`, "/")
 	if !strings.Contains(normalized, "/") {
 		return nil, os.ErrNotExist
 	}
 	parts := strings.Split(normalized, "/")
 	for i := range parts {
-		// Join with "/" (OSes accept it as a separator, including Windows) to
-		// avoid filepath.Join's drive-relative surprise on Windows paths like
-		// "C:/Users/..." where Join("C:", "Users", ...) produces "C:Users\..."
-		// instead of "C:\Users\...".
 		if lines, err := readFileLines(strings.Join(parts[i:], "/")); err == nil {
 			return lines, nil
 		}
