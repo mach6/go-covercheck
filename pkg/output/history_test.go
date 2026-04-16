@@ -33,12 +33,15 @@ func TestCompareHistory(t *testing.T) {
  → By File
     [S] github.com/mach6/go-covercheck/pkg/math/math.go [−25.0%]
     [B] github.com/mach6/go-covercheck/pkg/math/math.go [−25.0%]
+    [F] github.com/mach6/go-covercheck/pkg/math/math.go [+100.0%]
  → By Package
     [S] github.com/mach6/go-covercheck/pkg/math [−25.0%]
     [B] github.com/mach6/go-covercheck/pkg/math [−25.0%]
+    [F] github.com/mach6/go-covercheck/pkg/math [+100.0%]
  → By Total
     [S] total [+22.2%]
     [B] total [+26.8%]
+    [F] total [+100.0%]
 `, stdout)
 }
 
@@ -55,6 +58,7 @@ func TestShowHistory(t *testing.T) {
 ├────────────┼─────────┼─────────────────┼─────────────────┼─────────────────┼─────────────┤
 │ 2025-07-18 │ e402629 │ main            │                 │                 │ 180/648 [S] │
 │            │         │                 │                 │                 │ 95/409  [B] │
+│            │         │                 │                 │                 │         [F] │
 └────────────┴─────────┴─────────────────┴─────────────────┴─────────────────┴─────────────┘
 ≡ Showing last 1 history entry
 `, stdout)

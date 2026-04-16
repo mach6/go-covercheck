@@ -25,9 +25,11 @@ const (
 	SortByStatements       = "statements"
 	SortByBlocks           = "blocks"
 	SortByLines            = "lines"
+	SortByFunctions        = "functions"
 	SortByStatementPercent = "statement-percent"
 	SortByBlockPercent     = "block-percent"
 	SortByLinePercent      = "line-percent"
+	SortByFunctionPercent  = "function-percent"
 	SortByDefault          = SortByFile
 
 	SortOrderAsc     = "asc"
@@ -65,6 +67,10 @@ const (
 	LineThresholdOff     = thresholdOff
 	LineThresholdMax     = thresholdMax
 
+	FunctionThresholdDefault = 60
+	FunctionThresholdOff     = thresholdOff
+	FunctionThresholdMax     = thresholdMax
+
 	// InspectContextDefault is the default number of context lines shown around
 	// uncovered blocks by --inspect.
 	InspectContextDefault = 2
@@ -83,16 +89,18 @@ const (
 	StatementsSection = "statements"
 	BlocksSection     = "blocks"
 	LinesSection      = "lines"
+	FunctionsSection  = "functions"
 )
 
 // PerOverride holds override per thresholds.
 type PerOverride map[string]float64
 
-// PerThresholdOverride holds PerOverride's for Statements, Blocks, and Lines.
+// PerThresholdOverride holds PerOverride's for Statements, Blocks, Lines, and Functions.
 type PerThresholdOverride struct {
 	Statements PerOverride `yaml:"statements"`
 	Blocks     PerOverride `yaml:"blocks"`
 	Lines      PerOverride `yaml:"lines"`
+	Functions  PerOverride `yaml:"functions"`
 }
 
 // Config for application.
@@ -100,6 +108,7 @@ type Config struct {
 	StatementThreshold float64              `yaml:"statementThreshold,omitempty"`
 	BlockThreshold     float64              `yaml:"blockThreshold,omitempty"`
 	LineThreshold      float64              `yaml:"lineThreshold,omitempty"`
+	FunctionThreshold  float64              `yaml:"functionThreshold,omitempty"`
 	SortBy             string               `yaml:"sortBy,omitempty"`
 	SortOrder          string               `yaml:"sortOrder,omitempty"`
 	Skip               []string             `yaml:"skip,omitempty"`
@@ -147,6 +156,7 @@ func (c *Config) ApplyDefaults() {
 	c.StatementThreshold = StatementThresholdDefault
 	c.BlockThreshold = BlockThresholdDefault
 	c.LineThreshold = LineThresholdDefault
+	c.FunctionThreshold = FunctionThresholdDefault
 	c.SortBy = SortByDefault
 	c.SortOrder = SortOrderDefault
 	c.Skip = []string{}
@@ -158,7 +168,7 @@ func (c *Config) ApplyDefaults() {
 
 	c.initPerFileWhenNil()
 	c.initPerPackageWhenNil()
-	c.setTotalThresholds(StatementThresholdDefault, BlockThresholdDefault, LineThresholdDefault)
+	c.setTotalThresholds(StatementThresholdDefault, BlockThresholdDefault, LineThresholdDefault, FunctionThresholdDefault)
 }
 
 // Validate the config or return an error if it is not valid.
@@ -172,6 +182,9 @@ func (c *Config) Validate() error { //nolint:cyclop
 	if c.LineThreshold < LineThresholdOff || c.LineThreshold > LineThresholdMax {
 		return errors.New("line threshold must be between 0 and 100")
 	}
+	if c.FunctionThreshold < FunctionThresholdOff || c.FunctionThreshold > FunctionThresholdMax {
+		return errors.New("function threshold must be between 0 and 100")
+	}
 	if c.InspectContext < 0 {
 		return errors.New("inspect-context must be greater than or equal to 0")
 	}
@@ -184,13 +197,13 @@ func (c *Config) Validate() error { //nolint:cyclop
 	}
 
 	switch c.SortBy {
-	case SortByFile, SortByStatements, SortByBlocks, SortByLines,
-		SortByStatementPercent, SortByBlockPercent, SortByLinePercent:
+	case SortByFile, SortByStatements, SortByBlocks, SortByLines, SortByFunctions,
+		SortByStatementPercent, SortByBlockPercent, SortByLinePercent, SortByFunctionPercent:
 		break
 	default:
-		return fmt.Errorf("sort-by must be one of %s|%s|%s|%s|%s|%s|%s",
-			SortByFile, SortByStatements, SortByBlocks, SortByLines,
-			SortByStatementPercent, SortByBlockPercent, SortByLinePercent)
+		return fmt.Errorf("sort-by must be one of %s|%s|%s|%s|%s|%s|%s|%s|%s",
+			SortByFile, SortByStatements, SortByBlocks, SortByLines, SortByFunctions,
+			SortByStatementPercent, SortByBlockPercent, SortByLinePercent, SortByFunctionPercent)
 	}
 
 	switch c.SortOrder {
@@ -226,7 +239,7 @@ func (c *Config) Validate() error { //nolint:cyclop
 
 	c.initPerFileWhenNil()
 	c.initPerPackageWhenNil()
-	c.setTotalThresholds(c.StatementThreshold, c.BlockThreshold, c.LineThreshold)
+	c.setTotalThresholds(c.StatementThreshold, c.BlockThreshold, c.LineThreshold, c.FunctionThreshold)
 
 	return nil
 }
@@ -241,6 +254,9 @@ func (c *Config) initPerFileWhenNil() {
 	if c.PerFile.Lines == nil {
 		c.PerFile.Lines = PerOverride{}
 	}
+	if c.PerFile.Functions == nil {
+		c.PerFile.Functions = PerOverride{}
+	}
 }
 
 func (c *Config) initPerPackageWhenNil() {
@@ -253,9 +269,12 @@ func (c *Config) initPerPackageWhenNil() {
 	if c.PerPackage.Lines == nil {
 		c.PerPackage.Lines = PerOverride{}
 	}
+	if c.PerPackage.Functions == nil {
+		c.PerPackage.Functions = PerOverride{}
+	}
 }
 
-func (c *Config) setTotalThresholds(totalStatement, totalBlock, totalLine float64) {
+func (c *Config) setTotalThresholds(totalStatement, totalBlock, totalLine, totalFunction float64) {
 	if c.Total == nil {
 		c.Total = PerOverride{}
 	}
@@ -267,5 +286,8 @@ func (c *Config) setTotalThresholds(totalStatement, totalBlock, totalLine float6
 	}
 	if _, exists := c.Total[LinesSection]; !exists {
 		c.Total[LinesSection] = totalLine
+	}
+	if _, exists := c.Total[FunctionsSection]; !exists {
+		c.Total[FunctionsSection] = totalFunction
 	}
 }
