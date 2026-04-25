@@ -1,0 +1,32 @@
+# Example GitHub Action Workflow using go-covercheck
+
+name: Coverage Check
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  coverage:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.24'
+
+      - name: Run tests with coverage
+        run: go test -v -coverprofile=coverage.out ./...
+
+      - name: Run coverage check
+        uses: mach6/go-covercheck@v1
+        with:
+          coverage-file: coverage.out
+          statement-threshold: "80"
+          block-threshold: "70"
