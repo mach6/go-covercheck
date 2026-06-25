@@ -18,12 +18,15 @@ const (
       "statementCoverage": "150/150",
       "blockCoverage": "1/1",
       "lineCoverage": "11/11",
+      "functionCoverage": "0/0",
       "statementPercentage": 100,
       "blockPercentage": 100,
       "linePercentage": 100,
-      "statementThreshold": 0,
-      "blockThreshold": 0,
-      "lineThreshold": 0,
+      "functionPercentage": 100,
+      "statementThreshold": 70,
+      "blockThreshold": 50,
+      "lineThreshold": 50,
+      "functionThreshold": 60,
       "failed": false,
       "file": "foo"
     }
@@ -33,12 +36,15 @@ const (
       "statementCoverage": "150/150",
       "blockCoverage": "1/1",
       "lineCoverage": "11/11",
+      "functionCoverage": "0/0",
       "statementPercentage": 100,
       "blockPercentage": 100,
       "linePercentage": 100,
-      "statementThreshold": 0,
-      "blockThreshold": 0,
-      "lineThreshold": 0,
+      "functionPercentage": 100,
+      "statementThreshold": 70,
+      "blockThreshold": 50,
+      "lineThreshold": 50,
+      "functionThreshold": 60,
       "failed": false,
       "package": "."
     }
@@ -46,19 +52,25 @@ const (
   "byTotal": {
     "statements": {
       "coverage": "150/150",
-      "threshold": 0,
+      "threshold": 70,
       "percentage": 100,
       "failed": false
     },
     "blocks": {
       "coverage": "1/1",
-      "threshold": 0,
+      "threshold": 50,
+      "percentage": 100,
+      "failed": false
+    },
+    "functions": {
+      "coverage": "0/0",
+      "threshold": 60,
       "percentage": 100,
       "failed": false
     },
     "lines": {
       "coverage": "11/11",
-      "threshold": 0,
+      "threshold": 50,
       "percentage": 100,
       "failed": false
     }
@@ -69,40 +81,51 @@ const (
     - statementCoverage: 150/150
       blockCoverage: 1/1
       lineCoverage: 11/11
+      functionCoverage: 0/0
       statementPercentage: 100
       blockPercentage: 100
       linePercentage: 100
-      statementThreshold: 0
-      blockThreshold: 0
-      lineThreshold: 0
+      functionPercentage: 100
+      statementThreshold: 70
+      blockThreshold: 50
+      lineThreshold: 50
+      functionThreshold: 60
       failed: false
       file: foo
 byPackage:
     - statementCoverage: 150/150
       blockCoverage: 1/1
       lineCoverage: 11/11
+      functionCoverage: 0/0
       statementPercentage: 100
       blockPercentage: 100
       linePercentage: 100
-      statementThreshold: 0
-      blockThreshold: 0
-      lineThreshold: 0
+      functionPercentage: 100
+      statementThreshold: 70
+      blockThreshold: 50
+      lineThreshold: 50
+      functionThreshold: 60
       failed: false
       package: .
 byTotal:
     statements:
         coverage: 150/150
-        threshold: 0
+        threshold: 70
         percentage: 100
         failed: false
     blocks:
         coverage: 1/1
-        threshold: 0
+        threshold: 50
+        percentage: 100
+        failed: false
+    functions:
+        coverage: 0/0
+        threshold: 60
         percentage: 100
         failed: false
     lines:
         coverage: 11/11
-        threshold: 0
+        threshold: 50
         percentage: 100
         failed: false
 `
@@ -146,7 +169,9 @@ func TestModelMarshalYaml(t *testing.T) {
 		},
 	}
 
-	r, _ := compute.CollectResults(profiles, new(config.Config))
+	cfg := new(config.Config)
+	cfg.ApplyDefaults()
+	r, _ := compute.CollectResults(profiles, cfg)
 	out, err := yaml.Marshal(r)
 	require.NoError(t, err)
 	require.NotEmpty(t, out)
@@ -171,7 +196,9 @@ func TestModelMarshalJson(t *testing.T) {
 		},
 	}
 
-	r, _ := compute.CollectResults(profiles, new(config.Config))
+	cfg := new(config.Config)
+	cfg.ApplyDefaults()
+	r, _ := compute.CollectResults(profiles, cfg)
 	out, err := json.MarshalIndent(r, "", "  ")
 	require.NoError(t, err)
 	require.NotEmpty(t, out)

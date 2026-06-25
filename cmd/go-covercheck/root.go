@@ -64,6 +64,14 @@ const (
 	TotalLineThresholdFlagShort = "N"
 	TotalLineThresholdFlagUsage = "total line threshold to enforce [0=disabled]"
 
+	FunctionThresholdFlag      = "function-threshold"
+	FunctionThresholdFlagShort = "g"
+	FunctionThresholdFlagUsage = "global function threshold to enforce [0=disabled]"
+
+	TotalFunctionThresholdFlag      = "total-function-threshold"
+	TotalFunctionThresholdFlagShort = "G"
+	TotalFunctionThresholdFlagUsage = "total function threshold to enforce [0=disabled]"
+
 	SortByFlag    = "sort-by"
 	SortOrderFlag = "sort-order"
 
@@ -171,14 +179,16 @@ var (
 	)
 
 	SortByFlagUsage = fmt.Sprintf(
-		"sort-by [%s|%s|%s|%s|%s|%s|%s]",
+		"sort-by [%s|%s|%s|%s|%s|%s|%s|%s|%s]",
 		config.SortByFile,
 		config.SortByBlocks,
 		config.SortByStatements,
 		config.SortByLines,
+		config.SortByFunctions,
 		config.SortByStatementPercent,
 		config.SortByBlockPercent,
 		config.SortByLinePercent,
+		config.SortByFunctionPercent,
 	)
 
 	SortOrderFlagUsage = fmt.Sprintf("sort order [%s|%s]",
@@ -479,9 +489,11 @@ func applyConfigOverrides(cfg *config.Config, cmd *cobra.Command, noConfigFile b
 	applyFloat64FlagOverride(cmd, StatementThresholdFlag, &cfg.StatementThreshold, noConfigFile)
 	applyFloat64FlagOverride(cmd, BlockThresholdFlag, &cfg.BlockThreshold, noConfigFile)
 	applyFloat64FlagOverride(cmd, LineThresholdFlag, &cfg.LineThreshold, noConfigFile)
+	applyFloat64FlagOverride(cmd, FunctionThresholdFlag, &cfg.FunctionThreshold, noConfigFile)
 	applyFloat64TotalFlagOverride(cmd, TotalStatementThresholdFlag, config.StatementsSection, cfg.Total)
 	applyFloat64TotalFlagOverride(cmd, TotalBlockThresholdFlag, config.BlocksSection, cfg.Total)
 	applyFloat64TotalFlagOverride(cmd, TotalLineThresholdFlag, config.LinesSection, cfg.Total)
+	applyFloat64TotalFlagOverride(cmd, TotalFunctionThresholdFlag, config.FunctionsSection, cfg.Total)
 	applyStringFlagOverride(cmd, SortByFlag, &cfg.SortBy, noConfigFile)
 	applyStringFlagOverride(cmd, SortOrderFlag, &cfg.SortOrder, noConfigFile)
 	applyStringArrayFlagOverride(cmd, SkipFlag, &cfg.Skip, noConfigFile)
@@ -514,6 +526,10 @@ func applyConfigOverrides(cfg *config.Config, cmd *cobra.Command, noConfigFile b
 	if v, _ := cmd.Flags().GetFloat64(LineThresholdFlag); !cmd.Flags().Changed(TotalLineThresholdFlag) &&
 		cfg.Total[config.LinesSection] == config.LineThresholdDefault {
 		cfg.Total[config.LinesSection] = v
+	}
+	if v, _ := cmd.Flags().GetFloat64(FunctionThresholdFlag); !cmd.Flags().Changed(TotalFunctionThresholdFlag) &&
+		cfg.Total[config.FunctionsSection] == config.FunctionThresholdDefault {
+		cfg.Total[config.FunctionsSection] = v
 	}
 }
 
@@ -634,6 +650,13 @@ func initFlags(cmd *cobra.Command) {
 	)
 
 	cmd.Flags().Float64P(
+		FunctionThresholdFlag,
+		FunctionThresholdFlagShort,
+		config.FunctionThresholdDefault,
+		FunctionThresholdFlagUsage,
+	)
+
+	cmd.Flags().Float64P(
 		TotalStatementThresholdFlag,
 		TotalStatementThresholdFlagShort,
 		0,
@@ -652,6 +675,13 @@ func initFlags(cmd *cobra.Command) {
 		TotalLineThresholdFlagShort,
 		0,
 		TotalLineThresholdFlagUsage,
+	)
+
+	cmd.Flags().Float64P(
+		TotalFunctionThresholdFlag,
+		TotalFunctionThresholdFlagShort,
+		0,
+		TotalFunctionThresholdFlagUsage,
 	)
 
 	cmd.Flags().String(
