@@ -78,7 +78,8 @@ func compareByPackage(results compute.Results, refEntry *history.Entry) bool {
 				if prev.Lines != "" {
 					l, sl = formatDelta(curr.LinePercentage - prev.LinePercentage)
 				}
-				if ss || sb || sl {
+				f, sf := formatDelta(curr.FunctionPercentage - prev.FunctionPercentage)
+				if ss || sb || sl || sf {
 					if !bPrintedPkg {
 						fmt.Printf(" → By Package\n")
 						bPrintedPkg = true
@@ -95,6 +96,10 @@ func compareByPackage(results compute.Results, refEntry *history.Entry) bool {
 					if sl {
 						compareShowL()
 						fmt.Printf("%s [%s]\n", curr.Package, l)
+					}
+					if sf {
+						compareShowF()
+						fmt.Printf("%s [%s]\n", curr.Package, f)
 					}
 				}
 			}
@@ -115,7 +120,9 @@ func compareByTotal(results compute.Results, refEntry *history.Entry) bool {
 		deltaL, okL = formatDelta(results.ByTotal.Lines.Percentage - refEntry.Results.ByTotal.Lines.Percentage)
 	}
 
-	if okS || okB || okL {
+	deltaF, okF := formatDelta(results.ByTotal.Functions.Percentage - refEntry.Results.ByTotal.Functions.Percentage)
+
+	if okS || okB || okL || okF {
 		fmt.Printf(" → By Total\n")
 		bPrintedTotal = true
 		if okS {
@@ -129,6 +136,10 @@ func compareByTotal(results compute.Results, refEntry *history.Entry) bool {
 		if okL {
 			compareShowL()
 			fmt.Printf("total [%s]\n", deltaL)
+		}
+		if okF {
+			compareShowF()
+			fmt.Printf("total [%s]\n", deltaF)
 		}
 	}
 	return bPrintedTotal
@@ -149,7 +160,8 @@ func compareByFile(results compute.Results, refEntry *history.Entry) bool {
 				if prev.Lines != "" {
 					l, sl = formatDelta(curr.LinePercentage - prev.LinePercentage)
 				}
-				if ss || sb || sl {
+				f, sf := formatDelta(curr.FunctionPercentage - prev.FunctionPercentage)
+				if ss || sb || sl || sf {
 					if !bPrintedFile {
 						fmt.Printf(" → By File\n")
 						bPrintedFile = true
@@ -166,6 +178,10 @@ func compareByFile(results compute.Results, refEntry *history.Entry) bool {
 					if sl {
 						compareShowL()
 						fmt.Printf("%s [%s]\n", curr.File, l)
+					}
+					if sf {
+						compareShowF()
+						fmt.Printf("%s [%s]\n", curr.File, f)
 					}
 				}
 			}
@@ -210,12 +226,15 @@ func ShowHistory(h *history.History, limit int, cfg *config.Config) {
 			entry.Results.ByTotal.Blocks.Threshold)
 		lineColor := severityColor(entry.Results.ByTotal.Lines.Percentage,
 			entry.Results.ByTotal.Lines.Threshold)
+		funcColor := severityColor(entry.Results.ByTotal.Functions.Percentage,
+			entry.Results.ByTotal.Functions.Threshold)
 
 		wrapTextWidth := 20
 
-		// Build coverage display string - show line coverage only if data exists
+		// Build coverage display string - functions always shown, lines shown only if data exists
 		coverageDisplay := stmtColor(fmt.Sprintf("%-7s", entry.Results.ByTotal.Statements.Coverage)) + " [S]\n" +
-			blockColor(fmt.Sprintf("%-7s", entry.Results.ByTotal.Blocks.Coverage)) + " [B]"
+			blockColor(fmt.Sprintf("%-7s", entry.Results.ByTotal.Blocks.Coverage)) + " [B]\n" +
+			funcColor(fmt.Sprintf("%-7s", entry.Results.ByTotal.Functions.Coverage)) + " [F]"
 		if entry.Results.ByTotal.Lines.Coverage != "" {
 			coverageDisplay += "\n" + lineColor(fmt.Sprintf("%-7s", entry.Results.ByTotal.Lines.Coverage)) + " [L]"
 		}
@@ -281,4 +300,8 @@ func compareShowB() {
 
 func compareShowL() {
 	fmt.Printf("    [%s] ", color.New(color.FgYellow).Sprint("L"))
+}
+
+func compareShowF() {
+	fmt.Printf("    [%s] ", color.New(color.FgGreen).Sprint("F"))
 }

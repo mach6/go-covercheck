@@ -107,9 +107,11 @@ const (
 	colStatements     = "Statements"
 	colBlocks         = "Blocks"
 	colLines          = "Lines"
+	colFunctions      = "Functions"
 	colStatementPct   = "Statement %"
 	colBlockPct       = "Block %"
 	colLinePct        = "Line %"
+	colFunctionPct    = "Function %"
 	colUncoveredLines = "Uncovered Lines"
 )
 
@@ -190,9 +192,9 @@ func maxRenderedWidth(column string, results compute.Results) int {
 		for _, r := range results.ByPackage {
 			width = maxInt(width, displayWidth(r.Package))
 		}
-	case colStatements, colBlocks, colLines:
+	case colStatements, colBlocks, colLines, colFunctions:
 		width = maxInt(width, maxCoverageWidth(column, results))
-	case colStatementPct, colBlockPct, colLinePct:
+	case colStatementPct, colBlockPct, colLinePct, colFunctionPct:
 		// Percentages render as "%.1f" — 5 cells max ("100.0").
 		width = maxInt(width, displayWidth("100.0"))
 	}
@@ -214,6 +216,8 @@ func maxCoverageWidth(column string, results compute.Results) int {
 		width = maxInt(width, displayWidth(results.ByTotal.Blocks.Coverage))
 	case colLines:
 		width = maxInt(width, displayWidth(results.ByTotal.Lines.Coverage))
+	case colFunctions:
+		width = maxInt(width, displayWidth(results.ByTotal.Functions.Coverage))
 	}
 	return width
 }
@@ -226,6 +230,8 @@ func coverageCell(column string, by compute.By) string {
 		return by.Blocks
 	case colLines:
 		return by.Lines
+	case colFunctions:
+		return by.Functions
 	}
 	return ""
 }
@@ -248,15 +254,19 @@ func renderTable(results compute.Results, cfg *config.Config) {
 	t.SetAllowedRowLength(cfg.TerminalWidth)
 	t.SetStyle(getTableStyle(cfg))
 
-	headers := table.Row{"", "Statements", "Blocks", "Lines", "Statement %", "Block %", "Line %"}
+	headers := table.Row{
+		"", "Statements", "Blocks", "Lines", "Functions", "Statement %", "Block %", "Line %", "Function %",
+	}
 	columnConfigs := []table.ColumnConfig{
 		{Name: "", Align: text.AlignLeft, AlignFooter: text.AlignLeft},
 		{Name: "Statements", Align: text.AlignRight, AlignHeader: text.AlignLeft, AlignFooter: text.AlignRight},
 		{Name: "Blocks", Align: text.AlignRight, AlignHeader: text.AlignLeft, AlignFooter: text.AlignRight},
 		{Name: "Lines", Align: text.AlignRight, AlignHeader: text.AlignLeft, AlignFooter: text.AlignRight},
+		{Name: "Functions", Align: text.AlignRight, AlignHeader: text.AlignLeft, AlignFooter: text.AlignRight},
 		{Name: "Statement %", Align: text.AlignRight, AlignHeader: text.AlignLeft, AlignFooter: text.AlignRight},
 		{Name: "Block %", Align: text.AlignRight, AlignHeader: text.AlignLeft, AlignFooter: text.AlignRight},
 		{Name: "Line %", Align: text.AlignRight, AlignHeader: text.AlignLeft, AlignFooter: text.AlignRight},
+		{Name: "Function %", Align: text.AlignRight, AlignHeader: text.AlignLeft, AlignFooter: text.AlignRight},
 	}
 	if !cfg.NoUncoveredLines {
 		headers = append(headers, "Uncovered Lines")
@@ -285,15 +295,18 @@ func renderTable(results compute.Results, cfg *config.Config) {
 		stmtColor := severityColor(r.StatementPercentage, r.StatementThreshold)
 		blockColor := severityColor(r.BlockPercentage, r.BlockThreshold)
 		lineColor := severityColor(r.LinePercentage, r.LineThreshold)
+		functionColor := severityColor(r.FunctionPercentage, r.FunctionThreshold)
 
 		row := table.Row{
 			r.File,
 			r.Statements,
 			r.Blocks,
 			r.Lines,
+			r.Functions,
 			stmtColor(fmt.Sprintf("%.1f", r.StatementPercentage)),
 			blockColor(fmt.Sprintf("%.1f", r.BlockPercentage)),
 			lineColor(fmt.Sprintf("%.1f", r.LinePercentage)),
+			functionColor(fmt.Sprintf("%.1f", r.FunctionPercentage)),
 		}
 
 		if !cfg.NoUncoveredLines {
@@ -310,15 +323,18 @@ func renderTable(results compute.Results, cfg *config.Config) {
 		stmtColor := severityColor(r.StatementPercentage, r.StatementThreshold)
 		blockColor := severityColor(r.BlockPercentage, r.BlockThreshold)
 		lineColor := severityColor(r.LinePercentage, r.LineThreshold)
+		functionColor := severityColor(r.FunctionPercentage, r.FunctionThreshold)
 
 		row := table.Row{
 			r.Package,
 			r.Statements,
 			r.Blocks,
 			r.Lines,
+			r.Functions,
 			stmtColor(fmt.Sprintf("%.1f", r.StatementPercentage)),
 			blockColor(fmt.Sprintf("%.1f", r.BlockPercentage)),
 			lineColor(fmt.Sprintf("%.1f", r.LinePercentage)),
+			functionColor(fmt.Sprintf("%.1f", r.FunctionPercentage)),
 		}
 		if !cfg.NoUncoveredLines {
 			// Packages don't have uncovered lines, so show empty string
@@ -330,6 +346,7 @@ func renderTable(results compute.Results, cfg *config.Config) {
 	stmtColor := severityColor(results.ByTotal.Statements.Percentage, results.ByTotal.Statements.Threshold)
 	blockColor := severityColor(results.ByTotal.Blocks.Percentage, results.ByTotal.Blocks.Threshold)
 	lineColor := severityColor(results.ByTotal.Lines.Percentage, results.ByTotal.Lines.Threshold)
+	functionColor := severityColor(results.ByTotal.Functions.Percentage, results.ByTotal.Functions.Threshold)
 
 	t.AppendSeparator()
 	t.AppendRow(table.Row{text.Bold.Sprint("BY TOTAL")})
@@ -340,9 +357,11 @@ func renderTable(results compute.Results, cfg *config.Config) {
 		text.Bold.Sprint(results.ByTotal.Statements.Coverage),
 		text.Bold.Sprint(results.ByTotal.Blocks.Coverage),
 		text.Bold.Sprint(results.ByTotal.Lines.Coverage),
+		text.Bold.Sprint(results.ByTotal.Functions.Coverage),
 		stmtColor(text.Bold.Sprintf("%.1f", results.ByTotal.Statements.Percentage)),
 		blockColor(text.Bold.Sprintf("%.1f", results.ByTotal.Blocks.Percentage)),
 		lineColor(text.Bold.Sprintf("%.1f", results.ByTotal.Lines.Percentage)),
+		functionColor(text.Bold.Sprintf("%.1f", results.ByTotal.Functions.Percentage)),
 	}
 	if !cfg.NoUncoveredLines {
 		footer = append(footer, "")
