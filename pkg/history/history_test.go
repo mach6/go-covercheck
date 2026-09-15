@@ -128,10 +128,11 @@ func TestHistory_AddResults_AreSorted(t *testing.T) {
 
 	w, err := repo.Worktree()
 	require.NoError(t, err)
+	fs := w.Filesystem()
 
 	// First commit
-	filePath := w.Filesystem.Join("file1.txt")
-	f, err := w.Filesystem.Create(filePath)
+	filePath := fs.Join("file1.txt")
+	f, err := fs.Create(filePath)
 	require.NoError(t, err)
 	_, err = f.Write([]byte("content1"))
 	require.NoError(t, err)
@@ -157,8 +158,8 @@ func TestHistory_AddResults_AreSorted(t *testing.T) {
 	time.Sleep(1 * time.Second) // Ensure timestamp difference
 
 	// Second commit (new file)
-	filePath2 := w.Filesystem.Join("file2.txt")
-	f2, err := w.Filesystem.Create(filePath2)
+	filePath2 := fs.Join("file2.txt")
+	f2, err := fs.Create(filePath2)
 	require.NoError(t, err)
 	_, err = f2.Write([]byte("content2"))
 	require.NoError(t, err)
@@ -277,10 +278,11 @@ func TestCreateEntryWithDetachedHead(t *testing.T) {
 
 	w, err := repo.Worktree()
 	require.NoError(t, err)
+	fs := w.Filesystem()
 
 	// Create a file to ensure there is something to commit
-	filePath := w.Filesystem.Join("file.txt")
-	f, err := w.Filesystem.Create(filePath)
+	filePath := fs.Join("file.txt")
+	f, err := fs.Create(filePath)
 	require.NoError(t, err)
 	_, err = f.Write([]byte("content"))
 	require.NoError(t, err)
@@ -320,10 +322,11 @@ func TestCreateEntryWithTags(t *testing.T) {
 
 	w, err := repo.Worktree()
 	require.NoError(t, err)
+	fs := w.Filesystem()
 
 	// Create a file to commit (go-git does not allow empty commits)
-	filePath := w.Filesystem.Join("file.txt")
-	f, err := w.Filesystem.Create(filePath)
+	filePath := fs.Join("file.txt")
+	f, err := fs.Create(filePath)
 	require.NoError(t, err)
 	_, err = f.Write([]byte("content"))
 	require.NoError(t, err)
