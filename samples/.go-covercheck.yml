@@ -100,3 +100,25 @@ skip:
 # git reference to diff from (enables diff-only mode)
 # default "" (disabled)
 diffFrom: ""
+
+# post results as a comment on a pull/merge request
+comment:
+  # default false
+  enabled: false
+  platform:
+    # github|gitlab|gitea|gogs
+    type: github
+    # server URL for self-hosted instances; required for gogs
+    # baseUrl: https://github.example.com
+    # API token; prefer --comment-token or GITHUB_TOKEN/GITLAB_TOKEN/GITEA_TOKEN/GOGS_TOKEN
+    # token: ""
+    # owner/repo (GitLab: group/project or numeric project ID)
+    # repository: owner/repo
+    # pull/merge request number
+    # pullRequestId: 0
+    # show pass/fail with colored emoji instead of PASS/FAIL text
+    # default true
+    includeColors: true
+    # edit the previous go-covercheck comment instead of adding a new one
+    # default false
+    updateExisting: false
