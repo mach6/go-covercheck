@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -10,6 +11,7 @@ import (
 
 	"github.com/fatih/color"
 	"github.com/jedib0t/go-pretty/v6/text"
+	"github.com/mach6/go-covercheck/pkg/comment"
 	"github.com/mach6/go-covercheck/pkg/compute"
 	"github.com/mach6/go-covercheck/pkg/config"
 	"github.com/mach6/go-covercheck/pkg/filters"
@@ -140,6 +142,25 @@ const (
 		"monokai|dracula|solarized-dark|vim|emacs|...]; auto picks github or github-dark " +
 		"based on detected terminal background"
 
+	CommentFlag      = "comment"
+	CommentFlagUsage = "post coverage results as a comment on a pull/merge request"
+
+	CommentBaseURLFlag      = "comment-base-url"
+	CommentBaseURLFlagUsage = "base URL of a self-hosted platform instance (required for gogs)"
+
+	CommentTokenFlag      = "comment-token"
+	CommentTokenFlagUsage = "API token for the comment platform; defaults to $GITHUB_TOKEN, $GITLAB_TOKEN, " +
+		"$GITEA_TOKEN, or $GOGS_TOKEN"
+
+	CommentRepositoryFlag      = "comment-repository"
+	CommentRepositoryFlagUsage = "repository to comment on as owner/repo (GitLab: group/project or project ID)"
+
+	CommentPRFlag      = "comment-pr"
+	CommentPRFlagUsage = "pull/merge request number to comment on"
+
+	CommentUpdateFlag      = "comment-update"
+	CommentUpdateFlagUsage = "update the previous go-covercheck comment instead of adding a new one"
+
 	// ConfigFilePermissions permissions.
 	ConfigFilePermissions = 0600
 )
@@ -196,6 +217,10 @@ var (
 		config.FormatTSV,
 	)
 
+	CommentPlatformFlag      = "comment-platform"
+	CommentPlatformFlagUsage = fmt.Sprintf("platform to post the comment to [%s]",
+		strings.Join(config.CommentPlatforms, "|"))
+
 	SkipFlagDefault []string
 
 	rootCmd = &cobra.Command{
@@ -223,6 +248,11 @@ func run(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
+	// catch comment misconfiguration before doing any work.
+	if err := validateComment(cfg); err != nil {
+		return err
+	}
+
 	// showCoverage and get the results.
 	results, failed, err := showCoverage(args, cfg)
 	if err != nil {
@@ -239,10 +269,30 @@ func run(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
+	postComment(results, failed, cfg)
+
 	if failed {
 		os.Exit(1)
 	}
 	return nil
+}
+
+func validateComment(cfg *config.Config) error {
+	if !cfg.Comment.Enabled {
+		return nil
+	}
+	return comment.Validate(&cfg.Comment)
+}
+
+// postComment posts results when enabled. A failure is reported as a warning and does not
+// change the exit code, which depends only on coverage.
+func postComment(results compute.Results, failed bool, cfg *config.Config) {
+	if !cfg.Comment.Enabled {
+		return
+	}
+	if err := comment.Post(context.Background(), results, failed, &cfg.Comment); err != nil {
+		fmt.Fprintf(os.Stderr, "warning: failed to post coverage comment: %v\n", err)
+	}
 }
 
 func handleNonCoverageOperationsWhichShouldExit(cmd *cobra.Command, cfg *config.Config) (bool, error) {
@@ -501,6 +551,13 @@ func applyConfigOverrides(cfg *config.Config, cmd *cobra.Command, noConfigFile b
 	applyIntFlagOverride(cmd, InspectContextFlag, &cfg.InspectContext, noConfigFile)
 	applyStringFlagOverride(cmd, ModuleNameFlag, &cfg.ModuleName, noConfigFile)
 	applyStringFlagOverride(cmd, DiffFromFlag, &cfg.DiffFrom, noConfigFile)
+	applyBoolFlagOverride(cmd, CommentFlag, &cfg.Comment.Enabled, noConfigFile)
+	applyStringFlagOverride(cmd, CommentPlatformFlag, &cfg.Comment.Platform.Type, noConfigFile)
+	applyStringFlagOverride(cmd, CommentBaseURLFlag, &cfg.Comment.Platform.BaseURL, noConfigFile)
+	applyStringFlagOverride(cmd, CommentTokenFlag, &cfg.Comment.Platform.Token, noConfigFile)
+	applyStringFlagOverride(cmd, CommentRepositoryFlag, &cfg.Comment.Platform.Repository, noConfigFile)
+	applyIntFlagOverride(cmd, CommentPRFlag, &cfg.Comment.Platform.PullRequestID, noConfigFile)
+	applyBoolFlagOverride(cmd, CommentUpdateFlag, &cfg.Comment.Platform.UpdateExisting, noConfigFile)
 
 	// set cfg.Total thresholds to the global values, iff no override was specified for each.
 	if v, _ := cmd.Flags().GetFloat64(StatementThresholdFlag); !cmd.Flags().Changed(TotalStatementThresholdFlag) &&
@@ -781,6 +838,14 @@ func initFlags(cmd *cobra.Command) {
 		"",
 		DiffFromFlagUsage,
 	)
+
+	cmd.Flags().Bool(CommentFlag, false, CommentFlagUsage)
+	cmd.Flags().String(CommentPlatformFlag, "", CommentPlatformFlagUsage)
+	cmd.Flags().String(CommentBaseURLFlag, "", CommentBaseURLFlagUsage)
+	cmd.Flags().String(CommentTokenFlag, "", CommentTokenFlagUsage)
+	cmd.Flags().String(CommentRepositoryFlag, "", CommentRepositoryFlagUsage)
+	cmd.Flags().Int(CommentPRFlag, 0, CommentPRFlagUsage)
+	cmd.Flags().Bool(CommentUpdateFlag, false, CommentUpdateFlagUsage)
 }
 
 func initConfigFile(cmd *cobra.Command) error {
