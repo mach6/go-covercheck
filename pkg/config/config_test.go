@@ -226,3 +226,44 @@ func TestValidate_SyntaxStyle(t *testing.T) {
 		require.Contains(t, err.Error(), "syntax-style")
 	})
 }
+
+func TestLoad_Comment(t *testing.T) {
+	yaml := `
+comment:
+  enabled: true
+  platform:
+    type: GitLab
+    repository: group/project
+    pullRequestId: 4
+    updateExisting: true
+`
+	tmpFile := path.Join(t.TempDir(), "comment.yaml")
+	require.NoError(t, os.WriteFile(tmpFile, []byte(yaml), 0600))
+
+	cfg, err := config.Load(tmpFile)
+	require.NoError(t, err)
+	require.True(t, cfg.Comment.Enabled)
+	require.Equal(t, "gitlab", cfg.Comment.Platform.Type, "platform type is normalized to lower case")
+	require.Equal(t, "group/project", cfg.Comment.Platform.Repository)
+	require.Equal(t, 4, cfg.Comment.Platform.PullRequestID)
+	require.True(t, cfg.Comment.Platform.UpdateExisting)
+	require.True(t, cfg.Comment.Platform.IncludeColors, "includeColors defaults to true")
+}
+
+func TestLoad_CommentIncludeColorsDisabled(t *testing.T) {
+	tmpFile := path.Join(t.TempDir(), "comment.yaml")
+	require.NoError(t, os.WriteFile(tmpFile, []byte("comment:\n  platform:\n    includeColors: false\n"), 0600))
+
+	cfg, err := config.Load(tmpFile)
+	require.NoError(t, err)
+	require.False(t, cfg.Comment.Platform.IncludeColors)
+}
+
+func TestValidate_CommentPlatform(t *testing.T) {
+	cfg := &config.Config{}
+	cfg.ApplyDefaults()
+	require.NoError(t, cfg.Validate(), "no platform is valid until comments are enabled")
+
+	cfg.Comment.Platform.Type = "bitbucket"
+	require.ErrorContains(t, cfg.Validate(), "comment platform must be one of github|gitlab|gitea|gogs")
+}
