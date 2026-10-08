@@ -55,8 +55,24 @@ func isEmptyResults(results compute.Results) bool {
 		results.ByTotal.Blocks.Coverage == "0/0"
 }
 
+// report is the JSON and YAML document: the results, plus the comparison when one was requested.
+type report struct {
+	compute.Results `yaml:",inline"`
+	Comparison      *compute.Comparison `json:"comparison,omitempty" yaml:"comparison,omitempty"`
+}
+
 // FormatAndReport writes out formatted profile results.
 func FormatAndReport(results compute.Results, cfg *config.Config, hasFailure bool) {
+	FormatAndReportWithComparison(results, nil, cfg, hasFailure)
+}
+
+// FormatAndReportWithComparison writes out formatted profile results and, when comparison is not nil,
+// the comparison against history. JSON and YAML include it as a "comparison" object.
+// Other formats print it as text after the report.
+func FormatAndReportWithComparison(results compute.Results, comparison *compute.Comparison, cfg *config.Config,
+	hasFailure bool,
+) {
+	doc := report{Results: results, Comparison: comparison}
 	isEmpty := isEmptyResults(results)
 	switch cfg.Format {
 	case config.FormatTable, config.FormatMD, config.FormatHTML, config.FormatCSV, config.FormatTSV:
@@ -67,23 +83,26 @@ func FormatAndReport(results compute.Results, cfg *config.Config, hasFailure boo
 			_ = os.Stdout.Sync()
 			renderSummary(hasFailure, results, cfg)
 		}
+		if comparison != nil {
+			printComparison(comparison)
+		}
 	case config.FormatJSON:
 		if cfg.NoColor {
 			enc := json.NewEncoder(os.Stdout)
 			enc.SetIndent("", "  ")
-			err := enc.Encode(results)
+			err := enc.Encode(doc)
 			bailOnError(err)
 		} else {
-			jsonString, err := json.MarshalIndent(results, "", "  ")
+			jsonString, err := json.MarshalIndent(doc, "", "  ")
 			bailOnError(err)
 			fmt.Println(highlightJSONSyntax(string(jsonString), cfg))
 		}
 	case config.FormatYAML:
 		if cfg.NoColor {
-			err := yaml.NewEncoder(os.Stdout).Encode(results)
+			err := yaml.NewEncoder(os.Stdout).Encode(doc)
 			bailOnError(err)
 		} else {
-			yamlData, err := yaml.Marshal(results)
+			yamlData, err := yaml.Marshal(doc)
 			bailOnError(err)
 			fmt.Println(highlightYAMLSyntax(string(yamlData), cfg))
 		}

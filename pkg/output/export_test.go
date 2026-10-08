@@ -9,6 +9,9 @@ var (
 	TrimWithEllipsis     = trimWithEllipsis
 	ApplyTableWidths     = applyTableWidths
 	MatchesInspectFile   = matchesInspectFile
+	PrintComparison      = printComparison
+	WrapText             = wrapText
+	FormatDelta          = formatDelta
 )
 
 const FixedColumnWidth = fixedColumnWidth
