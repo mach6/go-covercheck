@@ -6,6 +6,7 @@ import (
 	"sort"
 
 	"github.com/mach6/go-covercheck/pkg/config"
+	"github.com/mach6/go-covercheck/pkg/functions"
 	"github.com/mach6/go-covercheck/pkg/lines"
 	"github.com/mach6/go-covercheck/pkg/math"
 
@@ -28,16 +29,22 @@ func collect(profiles []*cover.Profile, cfg *config.Config) (Results, bool) { //
 			Statements: TotalStatements{},
 			Blocks:     TotalBlocks{},
 			Lines:      TotalLines{},
+			Functions:  TotalFunctions{},
 		},
 		ByPackage: make([]ByPackage, 0),
 	}
 
 	for _, p := range profiles {
 		stmts, stmtHits, blocks, blockHits := 0, 0, 0, 0
-		// Collect blocks once per profile and reuse for line coverage and
-		// uncovered-line formatting; both walks read/parse the source file.
-		collectedBlocks := lines.CollectBlocks(p)
+		// Read the source once per profile and share it between line
+		// coverage, uncovered-line formatting, and function coverage.
+		sourceLines, readErr := lines.ReadSourceFile(p.FileName)
+		collectedBlocks := lines.CollectBlocksFromSource(p, sourceLines)
 		linesCount, lineHits := lines.CoverageFromBlocks(collectedBlocks)
+		functionCount, functionHits, fnErr := functionCoverage(p, sourceLines)
+		if w := sourceWarning(p.FileName, readErr, fnErr); w != "" {
+			results.Warnings = append(results.Warnings, w)
+		}
 
 		for _, b := range p.Blocks {
 			stmts += b.NumStmt
@@ -51,6 +58,7 @@ func collect(profiles []*cover.Profile, cfg *config.Config) (Results, bool) { //
 		stmtPct := math.Percent(stmtHits, stmts)
 		blockPct := math.Percent(blockHits, blocks)
 		linePct := math.Percent(lineHits, linesCount)
+		functionPct := math.Percent(functionHits, functionCount)
 
 		stmtThreshold := cfg.StatementThreshold
 		if t, ok := cfg.PerFile.Statements[p.FileName]; ok {
@@ -70,6 +78,12 @@ func collect(profiles []*cover.Profile, cfg *config.Config) (Results, bool) { //
 		}
 		failed = failed || linePct < lineThreshold
 
+		functionThreshold := cfg.FunctionThreshold
+		if t, ok := cfg.PerFile.Functions[p.FileName]; ok {
+			functionThreshold = t
+		}
+		failed = failed || functionPct < functionThreshold
+
 		if failed {
 			hasFailure = true
 		}
@@ -80,12 +94,15 @@ func collect(profiles []*cover.Profile, cfg *config.Config) (Results, bool) { //
 				Statements:          fmt.Sprintf("%d/%d", stmtHits, stmts),
 				Blocks:              fmt.Sprintf("%d/%d", blockHits, blocks),
 				Lines:               fmt.Sprintf("%d/%d", lineHits, linesCount),
+				Functions:           fmt.Sprintf("%d/%d", functionHits, functionCount),
 				StatementPercentage: stmtPct,
 				StatementThreshold:  stmtThreshold,
 				BlockPercentage:     blockPct,
 				BlockThreshold:      blockThreshold,
 				LinePercentage:      linePct,
 				LineThreshold:       lineThreshold,
+				FunctionPercentage:  functionPct,
+				FunctionThreshold:   functionThreshold,
 				Failed:              failed,
 				stmtHits:            stmtHits,
 				blockHits:           blockHits,
@@ -93,6 +110,8 @@ func collect(profiles []*cover.Profile, cfg *config.Config) (Results, bool) { //
 				stmts:               stmts,
 				blocks:              blocks,
 				lines:               linesCount,
+				functions:           functionCount,
+				functionHits:        functionHits,
 			},
 		}
 
@@ -108,6 +127,8 @@ func collect(profiles []*cover.Profile, cfg *config.Config) (Results, bool) { //
 		results.ByTotal.Blocks.totalCoveredBlocks += blockHits
 		results.ByTotal.Lines.totalLines += linesCount
 		results.ByTotal.Lines.totalCoveredLines += lineHits
+		results.ByTotal.Functions.totalFunctions += functionCount
+		results.ByTotal.Functions.totalCoveredFunctions += functionHits
 	}
 
 	sortFileResults(results.ByFile, cfg)
@@ -118,7 +139,65 @@ func collect(profiles []*cover.Profile, cfg *config.Config) (Results, bool) { //
 	return results, hasFailure || hasPackageFailure ||
 		results.ByTotal.Statements.Failed ||
 		results.ByTotal.Blocks.Failed ||
-		results.ByTotal.Lines.Failed
+		results.ByTotal.Lines.Failed ||
+		results.ByTotal.Functions.Failed
+}
+
+// functionCoverage returns the number of functions declared in p's source and
+// how many of them executed. When the source is unavailable or does not parse
+// there is nothing to count: the file reports 0/0 like a file that declares no
+// functions, which is neutral for the totals, and the parse error is returned
+// so the caller can warn about it.
+func functionCoverage(p *cover.Profile, sourceLines []string) (int, int, error) {
+	fns, err := functions.Collect(p, sourceLines)
+	if err != nil {
+		return 0, 0, err
+	}
+	count, hits := functions.Coverage(fns)
+	return count, hits, nil
+}
+
+// sourceWarning describes why file's source could not be used, or returns ""
+// when it was read and parsed. A read failure takes precedence: the parse of
+// the resulting empty source would only repeat it.
+func sourceWarning(file string, readErr, parseErr error) string {
+	switch {
+	case readErr != nil:
+		return fmt.Sprintf("%s: source file not found; function coverage unavailable (reported as 0/0) "+
+			"and line coverage estimated from the profile alone", file)
+	case parseErr != nil:
+		return fmt.Sprintf("%s: source file could not be parsed (%v); function coverage unavailable "+
+			"(reported as 0/0)", file, parseErr)
+	default:
+		return ""
+	}
+}
+
+func applyPackageThresholds(v *ByPackage, cfg *config.Config) {
+	v.StatementThreshold = cfg.StatementThreshold
+	if t, ok := cfg.PerPackage.Statements[v.Package]; ok {
+		v.StatementThreshold = t
+	}
+
+	v.BlockThreshold = cfg.BlockThreshold
+	if t, ok := cfg.PerPackage.Blocks[v.Package]; ok {
+		v.BlockThreshold = t
+	}
+
+	v.LineThreshold = cfg.LineThreshold
+	if t, ok := cfg.PerPackage.Lines[v.Package]; ok {
+		v.LineThreshold = t
+	}
+
+	v.FunctionThreshold = cfg.FunctionThreshold
+	if t, ok := cfg.PerPackage.Functions[v.Package]; ok {
+		v.FunctionThreshold = t
+	}
+
+	v.Failed = v.StatementPercentage < v.StatementThreshold ||
+		v.BlockPercentage < v.BlockThreshold ||
+		v.LinePercentage < v.LineThreshold ||
+		v.FunctionPercentage < v.FunctionThreshold
 }
 
 func collectPackageResults(results *Results, cfg *config.Config) bool {
@@ -136,6 +215,8 @@ func collectPackageResults(results *Results, cfg *config.Config) bool {
 		p.blocks += v.blocks
 		p.stmts += v.stmts
 		p.lines += v.lines
+		p.functions += v.functions
+		p.functionHits += v.functionHits
 		working[path.Dir(v.File)] = p
 	}
 
@@ -144,27 +225,13 @@ func collectPackageResults(results *Results, cfg *config.Config) bool {
 		v.Statements = fmt.Sprintf("%d/%d", v.stmtHits, v.stmts)
 		v.Blocks = fmt.Sprintf("%d/%d", v.blockHits, v.blocks)
 		v.Lines = fmt.Sprintf("%d/%d", v.lineHits, v.lines)
+		v.Functions = fmt.Sprintf("%d/%d", v.functionHits, v.functions)
 		v.StatementPercentage = math.Percent(v.stmtHits, v.stmts)
 		v.BlockPercentage = math.Percent(v.blockHits, v.blocks)
 		v.LinePercentage = math.Percent(v.lineHits, v.lines)
+		v.FunctionPercentage = math.Percent(v.functionHits, v.functions)
 
-		v.StatementThreshold = cfg.StatementThreshold
-		if t, ok := cfg.PerPackage.Statements[v.Package]; ok {
-			v.StatementThreshold = t
-		}
-		v.Failed = v.StatementPercentage < v.StatementThreshold
-
-		v.BlockThreshold = cfg.BlockThreshold
-		if t, ok := cfg.PerPackage.Blocks[v.Package]; ok {
-			v.BlockThreshold = t
-		}
-		v.Failed = v.Failed || v.BlockPercentage < v.BlockThreshold
-
-		v.LineThreshold = cfg.LineThreshold
-		if t, ok := cfg.PerPackage.Lines[v.Package]; ok {
-			v.LineThreshold = t
-		}
-		v.Failed = v.Failed || v.LinePercentage < v.LineThreshold
+		applyPackageThresholds(&v, cfg)
 
 		if v.Failed {
 			hasFailed = true
@@ -198,6 +265,14 @@ func setTotals(results *Results, cfg *config.Config) {
 	results.ByTotal.Lines.Percentage = math.Percent(results.ByTotal.Lines.totalCoveredLines,
 		results.ByTotal.Lines.totalLines)
 	results.ByTotal.Lines.Failed = results.ByTotal.Lines.Percentage < results.ByTotal.Lines.Threshold
+
+	results.ByTotal.Functions.Threshold = cfg.Total[config.FunctionsSection]
+	results.ByTotal.Functions.Coverage =
+		fmt.Sprintf("%d/%d", results.ByTotal.Functions.totalCoveredFunctions,
+			results.ByTotal.Functions.totalFunctions)
+	results.ByTotal.Functions.Percentage = math.Percent(results.ByTotal.Functions.totalCoveredFunctions,
+		results.ByTotal.Functions.totalFunctions)
+	results.ByTotal.Functions.Failed = results.ByTotal.Functions.Percentage < results.ByTotal.Functions.Threshold
 }
 
 // sortKey returns the numeric value of the configured sort field for a row.
@@ -210,12 +285,16 @@ func sortKey(by *By, sortBy string) (float64, bool) {
 		return by.BlockPercentage, true
 	case config.SortByLinePercent:
 		return by.LinePercentage, true
+	case config.SortByFunctionPercent:
+		return by.FunctionPercentage, true
 	case config.SortByStatements:
 		return float64(by.stmtHits), true
 	case config.SortByBlocks:
 		return float64(by.blockHits), true
 	case config.SortByLines:
 		return float64(by.lineHits), true
+	case config.SortByFunctions:
+		return float64(by.functionHits), true
 	default:
 		return 0, false
 	}
@@ -240,8 +319,8 @@ func sortBy[T HasBy](results []T, cfg *config.Config) {
 
 func sortFileResults(results []ByFile, cfg *config.Config) {
 	switch cfg.SortBy {
-	case config.SortByStatementPercent, config.SortByBlockPercent, config.SortByLinePercent,
-		config.SortByStatements, config.SortByBlocks, config.SortByLines:
+	case config.SortByStatementPercent, config.SortByBlockPercent, config.SortByLinePercent, config.SortByFunctionPercent,
+		config.SortByStatements, config.SortByBlocks, config.SortByLines, config.SortByFunctions:
 		sortBy(results, cfg)
 		return
 	default:
@@ -258,8 +337,8 @@ func sortFileResults(results []ByFile, cfg *config.Config) {
 
 func sortPackageResults(results []ByPackage, cfg *config.Config) {
 	switch cfg.SortBy {
-	case config.SortByStatementPercent, config.SortByBlockPercent, config.SortByLinePercent,
-		config.SortByStatements, config.SortByBlocks, config.SortByLines:
+	case config.SortByStatementPercent, config.SortByBlockPercent, config.SortByLinePercent, config.SortByFunctionPercent,
+		config.SortByStatements, config.SortByBlocks, config.SortByLines, config.SortByFunctions:
 		sortBy(results, cfg)
 		return
 	default:

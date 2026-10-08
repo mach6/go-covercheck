@@ -31,6 +31,52 @@ func runCmdForTest(t *testing.T, cmd *cobra.Command) (string, string, error) {
 	return stdOut, stdErr, err
 }
 
+// requireOnlySourceWarnings fails unless every line of stderr is a
+// missing-source warning (stderr may be empty).
+func requireOnlySourceWarnings(t *testing.T, stdErr string) {
+	t.Helper()
+	for _, line := range strings.Split(strings.TrimSpace(stdErr), "\n") {
+		if line != "" {
+			require.True(t, strings.HasPrefix(line, "warning: "), "unexpected stderr line: %s", line)
+		}
+	}
+}
+
+func coverageFileFor(t *testing.T, fileName string) string {
+	t.Helper()
+	return test.CreateTempCoverageFile(t, "mode: set\n"+fileName+":3.16,5.2 1 1\n")
+}
+
+func Test_run_WarnsOnMissingSource(t *testing.T) {
+	cmd := setupTestCmd()
+	cmd.SetArgs([]string{"-w", "-f", "json", coverageFileFor(t, "example.com/mod/nope/missing.go")})
+
+	stdOut, stdErr, err := runCmdForTest(t, cmd)
+	require.NoError(t, err)
+
+	require.Equal(t, 1, strings.Count(stdErr, "warning: "))
+	require.Contains(t, stdErr, "warning: example.com/mod/nope/missing.go: source file not found")
+	require.Contains(t, stdErr, "function coverage unavailable")
+
+	// stdout is still one valid JSON document, free of the warning.
+	require.NotContains(t, stdOut, "warning")
+	r := new(compute.Results)
+	require.NoError(t, json.Unmarshal([]byte(strings.TrimSpace(stdOut)), r))
+	require.Equal(t, "0/0", r.ByFile[0].Functions)
+}
+
+func Test_run_NoWarningWhenSourceFound(t *testing.T) {
+	cmd := setupTestCmd()
+	cmd.SetArgs([]string{"-w", "-f", "json", coverageFileFor(t, "../../pkg/compute/testdata/alpha/alpha.go")})
+
+	stdOut, stdErr, err := runCmdForTest(t, cmd)
+	require.NoError(t, err)
+	require.Empty(t, stdErr)
+	r := new(compute.Results)
+	require.NoError(t, json.Unmarshal([]byte(strings.TrimSpace(stdOut)), r))
+	require.Equal(t, "1/2", r.ByFile[0].Functions)
+}
+
 func TestFilterBySkipped_MatchesPrefix(t *testing.T) {
 	profiles := []*cover.Profile{
 		{FileName: "vendor/foo.go"},
@@ -159,7 +205,7 @@ func Test_run_SaveHistory(t *testing.T) {
 
 	stdOut, stdErr, err := runCmdForTest(t, cmd)
 	require.NoError(t, err)
-	require.Empty(t, stdErr)
+	requireOnlySourceWarnings(t, stdErr)
 
 	// For JSON format, a success message should NOT be present
 	require.NotContains(t, stdOut, "≡ Saved history entry")
@@ -194,7 +240,7 @@ func Test_run_SaveHistory_NoPreviousFile(t *testing.T) {
 
 	stdOut, stdErr, err := runCmdForTest(t, cmd)
 	require.NoError(t, err)
-	require.Empty(t, stdErr)
+	requireOnlySourceWarnings(t, stdErr)
 
 	// For JSON format, a success message should NOT be present
 	require.NotContains(t, stdOut, "≡ Saved history entry")
@@ -229,7 +275,7 @@ func Test_run_SaveHistory_TableFormat(t *testing.T) {
 
 	stdOut, stdErr, err := runCmdForTest(t, cmd)
 	require.NoError(t, err)
-	require.Empty(t, stdErr)
+	requireOnlySourceWarnings(t, stdErr)
 
 	// For table format, success message SHOULD be present
 	require.Contains(t, stdOut, "≡ Saved history entry")
@@ -272,7 +318,7 @@ func Test_run_CompareHistory(t *testing.T) {
 
 	stdOut, stdErr, err := runCmdForTest(t, cmd)
 	require.NoError(t, err)
-	require.Empty(t, stdErr)
+	requireOnlySourceWarnings(t, stdErr)
 
 	require.Contains(t, stdOut, "[S] github.com/mach6/go-covercheck/pkg/math/math.go [−25.0%]")
 	require.Contains(t, stdOut, "Comparing against ref: main")
@@ -328,7 +374,7 @@ func Test_run_WithConfigFile(t *testing.T) {
 	stdOut, stdErr, err := runCmdForTest(t, cmd)
 	require.NoError(t, err)
 	require.NotEmpty(t, stdOut)
-	require.Empty(t, stdErr)
+	requireOnlySourceWarnings(t, stdErr)
 
 	// unmarshal the yaml output and confirm it used the block and statement coverage thresholds specified in the config
 	// flags.
@@ -465,4 +511,58 @@ func TestApplyConfigOverrides_TableStyleNoConfigFile(t *testing.T) {
 	// Flag not explicitly set; default ("light") should take over when there is no config file.
 	applyConfigOverrides(cfg, cmd, true)
 	require.Equal(t, config.TableStyleLight, cfg.TableStyle)
+}
+
+func TestApplyConfigOverrides_FunctionThresholdFlags(t *testing.T) {
+	tests := []struct {
+		name       string
+		flags      map[string]string
+		configured config.PerOverride
+		wantGlobal float64
+		wantTotal  float64
+	}{
+		{
+			name: "disabled by default",
+		},
+		{
+			name:       "global flag also sets total",
+			flags:      map[string]string{FunctionThresholdFlag: "80"},
+			wantGlobal: 80,
+			wantTotal:  80,
+		},
+		{
+			name:       "total flag overrides global",
+			flags:      map[string]string{FunctionThresholdFlag: "80", TotalFunctionThresholdFlag: "90"},
+			wantGlobal: 80,
+			wantTotal:  90,
+		},
+		{
+			name:       "configured total is kept",
+			flags:      map[string]string{FunctionThresholdFlag: "80"},
+			configured: config.PerOverride{config.FunctionsSection: 65},
+			wantGlobal: 80,
+			wantTotal:  65,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cmd := &cobra.Command{}
+			initFlags(cmd)
+			for k, v := range tt.flags {
+				require.NoError(t, cmd.Flags().Set(k, v))
+			}
+
+			cfg := &config.Config{}
+			cfg.ApplyDefaults()
+			for k, v := range tt.configured {
+				cfg.Total[k] = v
+			}
+
+			applyConfigOverrides(cfg, cmd, tt.configured == nil)
+			require.NoError(t, cfg.Validate())
+			require.InDelta(t, tt.wantGlobal, cfg.FunctionThreshold, 0.001)
+			require.InDelta(t, tt.wantTotal, cfg.Total[config.FunctionsSection], 0.001)
+		})
+	}
 }

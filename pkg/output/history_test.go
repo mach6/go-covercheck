@@ -3,6 +3,7 @@ package output_test
 import (
 	"fmt"
 	"testing"
+	"time"
 
 	"github.com/mach6/go-covercheck/pkg/compute"
 	"github.com/mach6/go-covercheck/pkg/config"
@@ -109,4 +110,77 @@ func TestShowHistory_ShortCommits(t *testing.T) {
 		})
 		require.Contains(t, out, "│ "+fmt.Sprintf("%-7s", want)+" │")
 	}
+}
+
+func functionHistoryEntry(filePct, pkgPct, totalPct float64) *history.Entry {
+	return &history.Entry{
+		Commit:    "0123456789abcdef",
+		Branch:    "main",
+		Timestamp: time.Date(2026, 1, 2, 0, 0, 0, 0, time.UTC),
+		Results: compute.Results{
+			ByFile: []compute.ByFile{{
+				File: "pkg/a.go",
+				By:   compute.By{Functions: "1/2", FunctionPercentage: filePct},
+			}},
+			ByPackage: []compute.ByPackage{{
+				Package: "pkg",
+				By:      compute.By{Functions: "1/2", FunctionPercentage: pkgPct},
+			}},
+			ByTotal: compute.Totals{
+				Statements: compute.TotalStatements{Coverage: "1/2"},
+				Blocks:     compute.TotalBlocks{Coverage: "1/2"},
+				Functions:  compute.TotalFunctions{Coverage: "1/2", Percentage: totalPct},
+			},
+		},
+	}
+}
+
+func TestCompareHistory_FunctionCoverage(t *testing.T) {
+	ref := functionHistoryEntry(50, 50, 50)
+	current := functionHistoryEntry(100, 75, 60).Results
+
+	stdout, stderr := test.RepipeStdOutAndErrForTest(func() {
+		output.CompareHistory("main", ref, current)
+	})
+
+	require.Empty(t, stderr)
+	require.Equal(t, `
+≡ Comparing against ref: main [commit 0123456]
+ → By File
+    [F] pkg/a.go [+50.0%]
+ → By Package
+    [F] pkg [+25.0%]
+ → By Total
+    [F] total [+10.0%]
+`, stdout)
+}
+
+func TestCompareHistory_LegacyEntryWithoutFunctionCoverage(t *testing.T) {
+	ref := functionHistoryEntry(0, 0, 0)
+	ref.Results.ByFile[0].Functions = ""
+	ref.Results.ByPackage[0].Functions = ""
+	ref.Results.ByTotal.Functions.Coverage = ""
+	current := functionHistoryEntry(100, 100, 100).Results
+
+	stdout, stderr := test.RepipeStdOutAndErrForTest(func() {
+		output.CompareHistory("main", ref, current)
+	})
+
+	require.Empty(t, stderr)
+	require.NotContains(t, stdout, "[F]")
+	require.Contains(t, stdout, "→ No change")
+}
+
+func TestShowHistory_FunctionCoverage(t *testing.T) {
+	h := history.New("")
+	h.Entries = append(h.Entries, *functionHistoryEntry(50, 50, 50))
+
+	stdout, stderr := test.RepipeStdOutAndErrForTest(func() {
+		output.ShowHistory(h, 1, new(config.Config))
+	})
+
+	require.Empty(t, stderr)
+	require.Contains(t, stdout, "1/2     [B]")
+	require.Contains(t, stdout, "1/2     [F]")
+	require.NotContains(t, stdout, "[L]")
 }

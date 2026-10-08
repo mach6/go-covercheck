@@ -17,6 +17,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   bug when the same profile set is routed through both the `--inspect` path
   and the regular reporting path.
 
+### Added
+
+* Function coverage: functions are counted per file, per package, and in total,
+  with a function covered when any of its code ran. New `functionThreshold`
+  config key and `--function-threshold` (`-g`) / `--total-function-threshold`
+  (`-G`) flags, `functions:` maps under `perFile`, `perPackage`, and `total`,
+  and `--sort-by functions|function-percent`. The threshold defaults to `0`
+  (disabled). Table, md, html, csv, and tsv output gain `Functions` and
+  `Function %` columns (table, md, and html show them only when a function
+  threshold is in effect; csv and tsv always do); json and yaml gain `functionCoverage`,
+  `functionPercentage`, `functionThreshold`, and `byTotal.functions`; history
+  show/compare report function coverage when the entry has it. A file whose
+  source cannot be found or parsed reports `0/0` functions, which is neutral
+  for totals and thresholds, and now produces a `warning:` line on stderr
+  (also covering the line-coverage estimate for that file). Library users get
+  these in `compute.Results.Warnings`, which is excluded from json, yaml, and
+  saved history.
+
 ### Fixed
 
 * History lookup (`FindByRef`, `DeleteByRef`) and the history/compare output no

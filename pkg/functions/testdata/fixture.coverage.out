@@ -1,0 +1,13 @@
+mode: set
+example.com/fncov/a.go:5.30,5.62 1 1
+example.com/fncov/a.go:7.28,11.2 3 0
+example.com/fncov/a.go:14.15,14.16 0 1
+example.com/fncov/a.go:16.23,16.24 0 0
+example.com/fncov/a.go:19.25,20.20 1 1
+example.com/fncov/a.go:20.20,22.3 1 0
+example.com/fncov/a.go:26.29,26.41 1 1
+example.com/fncov/a.go:28.45,30.23 2 1
+example.com/fncov/a.go:30.23,32.3 1 1
+example.com/fncov/a.go:33.2,33.12 1 1
+example.com/fncov/a.go:37.14,37.26 1 0
+example.com/fncov/a.go:37.41,37.53 1 1

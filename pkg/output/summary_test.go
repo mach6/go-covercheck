@@ -11,7 +11,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-//nolint:dupl // parallel subtests exercise distinct failure configurations
 func TestRenderSummary(t *testing.T) {
 	prevNoColor := color.NoColor
 	t.Cleanup(func() { color.NoColor = prevNoColor })
@@ -51,13 +50,14 @@ func TestRenderSummary(t *testing.T) {
 		cfg.StatementThreshold = 80
 		cfg.BlockThreshold = 80
 		cfg.LineThreshold = 80
+		cfg.FunctionThreshold = 80
 
 		results := compute.Results{
 			ByFile: []compute.ByFile{
 				{
 					By: compute.By{
-						StatementPercentage: 70, BlockPercentage: 70, LinePercentage: 70,
-						StatementThreshold: 80, BlockThreshold: 80, LineThreshold: 80,
+						StatementPercentage: 70, BlockPercentage: 70, LinePercentage: 70, FunctionPercentage: 70,
+						StatementThreshold: 80, BlockThreshold: 80, LineThreshold: 80, FunctionThreshold: 80,
 						Failed: true,
 					},
 					File: "file1.go",
@@ -66,8 +66,8 @@ func TestRenderSummary(t *testing.T) {
 			ByPackage: []compute.ByPackage{
 				{
 					By: compute.By{
-						StatementPercentage: 60, BlockPercentage: 60, LinePercentage: 60,
-						StatementThreshold: 80, BlockThreshold: 80, LineThreshold: 80,
+						StatementPercentage: 60, BlockPercentage: 60, LinePercentage: 60, FunctionPercentage: 60,
+						StatementThreshold: 80, BlockThreshold: 80, LineThreshold: 80, FunctionThreshold: 80,
 						Failed: true,
 					},
 					Package: "pkg1",
@@ -77,6 +77,7 @@ func TestRenderSummary(t *testing.T) {
 				Statements: compute.TotalStatements{Percentage: 50, Threshold: 80, Failed: true},
 				Blocks:     compute.TotalBlocks{Percentage: 50, Threshold: 80, Failed: true},
 				Lines:      compute.TotalLines{Percentage: 50, Threshold: 80, Failed: true},
+				Functions:  compute.TotalFunctions{Percentage: 50, Threshold: 80, Failed: true},
 			},
 		}
 
@@ -92,18 +93,21 @@ func TestRenderSummary(t *testing.T) {
 		require.Contains(t, stdout, "[S] file1.go [+10.0% required for 80.0% threshold]")
 		require.Contains(t, stdout, "[B] file1.go [+10.0% required for 80.0% threshold]")
 		require.Contains(t, stdout, "[L] file1.go [+10.0% required for 80.0% threshold]")
+		require.Contains(t, stdout, "[F] file1.go [+10.0% required for 80.0% threshold]")
 
 		// Check By Package output
 		require.Contains(t, stdout, "→ By Package")
 		require.Contains(t, stdout, "[S] pkg1 [+20.0% required for 80.0% threshold]")
 		require.Contains(t, stdout, "[B] pkg1 [+20.0% required for 80.0% threshold]")
 		require.Contains(t, stdout, "[L] pkg1 [+20.0% required for 80.0% threshold]")
+		require.Contains(t, stdout, "[F] pkg1 [+20.0% required for 80.0% threshold]")
 
 		// Check By Total output
 		require.Contains(t, stdout, "→ By Total")
 		require.Contains(t, stdout, "[S] total [+30.0% required for 80.0% threshold]")
 		require.Contains(t, stdout, "[B] total [+30.0% required for 80.0% threshold]")
 		require.Contains(t, stdout, "[L] total [+30.0% required for 80.0% threshold]")
+		require.Contains(t, stdout, "[F] total [+30.0% required for 80.0% threshold]")
 	})
 
 	t.Run("Partial failures within categories", func(t *testing.T) {
@@ -165,6 +169,29 @@ func TestRenderSummary(t *testing.T) {
 		require.NotContains(t, stdout, "[S] total")
 		require.NotContains(t, stdout, "[B] total")
 		require.Contains(t, stdout, "[L] total [+10.0% required for 80.0% threshold]")
+	})
+
+	t.Run("Only total function coverage fails", func(t *testing.T) {
+		cfg := &config.Config{}
+		cfg.ApplyDefaults()
+
+		results := compute.Results{
+			ByTotal: compute.Totals{
+				Statements: compute.TotalStatements{Percentage: 90, Threshold: 80},
+				Blocks:     compute.TotalBlocks{Percentage: 90, Threshold: 80},
+				Lines:      compute.TotalLines{Percentage: 90, Threshold: 80},
+				Functions:  compute.TotalFunctions{Percentage: 75, Threshold: 80, Failed: true},
+			},
+		}
+
+		stdout, stderr := test.RepipeStdOutAndErrForTest(func() {
+			output.FormatAndReport(results, cfg, true)
+		})
+
+		require.Empty(t, stderr)
+		require.Contains(t, stdout, "→ By Total")
+		require.Contains(t, stdout, "[F] total [+5.0% required for 80.0% threshold]")
+		require.NotContains(t, stdout, "[S] total")
 	})
 
 	t.Run("No failures in one category", func(t *testing.T) {
