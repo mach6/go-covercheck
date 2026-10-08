@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+* `heatmap` output format (`--format heatmap`): a grid of colored cells per file and
+  package, colored relative to each item's statement threshold.
+* `--heatmap-png <path>` (config `heatmapPng`): also write the heat map as a PNG image,
+  alongside whichever report format is selected.
+
 ### Breaking
 
 * `compute.CollectResults` no longer normalizes `profile.FileName` internally.

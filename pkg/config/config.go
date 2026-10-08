@@ -45,6 +45,7 @@ const (
 	FormatHTML    = "html"
 	FormatTSV     = "tsv"
 	FormatMD      = "md"
+	FormatHeatmap = "heatmap"
 	FormatDefault = FormatTable
 
 	TableStyleDefault  = "default"
@@ -161,6 +162,7 @@ type Config struct {
 	TableStyle           string               `yaml:"tableStyle,omitempty"`
 	TerminalWidth        int                  `yaml:"terminalWidth,omitempty"`
 	ModuleName           string               `yaml:"moduleName,omitempty"`
+	HeatmapPNG           string               `yaml:"heatmapPng,omitempty"`
 	DiffFrom             string               `yaml:"diffFrom,omitempty"`
 	NoUncoveredLines     bool                 `yaml:"noUncoveredLines,omitempty"`
 	NoUncoveredFunctions bool                 `yaml:"noUncoveredFunctions,omitempty"`
@@ -272,11 +274,15 @@ func (c *Config) Validate() error { //nolint:cyclop
 	}
 
 	switch c.Format {
-	case FormatJSON, FormatYAML, FormatTable, FormatMD, FormatCSV, FormatHTML, FormatTSV:
+	case FormatJSON, FormatYAML, FormatTable, FormatMD, FormatCSV, FormatHTML, FormatTSV, FormatHeatmap:
 		break
 	default:
-		return fmt.Errorf("format must be one of %s|%s|%s|%s|%s|%s|%s",
-			FormatJSON, FormatYAML, FormatTable, FormatCSV, FormatHTML, FormatTSV, FormatMD)
+		return fmt.Errorf("format must be one of %s|%s|%s|%s|%s|%s|%s|%s",
+			FormatJSON, FormatYAML, FormatTable, FormatCSV, FormatHTML, FormatTSV, FormatMD, FormatHeatmap)
+	}
+
+	if c.HeatmapPNG != "" && !strings.HasSuffix(strings.ToLower(c.HeatmapPNG), ".png") {
+		return fmt.Errorf("heatmap-png must be a path ending in .png, got %q", c.HeatmapPNG)
 	}
 
 	switch c.TableStyle {

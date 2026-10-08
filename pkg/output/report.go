@@ -55,6 +55,16 @@ func isEmptyResults(results compute.Results) bool {
 		results.ByTotal.Blocks.Coverage == "0/0"
 }
 
+func reportHeatmap(results compute.Results, cfg *config.Config, hasFailure, isEmpty bool) {
+	if isEmpty {
+		fmt.Println(color.New(color.FgYellow).Sprint("⚠"), "No coverage results to display")
+		return
+	}
+	renderHeatmapToStdout(results, cfg)
+	_ = os.Stdout.Sync()
+	renderSummary(hasFailure, results, cfg)
+}
+
 // FormatAndReport writes out formatted profile results.
 func FormatAndReport(results compute.Results, cfg *config.Config, hasFailure bool) {
 	isEmpty := isEmptyResults(results)
@@ -67,6 +77,8 @@ func FormatAndReport(results compute.Results, cfg *config.Config, hasFailure boo
 			_ = os.Stdout.Sync()
 			renderSummary(hasFailure, results, cfg)
 		}
+	case config.FormatHeatmap:
+		reportHeatmap(results, cfg, hasFailure, isEmpty)
 	case config.FormatJSON:
 		if cfg.NoColor {
 			enc := json.NewEncoder(os.Stdout)
@@ -89,5 +101,9 @@ func FormatAndReport(results compute.Results, cfg *config.Config, hasFailure boo
 		}
 	default:
 		bailOnError(errors.New(color.RedString("Unsupported format: %s", cfg.Format)))
+	}
+
+	if cfg.HeatmapPNG != "" {
+		bailOnError(WriteHeatmapPNG(cfg.HeatmapPNG, results))
 	}
 }

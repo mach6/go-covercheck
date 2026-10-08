@@ -342,3 +342,24 @@ func TestValidate_CommentPlatform(t *testing.T) {
 	cfg.Comment.Platform.Type = "bitbucket"
 	require.ErrorContains(t, cfg.Validate(), "comment platform must be one of github|gitlab|gitea")
 }
+
+func TestValidate_Format(t *testing.T) {
+	for _, format := range []string{
+		config.FormatTable, config.FormatJSON, config.FormatYAML, config.FormatMD,
+		config.FormatHTML, config.FormatCSV, config.FormatTSV, config.FormatHeatmap,
+	} {
+		t.Run("valid/"+format, func(t *testing.T) {
+			cfg := &config.Config{}
+			cfg.ApplyDefaults()
+			cfg.Format = format
+			require.NoError(t, cfg.Validate())
+		})
+	}
+
+	cfg := &config.Config{}
+	cfg.ApplyDefaults()
+	cfg.Format = "png"
+	err := cfg.Validate()
+	require.Error(t, err)
+	require.Contains(t, err.Error(), config.FormatHeatmap)
+}
