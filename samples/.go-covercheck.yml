@@ -44,9 +44,14 @@ noSummary: false
 noColor: false
 
 # the format for output
-# table|json|yaml|md|html|csv|tsv
+# table|json|yaml|md|html|csv|tsv|heatmap
 # default table
 format: table
+
+# also write a coverage heat map image to this path, in addition to the normal output
+# must end in .png
+# default off
+# heatmapPng: coverage-heatmap.png
 
 # the table style for table output format
 # default|light|bold|rounded|double
