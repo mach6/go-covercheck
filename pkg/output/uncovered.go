@@ -242,7 +242,7 @@ func shouldUsePager(output string) bool {
 
 // isTerminal checks if we're running in a terminal.
 func isTerminal() bool {
-	return term.IsTerminal(int(os.Stdout.Fd())) //nolint:gosec // fd fits in int on supported platforms
+	return term.IsTerminal(int(os.Stdout.Fd()))
 }
 
 // displayWithPager displays output in an in-process Bubble Tea pager.
