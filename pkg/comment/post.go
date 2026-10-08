@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"strings"
 	"time"
@@ -74,28 +75,78 @@ func Post(ctx context.Context, results compute.Results, failed bool, cfg *config
 		return err
 	}
 	body := FormatMarkdown(results, failed, cfg.Platform.IncludeColors)
-	return upsert(ctx, poster, body, cfg.Platform.UpdateExisting)
+	return upsert(ctx, poster, cfg.Platform.Type, cfg.Platform.Author, body, cfg.Platform.UpdateExisting, os.Stderr)
 }
 
-func upsert(ctx context.Context, poster Poster, body string, updateExisting bool) error {
+// upsert creates a comment, or with updateExisting edits the newest comment that carries
+// Marker and was written by the authenticated user. Comments by anyone else (for example a
+// person quoting the marker) are never edited. A failed edit is reported on warn and does
+// not create a comment, so a persistent failure cannot add a comment on every run; only a
+// deleted comment falls back to creating a new one.
+func upsert(ctx context.Context, poster Poster, platform, author, body string, updateExisting bool,
+	warn io.Writer) error {
 	if !updateExisting {
+		return poster.CreateComment(ctx, body)
+	}
+	user, err := resolveAuthor(ctx, poster, author)
+	if err != nil {
+		notef(warn, "warning: %s: cannot identify the token's user (%v); adding a new comment instead of updating"+
+			" (set --comment-author to avoid this)",
+			platform, err)
 		return poster.CreateComment(ctx, body)
 	}
 	comments, err := poster.ListComments(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to list comments: %w", err)
 	}
-	for _, c := range comments {
-		if strings.Contains(c.Body, Marker) {
-			// The marked comment may not be editable by this token (e.g. posted by another account,
-			// or quoted by a person). Add a new comment rather than posting nothing.
-			if err := poster.UpdateComment(ctx, c.ID, body); err == nil {
-				return nil
-			}
-			break
+	target := newestOwnMarked(comments, user)
+	if target == nil {
+		return poster.CreateComment(ctx, body)
+	}
+	err = poster.UpdateComment(ctx, target.ID, body)
+	switch {
+	case err == nil:
+		return nil
+	case errors.Is(err, ErrNotFound):
+		notef(warn, "note: %s: previous coverage comment %d no longer exists; adding a new comment",
+			platform, target.ID)
+		return poster.CreateComment(ctx, body)
+	default:
+		notef(warn, "warning: %s: failed to update coverage comment %d, not adding a new one: %v",
+			platform, target.ID, err)
+		return nil
+	}
+}
+
+// resolveAuthor returns author when configured, otherwise the authenticated user's name.
+func resolveAuthor(ctx context.Context, poster Poster, author string) (string, error) {
+	if author != "" {
+		return author, nil
+	}
+	user, err := poster.CurrentUser(ctx)
+	if err == nil && user == "" {
+		err = errors.New("no username returned")
+	}
+	return user, err
+}
+
+// newestOwnMarked returns the newest comment written by user that carries Marker, or nil.
+// IDs increase over time on every platform, so the highest is the newest; list order differs
+// between platforms (GitLab returns newest first).
+func newestOwnMarked(comments []Comment, user string) *Comment {
+	var target *Comment
+	for i := range comments {
+		c := &comments[i]
+		if c.Author == user && strings.Contains(c.Body, Marker) && (target == nil || c.ID > target.ID) {
+			target = c
 		}
 	}
-	return poster.CreateComment(ctx, body)
+	return target
+}
+
+// notef writes a one-line message to w. Failing to write a diagnostic is not actionable.
+func notef(w io.Writer, format string, args ...any) {
+	_, _ = fmt.Fprintf(w, format+"\n", args...)
 }
 
 // splitRepository splits "owner/repo" into its parts.

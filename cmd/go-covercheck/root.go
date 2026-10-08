@@ -162,6 +162,13 @@ const (
 	CommentUpdateFlag      = "comment-update"
 	CommentUpdateFlagUsage = "update the previous go-covercheck comment instead of adding a new one"
 
+	CommentAuthorFlag      = "comment-author"
+	CommentAuthorFlagUsage = "login the comment is posted as; used with --comment-update to find the previous " +
+		"comment instead of looking up the token's user (GitHub Actions' GITHUB_TOKEN is github-actions[bot])"
+
+	CommentNoEmojiFlag      = "comment-no-emoji"
+	CommentNoEmojiFlagUsage = "show pass/fail as plain PASS/FAIL text instead of colored emoji in the comment"
+
 	// commentTimeout bounds the total time spent posting a comment.
 	commentTimeout = 2 * time.Minute
 
@@ -563,7 +570,11 @@ func applyConfigOverrides(cfg *config.Config, cmd *cobra.Command, noConfigFile b
 	applyStringFlagOverride(cmd, CommentTokenFlag, &cfg.Comment.Platform.Token, noConfigFile)
 	applyStringFlagOverride(cmd, CommentRepositoryFlag, &cfg.Comment.Platform.Repository, noConfigFile)
 	applyIntFlagOverride(cmd, CommentPRFlag, &cfg.Comment.Platform.PullRequestID, noConfigFile)
+	applyStringFlagOverride(cmd, CommentAuthorFlag, &cfg.Comment.Platform.Author, noConfigFile)
 	applyBoolFlagOverride(cmd, CommentUpdateFlag, &cfg.Comment.Platform.UpdateExisting, noConfigFile)
+	if v, _ := cmd.Flags().GetBool(CommentNoEmojiFlag); cmd.Flags().Changed(CommentNoEmojiFlag) {
+		cfg.Comment.Platform.IncludeColors = !v
+	}
 
 	// set cfg.Total thresholds to the global values, iff no override was specified for each.
 	if v, _ := cmd.Flags().GetFloat64(StatementThresholdFlag); !cmd.Flags().Changed(TotalStatementThresholdFlag) &&
@@ -851,7 +862,9 @@ func initFlags(cmd *cobra.Command) {
 	cmd.Flags().String(CommentTokenFlag, "", CommentTokenFlagUsage)
 	cmd.Flags().String(CommentRepositoryFlag, "", CommentRepositoryFlagUsage)
 	cmd.Flags().Int(CommentPRFlag, 0, CommentPRFlagUsage)
+	cmd.Flags().String(CommentAuthorFlag, "", CommentAuthorFlagUsage)
 	cmd.Flags().Bool(CommentUpdateFlag, false, CommentUpdateFlagUsage)
+	cmd.Flags().Bool(CommentNoEmojiFlag, false, CommentNoEmojiFlagUsage)
 }
 
 func initConfigFile(cmd *cobra.Command) error {

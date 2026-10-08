@@ -3,10 +3,15 @@ package comment
 import (
 	"context"
 	"fmt"
+	"net/http"
+	"os"
 	"strings"
 
 	"github.com/google/go-github/v92/github"
 )
+
+// actionsBotLogin is the login of comments written with the GitHub Actions GITHUB_TOKEN.
+const actionsBotLogin = "github-actions[bot]"
 
 // GitHubPoster posts comments to a GitHub pull request.
 type GitHubPoster struct {
@@ -52,7 +57,7 @@ func (g *GitHubPoster) ListComments(ctx context.Context) ([]Comment, error) {
 			return nil, err
 		}
 		for _, c := range comments {
-			out = append(out, Comment{ID: c.GetID(), Body: c.GetBody()})
+			out = append(out, Comment{ID: c.GetID(), Body: c.GetBody(), Author: c.GetUser().GetLogin()})
 		}
 		if resp.NextPage == 0 {
 			return out, nil
@@ -72,9 +77,28 @@ func (g *GitHubPoster) CreateComment(ctx context.Context, body string) error {
 
 // UpdateComment edits an existing comment.
 func (g *GitHubPoster) UpdateComment(ctx context.Context, id int64, body string) error {
-	_, _, err := g.client.Issues.UpdateComment(ctx, g.owner, g.repo, id, github.IssueCommentRequest{Body: body})
+	_, resp, err := g.client.Issues.UpdateComment(ctx, g.owner, g.repo, id, github.IssueCommentRequest{Body: body})
 	if err != nil {
+		if resp != nil && isGone(resp.StatusCode) {
+			err = fmt.Errorf("%w: %w", ErrNotFound, err)
+		}
 		return fmt.Errorf("failed to update github comment: %w", err)
 	}
 	return nil
+}
+
+// CurrentUser returns the login of the authenticated user.
+//
+// The GITHUB_TOKEN of GitHub Actions is an installation token, which cannot call GET /user
+// (it answers 403 "Resource not accessible by integration"). Its comments are authored by
+// actionsBotLogin, so that identity is used when the lookup is refused inside Actions.
+func (g *GitHubPoster) CurrentUser(ctx context.Context) (string, error) {
+	u, resp, err := g.client.Users.Get(ctx, "")
+	if err != nil {
+		if resp != nil && resp.StatusCode == http.StatusForbidden && os.Getenv("GITHUB_ACTIONS") == "true" {
+			return actionsBotLogin, nil
+		}
+		return "", fmt.Errorf("failed to look up github user: %w", err)
+	}
+	return u.GetLogin(), nil
 }

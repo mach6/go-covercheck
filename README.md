@@ -192,7 +192,9 @@ Flags:
   -b, --block-threshold float             global block threshold to enforce [0=disabled] (default 50)
   -C, --compare-history string            compare current coverage against historical ref [commit|branch|tag|label]
       --comment                           post coverage results as a comment on a pull/merge request
+      --comment-author string             login the comment is posted as; used with --comment-update to find the previous comment instead of looking up the token's user (GitHub Actions' GITHUB_TOKEN is github-actions[bot])
       --comment-base-url string           base URL of a self-hosted platform instance (required for gogs)
+      --comment-no-emoji                  show pass/fail as plain PASS/FAIL text instead of colored emoji in the comment
       --comment-platform string           platform to post the comment to [github|gitlab|gitea|gogs]
       --comment-pr int                    pull/merge request number to comment on
       --comment-repository string         repository to comment on as owner/repo (GitLab: group/project or project ID)
@@ -480,9 +482,20 @@ pull/merge request. This is handy when it runs as a pre-merge gate in CI.
 
 - The comment shows the total statement, block, and line coverage against their thresholds, plus
   any files and packages below threshold (capped at 50 rows each).
-- Pass/fail is shown with 🟢/🔴. Set `includeColors: false` for plain `PASS`/`FAIL` text.
+- Pass/fail is shown with 🟢/🔴. Use `--comment-no-emoji` (or `includeColors: false`) for plain `PASS`/`FAIL` text.
 - With `--comment-update`, the previous `go-covercheck` comment is edited in place instead of
-  adding a new one each run.
+  adding a new one each run. Only the newest comment containing the marker that was written by
+  the token's own account is edited; other people's comments are never touched. If that comment
+  was deleted, a new one is added. If the edit fails for any other reason (e.g. a permission
+  error), a warning is printed and no new comment is added.
+- "Your own" comments are found by looking up the token's user (`GET /user`). The default
+  `GITHUB_TOKEN` in GitHub Actions cannot call that endpoint (it answers 403), so when
+  `GITHUB_ACTIONS=true` and the lookup is refused, comments by `github-actions[bot]` are
+  updated. Gitea Actions needs nothing special: its job token reports itself as `gitea-actions`.
+  GitLab needs a personal, project, or group access token, since `CI_JOB_TOKEN` cannot write
+  notes. If the user cannot be determined, a warning is printed and a new comment is added; set
+  `--comment-author <login>` (config: `comment.platform.author`) to name the account explicitly
+  and skip the lookup.
 - Configuration is checked before coverage is computed. If posting fails at the API (e.g. a
   network or permission error), a warning is printed and the exit code still reflects coverage only.
 

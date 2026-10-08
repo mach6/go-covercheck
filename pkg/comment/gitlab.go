@@ -39,7 +39,7 @@ func (g *GitLabPoster) ListComments(ctx context.Context) ([]Comment, error) {
 			return nil, err
 		}
 		for _, n := range notes {
-			out = append(out, Comment{ID: n.ID, Body: n.Body})
+			out = append(out, Comment{ID: n.ID, Body: n.Body, Author: n.Author.Username})
 		}
 		if resp.NextPage == 0 {
 			return out, nil
@@ -60,9 +60,21 @@ func (g *GitLabPoster) CreateComment(ctx context.Context, body string) error {
 // UpdateComment edits an existing note.
 func (g *GitLabPoster) UpdateComment(ctx context.Context, id int64, body string) error {
 	opts := &gitlab.UpdateMergeRequestNoteOptions{Body: &body}
-	_, _, err := g.client.Notes.UpdateMergeRequestNote(g.project, g.number, id, opts, gitlab.WithContext(ctx))
+	_, resp, err := g.client.Notes.UpdateMergeRequestNote(g.project, g.number, id, opts, gitlab.WithContext(ctx))
 	if err != nil {
+		if resp != nil && isGone(resp.StatusCode) {
+			err = fmt.Errorf("%w: %w", ErrNotFound, err)
+		}
 		return fmt.Errorf("failed to update gitlab note: %w", err)
 	}
 	return nil
+}
+
+// CurrentUser returns the username of the authenticated user.
+func (g *GitLabPoster) CurrentUser(ctx context.Context) (string, error) {
+	u, _, err := g.client.Users.CurrentUser(gitlab.WithContext(ctx))
+	if err != nil {
+		return "", fmt.Errorf("failed to look up gitlab user: %w", err)
+	}
+	return u.Username, nil
 }

@@ -126,6 +126,9 @@ type PlatformConfig struct {
 	Repository string `yaml:"repository,omitempty"`
 	// PullRequestID is the pull request or merge request number.
 	PullRequestID int `yaml:"pullRequestId,omitempty"`
+	// Author is the login or username the comment is posted as. When set, it is used to find
+	// the previous comment to update, and the current-user lookup is skipped.
+	Author string `yaml:"author,omitempty"`
 	// IncludeColors shows pass/fail with colored emoji instead of plain text. Defaults to true.
 	IncludeColors bool `yaml:"includeColors"`
 	// UpdateExisting edits the previous go-covercheck comment instead of adding a new one.

@@ -55,7 +55,7 @@ func (g *GiteaPoster) ListComments(ctx context.Context) ([]Comment, error) {
 		}
 		for _, c := range comments {
 			seen[c.ID] = true
-			out = append(out, Comment{ID: c.ID, Body: c.Body})
+			out = append(out, Comment{ID: c.ID, Body: c.Body, Author: posterName(c.Poster)})
 		}
 		if len(comments) < listPageSize {
 			return out, nil
@@ -78,8 +78,28 @@ func (g *GiteaPoster) CreateComment(ctx context.Context, body string) error {
 func (g *GiteaPoster) UpdateComment(ctx context.Context, id int64, body string) error {
 	g.client.SetContext(ctx)
 	opts := gitea.EditIssueCommentOption{Body: body}
-	if _, _, err := g.client.EditIssueComment(g.owner, g.repo, id, opts); err != nil {
+	if _, resp, err := g.client.EditIssueComment(g.owner, g.repo, id, opts); err != nil {
+		if resp != nil && resp.Response != nil && isGone(resp.StatusCode) {
+			err = fmt.Errorf("%w: %w", ErrNotFound, err)
+		}
 		return fmt.Errorf("failed to update gitea comment: %w", err)
 	}
 	return nil
+}
+
+// CurrentUser returns the username of the authenticated user.
+func (g *GiteaPoster) CurrentUser(ctx context.Context) (string, error) {
+	g.client.SetContext(ctx)
+	u, _, err := g.client.GetMyUserInfo()
+	if err != nil {
+		return "", fmt.Errorf("failed to look up gitea user: %w", err)
+	}
+	return u.UserName, nil
+}
+
+func posterName(u *gitea.User) string {
+	if u == nil {
+		return ""
+	}
+	return u.UserName
 }

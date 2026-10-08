@@ -1,8 +1,10 @@
 package comment
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"regexp"
@@ -13,7 +15,6 @@ import (
 
 	"github.com/mach6/go-covercheck/pkg/compute"
 	"github.com/mach6/go-covercheck/pkg/config"
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -26,7 +27,19 @@ type fakeServer struct {
 	comments []Comment
 	auth     []string
 	requests []string
+	// allowed, when set, restricts the server to these exact "METHOD escaped-path" requests;
+	// anything else is answered with 418 so a wrong route fails the test.
+	allowed map[string]bool
+	// patchStatus, when non-zero, is returned for every PATCH/PUT instead of editing.
+	patchStatus int
+	// userStatus, when non-zero, is returned for GET /user instead of the user.
+	userStatus int
+	// userAs, when set, replaces fakeUser as the account GET /user returns.
+	userAs string
 }
+
+// fakeUser is the account the fake server authenticates every request as.
+const fakeUser = "bot"
 
 var commentIDPath = regexp.MustCompile(`/(\d+)$`)
 
@@ -44,7 +57,26 @@ func (f *fakeServer) handle(w http.ResponseWriter, r *http.Request) {
 	f.auth = append(f.auth, r.Header.Get("Authorization")+r.Header.Get("Private-Token"))
 	f.requests = append(f.requests, r.Method+" "+r.URL.EscapedPath())
 	w.Header().Set("Content-Type", "application/json")
+	if f.allowed != nil && !f.allowed[r.Method+" "+r.URL.EscapedPath()] {
+		w.WriteHeader(http.StatusTeapot)
+		return
+	}
+	if r.Method == http.MethodGet && strings.HasSuffix(r.URL.Path, "/user") {
+		if f.userStatus != 0 {
+			http.Error(w, `{"message":"Resource not accessible by integration"}`, f.userStatus)
+			return
+		}
+		name := fakeUser
+		if f.userAs != "" {
+			name = f.userAs
+		}
+		writeJSON(w, jsonUser{ID: 1, Login: name, Username: name})
+		return
+	}
+	f.handleComments(w, r)
+}
 
+func (f *fakeServer) handleComments(w http.ResponseWriter, r *http.Request) {
 	var in struct {
 		Body string `json:"body"`
 	}
@@ -53,11 +85,15 @@ func (f *fakeServer) handle(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, toJSON(f.comments))
 	case http.MethodPost:
 		_ = json.NewDecoder(r.Body).Decode(&in)
-		c := Comment{ID: int64(len(f.comments) + 1), Body: in.Body}
+		c := Comment{ID: int64(len(f.comments) + 1), Body: in.Body, Author: fakeUser}
 		f.comments = append(f.comments, c)
 		w.WriteHeader(http.StatusCreated)
-		writeJSON(w, jsonComment(c))
+		writeJSON(w, newJSONComment(c))
 	case http.MethodPatch, http.MethodPut:
+		if f.patchStatus != 0 {
+			w.WriteHeader(f.patchStatus)
+			return
+		}
 		_ = json.NewDecoder(r.Body).Decode(&in)
 		m := commentIDPath.FindStringSubmatch(r.URL.Path)
 		if m == nil {
@@ -68,7 +104,7 @@ func (f *fakeServer) handle(w http.ResponseWriter, r *http.Request) {
 		for i := range f.comments {
 			if f.comments[i].ID == id {
 				f.comments[i].Body = in.Body
-				writeJSON(w, jsonComment(f.comments[i]))
+				writeJSON(w, newJSONComment(f.comments[i]))
 				return
 			}
 		}
@@ -78,9 +114,24 @@ func (f *fakeServer) handle(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// jsonUser carries the fields each platform uses to name a user.
+type jsonUser struct {
+	ID       int64  `json:"id"`
+	Login    string `json:"login"`
+	Username string `json:"username"`
+}
+
+// jsonComment serves the comment author as "user" (GitHub, Gitea, Gogs) and "author" (GitLab).
 type jsonComment struct {
-	ID   int64  `json:"id"`
-	Body string `json:"body"`
+	ID     int64     `json:"id"`
+	Body   string    `json:"body"`
+	User   *jsonUser `json:"user"`
+	Author *jsonUser `json:"author"`
+}
+
+func newJSONComment(c Comment) jsonComment {
+	u := &jsonUser{Login: c.Author, Username: c.Author}
+	return jsonComment{ID: c.ID, Body: c.Body, User: u, Author: u}
 }
 
 func writeJSON(w http.ResponseWriter, v any) {
@@ -95,7 +146,7 @@ func writeJSON(w http.ResponseWriter, v any) {
 func toJSON(comments []Comment) []jsonComment {
 	out := make([]jsonComment, 0, len(comments))
 	for _, c := range comments {
-		out = append(out, jsonComment(c))
+		out = append(out, newJSONComment(c))
 	}
 	return out
 }
@@ -134,33 +185,38 @@ func TestPostToEachPlatform(t *testing.T) {
 		repository string
 		auth       string
 		listPath   string
+		userPath   string
 		updatePath string
 	}{
 		{
 			config.CommentPlatformGitHub, "owner/repo", "Bearer tok",
-			"/api/v3/repos/owner/repo/issues/7/comments",
+			"/api/v3/repos/owner/repo/issues/7/comments", "/api/v3/user",
 			"PATCH /api/v3/repos/owner/repo/issues/comments/2",
 		},
 		{
 			config.CommentPlatformGitLab, "group/sub/project", "tok",
-			"/api/v4/projects/group%2Fsub%2Fproject/merge_requests/7/notes",
+			"/api/v4/projects/group%2Fsub%2Fproject/merge_requests/7/notes", "/api/v4/user",
 			"PUT /api/v4/projects/group%2Fsub%2Fproject/merge_requests/7/notes/2",
 		},
 		{
 			config.CommentPlatformGitea, "owner/repo", "token tok",
-			"/api/v1/repos/owner/repo/issues/7/comments",
+			"/api/v1/repos/owner/repo/issues/7/comments", "/api/v1/user",
 			"PATCH /api/v1/repos/owner/repo/issues/comments/2",
 		},
 		{
 			config.CommentPlatformGogs, "owner/repo", "token tok",
-			"/api/v1/repos/owner/repo/issues/7/comments",
+			"/api/v1/repos/owner/repo/issues/7/comments", "/api/v1/user",
 			"PATCH /api/v1/repos/owner/repo/issues/7/comments/2",
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.platform, func(t *testing.T) {
-			other := Comment{ID: 1, Body: "LGTM"}
+			other := Comment{ID: 1, Body: "LGTM", Author: "human"}
 			srv := newFakeServer(t, other)
+			srv.allowed = map[string]bool{
+				"POST " + tt.listPath: true, "GET " + tt.listPath: true,
+				"GET " + tt.userPath: true, tt.updatePath: true,
+			}
 			cfg := &config.CommentConfig{Enabled: true, Platform: config.PlatformConfig{
 				Type: tt.platform, BaseURL: srv.URL, Token: "tok",
 				Repository: tt.repository, PullRequestID: 7, IncludeColors: true,
@@ -170,11 +226,11 @@ func TestPostToEachPlatform(t *testing.T) {
 			require.NoError(t, Post(context.Background(), testResults(true), true, cfg))
 			comments, auth, _ := srv.snapshot()
 			require.Len(t, comments, 2)
-			assert.Equal(t, other, comments[0])
-			assert.Contains(t, comments[1].Body, Marker)
-			assert.Contains(t, comments[1].Body, "Coverage check failed")
+			require.Equal(t, other, comments[0])
+			require.Contains(t, comments[1].Body, Marker)
+			require.Contains(t, comments[1].Body, "Coverage check failed")
 			for _, a := range auth {
-				assert.Equal(t, tt.auth, a)
+				require.Equal(t, tt.auth, a)
 			}
 
 			// second run with update edits the same comment
@@ -182,15 +238,16 @@ func TestPostToEachPlatform(t *testing.T) {
 			require.NoError(t, Post(context.Background(), testResults(false), false, cfg))
 			comments, _, requests := srv.snapshot()
 			require.Len(t, comments, 2)
-			assert.Equal(t, other, comments[0])
-			assert.Contains(t, comments[1].Body, "Coverage check passed")
-			assert.Equal(t, []string{"POST " + tt.listPath, "GET " + tt.listPath, tt.updatePath}, requests)
+			require.Equal(t, other, comments[0])
+			require.Contains(t, comments[1].Body, "Coverage check passed")
+			require.Equal(t,
+				[]string{"POST " + tt.listPath, "GET " + tt.userPath, "GET " + tt.listPath, tt.updatePath}, requests)
 
 			// without update, a new comment is added
 			cfg.Platform.UpdateExisting = false
 			require.NoError(t, Post(context.Background(), testResults(false), false, cfg))
 			comments, _, _ = srv.snapshot()
-			assert.Len(t, comments, 3)
+			require.Len(t, comments, 3)
 		})
 	}
 }
@@ -207,7 +264,7 @@ func TestPostReportsAPIErrors(t *testing.T) {
 				Type: platform, BaseURL: srv.URL, Token: "tok", Repository: "o/r", PullRequestID: 1,
 				UpdateExisting: true,
 			}}
-			assert.Error(t, Post(context.Background(), testResults(false), false, cfg))
+			require.Error(t, Post(context.Background(), testResults(false), false, cfg))
 		})
 	}
 }
@@ -243,9 +300,9 @@ func TestValidate(t *testing.T) {
 			tt.mutate(&cfg)
 			err := Validate(&cfg)
 			if tt.wantErr == "" {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 			} else {
-				assert.ErrorContains(t, err, tt.wantErr)
+				require.ErrorContains(t, err, tt.wantErr)
 			}
 		})
 	}
@@ -257,11 +314,11 @@ func TestValidateTokenFromEnv(t *testing.T) {
 		Type: "gitlab", Repository: "g/p", PullRequestID: 1,
 	}}
 	require.NoError(t, Validate(&cfg))
-	assert.Equal(t, "from-env", cfg.Platform.Token)
+	require.Equal(t, "from-env", cfg.Platform.Token)
 
 	cfg.Platform.Token = "explicit"
 	require.NoError(t, Validate(&cfg))
-	assert.Equal(t, "explicit", cfg.Platform.Token)
+	require.Equal(t, "explicit", cfg.Platform.Token)
 }
 
 func TestNewPosterErrors(t *testing.T) {
@@ -278,26 +335,26 @@ func TestNewPosterErrors(t *testing.T) {
 func TestFormatMarkdown(t *testing.T) {
 	t.Run("passed", func(t *testing.T) {
 		md := FormatMarkdown(testResults(false), false, true)
-		assert.True(t, strings.HasPrefix(md, Marker))
-		assert.Contains(t, md, "🟢 **Coverage check passed**")
-		assert.Contains(t, md, "| Lines | 16/20 | 80.0% | 50.0% | 🟢 |")
-		assert.NotContains(t, md, "Below Threshold")
+		require.True(t, strings.HasPrefix(md, Marker))
+		require.Contains(t, md, "🟢 **Coverage check passed**")
+		require.Contains(t, md, "| Lines | 16/20 | 80.0% | 50.0% | 🟢 |")
+		require.NotContains(t, md, "Below Threshold")
 	})
 
 	t.Run("failed", func(t *testing.T) {
 		md := FormatMarkdown(testResults(true), true, true)
-		assert.Contains(t, md, "🔴 **Coverage check failed**")
-		assert.Contains(t, md, "| Statements | 8/10 | 40.0% | 70.0% | 🔴 |")
-		assert.Contains(t, md, "### Files Below Threshold")
-		assert.Contains(t, md, "| `pkg/a/a.go` | 🔴 40.0% / 70.0% | 🔴 40.0% / 50.0% | 🔴 40.0% / 50.0% |")
-		assert.Contains(t, md, "### Packages Below Threshold")
+		require.Contains(t, md, "🔴 **Coverage check failed**")
+		require.Contains(t, md, "| Statements | 8/10 | 40.0% | 70.0% | 🔴 |")
+		require.Contains(t, md, "### Files Below Threshold")
+		require.Contains(t, md, "| `pkg/a/a.go` | 🔴 40.0% / 70.0% | 🔴 40.0% / 50.0% | 🔴 40.0% / 50.0% |")
+		require.Contains(t, md, "### Packages Below Threshold")
 	})
 
 	t.Run("no colors", func(t *testing.T) {
 		md := FormatMarkdown(testResults(true), true, false)
-		assert.Contains(t, md, "FAIL **Coverage check failed**")
-		assert.NotContains(t, md, "🔴")
-		assert.NotContains(t, md, "🟢")
+		require.Contains(t, md, "FAIL **Coverage check failed**")
+		require.NotContains(t, md, "🔴")
+		require.NotContains(t, md, "🟢")
 	})
 
 	t.Run("caps rows", func(t *testing.T) {
@@ -310,8 +367,8 @@ func TestFormatMarkdown(t *testing.T) {
 			results.ByFile = append(results.ByFile, f)
 		}
 		md := FormatMarkdown(results, true, true)
-		assert.Contains(t, md, "…and 5 more")
-		assert.Equal(t, maxRows, strings.Count(md, "| `f"))
+		require.Contains(t, md, "…and 5 more")
+		require.Equal(t, maxRows, strings.Count(md, "| `f"))
 	})
 }
 
@@ -321,11 +378,13 @@ func TestGitHubUpdateFindsCommentOnLaterPage(t *testing.T) {
 	srv = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		switch {
+		case r.Method == http.MethodGet && r.URL.Path == "/api/v3/user":
+			_, _ = w.Write([]byte(`{"login":"bot"}`))
 		case r.Method == http.MethodGet && r.URL.Query().Get("page") == "":
 			w.Header().Set("Link", `<`+srv.URL+r.URL.Path+`?page=2>; rel="next"`)
-			_, _ = w.Write([]byte(`[{"id":1,"body":"first page"}]`))
+			_, _ = w.Write([]byte(`[{"id":1,"body":"first page","user":{"login":"human"}}]`))
 		case r.Method == http.MethodGet:
-			_, _ = w.Write([]byte(`[{"id":42,"body":"` + Marker + `"}]`))
+			_, _ = w.Write([]byte(`[{"id":42,"body":"` + Marker + `","user":{"login":"bot"}}]`))
 		case r.Method == http.MethodPatch:
 			patched = r.URL.Path
 			_, _ = w.Write([]byte(`{"id":42}`))
@@ -337,8 +396,8 @@ func TestGitHubUpdateFindsCommentOnLaterPage(t *testing.T) {
 
 	p, err := NewGitHubPoster(srv.URL, "tok", "o/r", 1)
 	require.NoError(t, err)
-	require.NoError(t, upsert(context.Background(), p, "new", true))
-	assert.Equal(t, "/api/v3/repos/o/r/issues/comments/42", patched)
+	require.NoError(t, upsert(context.Background(), p, "github", "", "new", true, io.Discard))
+	require.Equal(t, "/api/v3/repos/o/r/issues/comments/42", patched)
 }
 
 func TestGiteaListStopsWhenServerIgnoresPaging(t *testing.T) {
@@ -358,39 +417,284 @@ func TestGiteaListStopsWhenServerIgnoresPaging(t *testing.T) {
 	require.NoError(t, err)
 	comments, err := p.ListComments(context.Background())
 	require.NoError(t, err)
-	assert.Len(t, comments, total)
-	assert.Equal(t, 2, requests)
+	require.Len(t, comments, total)
+	require.Equal(t, 2, requests)
 }
 
-func TestUpdateFailureFallsBackToCreate(t *testing.T) {
-	srv := newFakeServer(t, Comment{ID: 1, Body: "quoted by a person: " + Marker})
-	forbidPatch := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Method == http.MethodPatch {
-			w.WriteHeader(http.StatusForbidden)
-			return
-		}
-		srv.handle(w, r)
-	})
-	srv.Config.Handler = forbidPatch
-
+// newGogsFake returns a Gogs poster backed by a fake server holding existing comments.
+func newGogsFake(t *testing.T, existing ...Comment) (*fakeServer, *GogsPoster) {
+	t.Helper()
+	srv := newFakeServer(t, existing...)
 	p, err := NewGogsPoster(srv.URL, "tok", "o/r", 1)
 	require.NoError(t, err)
-	require.NoError(t, upsert(context.Background(), p, "report", true))
+	return srv, p
+}
+
+func TestUpdateNotFoundFallsBackToCreate(t *testing.T) {
+	// the marked comment is listed, but editing it reports 404 (deleted in the meantime)
+	srv, p := newGogsFake(t, Comment{ID: 1, Body: Marker + " old", Author: fakeUser})
+	srv.patchStatus = http.StatusNotFound
+
+	var warn bytes.Buffer
+	require.NoError(t, upsert(context.Background(), p, "gogs", "", "report", true, &warn))
 
 	comments, _, _ := srv.snapshot()
 	require.Len(t, comments, 2)
-	assert.Equal(t, "report", comments[1].Body)
+	require.Equal(t, "report", comments[1].Body)
+	require.Contains(t, warn.String(), "note: gogs: previous coverage comment 1 no longer exists")
+}
+
+func TestUpdateGoneFallsBackToCreate(t *testing.T) {
+	srv, p := newGogsFake(t, Comment{ID: 1, Body: Marker, Author: fakeUser})
+	srv.patchStatus = http.StatusGone
+
+	var warn bytes.Buffer
+	require.NoError(t, upsert(context.Background(), p, "gogs", "", "report", true, &warn))
+	comments, _, _ := srv.snapshot()
+	require.Len(t, comments, 2)
+	require.Contains(t, warn.String(), "no longer exists")
+}
+
+func TestUpdateOtherFailureDoesNotCreate(t *testing.T) {
+	for _, status := range []int{http.StatusForbidden, http.StatusUnauthorized, http.StatusInternalServerError} {
+		t.Run(strconv.Itoa(status), func(t *testing.T) {
+			srv, p := newGogsFake(t, Comment{ID: 1, Body: Marker + " old", Author: fakeUser})
+			srv.patchStatus = status
+
+			var warn bytes.Buffer
+			require.NoError(t, upsert(context.Background(), p, "gogs", "", "report", true, &warn))
+
+			comments, _, _ := srv.snapshot()
+			require.Len(t, comments, 1, "no duplicate comment may be added")
+			require.Equal(t, Marker+" old", comments[0].Body)
+			require.Contains(t, warn.String(), "warning: gogs: failed to update coverage comment 1")
+			require.Contains(t, warn.String(), strconv.Itoa(status))
+		})
+	}
+}
+
+func TestUpdateIgnoresCommentsByOthers(t *testing.T) {
+	// a person quoting the marker must not be edited; a new comment is added instead
+	srv, p := newGogsFake(t, Comment{ID: 1, Body: "> " + Marker + " quoted", Author: "human"})
+
+	var warn bytes.Buffer
+	require.NoError(t, upsert(context.Background(), p, "gogs", "", "report", true, &warn))
+
+	comments, _, requests := srv.snapshot()
+	require.Len(t, comments, 2)
+	require.Equal(t, "> "+Marker+" quoted", comments[0].Body)
+	require.Equal(t, "report", comments[1].Body)
+	require.NotContains(t, strings.Join(requests, "\n"), "PATCH")
+	require.Empty(t, warn.String())
+}
+
+func TestUpdateEditsNewestOwnComment(t *testing.T) {
+	// listed newest first (as GitLab does) with a human quote in between
+	srv, p := newGogsFake(t,
+		Comment{ID: 9, Body: Marker + " newest", Author: fakeUser},
+		Comment{ID: 7, Body: "> " + Marker, Author: "human"},
+		Comment{ID: 3, Body: Marker + " oldest", Author: fakeUser},
+	)
+	srv.allowed = map[string]bool{
+		"GET /api/v1/user":                            true,
+		"GET /api/v1/repos/o/r/issues/1/comments":     true,
+		"PATCH /api/v1/repos/o/r/issues/1/comments/9": true,
+	}
+
+	require.NoError(t, upsert(context.Background(), p, "gogs", "", "report", true, io.Discard))
+
+	comments, _, _ := srv.snapshot()
+	require.Len(t, comments, 3)
+	require.Equal(t, "report", comments[0].Body)
+	require.Equal(t, Marker+" oldest", comments[2].Body)
+}
+
+func TestUpdateUserLookupFailureCreates(t *testing.T) {
+	srv, p := newGogsFake(t, Comment{ID: 1, Body: Marker, Author: fakeUser})
+	handler := srv.Config.Handler
+	srv.Config.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if strings.HasSuffix(r.URL.Path, "/user") {
+			w.WriteHeader(http.StatusUnauthorized)
+			return
+		}
+		handler.ServeHTTP(w, r)
+	})
+
+	var warn bytes.Buffer
+	require.NoError(t, upsert(context.Background(), p, "gogs", "", "report", true, &warn))
+
+	comments, _, requests := srv.snapshot()
+	require.Len(t, comments, 2, "falls back to create without editing anything")
+	require.Equal(t, Marker, comments[0].Body)
+	require.NotContains(t, strings.Join(requests, "\n"), "PATCH")
+	require.Contains(t, warn.String(), "warning: gogs: cannot identify the token's user")
+}
+
+// newGitHubFake returns a GitHub poster backed by a fake server whose GET /user answers
+// userStatus (when non-zero), holding existing comments.
+func newGitHubFake(t *testing.T, userStatus int, existing ...Comment) (*fakeServer, *GitHubPoster) {
+	t.Helper()
+	srv := newFakeServer(t, existing...)
+	srv.userStatus = userStatus
+	p, err := NewGitHubPoster(srv.URL, "tok", "o/r", 1)
+	require.NoError(t, err)
+	return srv, p
+}
+
+func TestGitHubActionsTokenUpdatesBotComment(t *testing.T) {
+	// the Actions GITHUB_TOKEN cannot call GET /user; its comments are by github-actions[bot]
+	t.Setenv("GITHUB_ACTIONS", "true")
+	srv, p := newGitHubFake(t, http.StatusForbidden,
+		Comment{ID: 1, Body: "> " + Marker + " quoted", Author: "human"},
+		Comment{ID: 2, Body: Marker + " old", Author: "github-actions[bot]"},
+	)
+
+	var warn bytes.Buffer
+	require.NoError(t, upsert(context.Background(), p, "github", "", "report", true, &warn))
+
+	comments, _, requests := srv.snapshot()
+	require.Len(t, comments, 2, "the bot comment is edited, not duplicated")
+	require.Equal(t, "report", comments[1].Body)
+	require.Equal(t, "PATCH /api/v3/repos/o/r/issues/comments/2", requests[len(requests)-1])
+	require.Empty(t, warn.String())
+}
+
+func TestGitHubForbiddenUserOutsideActionsWarnsAndCreates(t *testing.T) {
+	t.Setenv("GITHUB_ACTIONS", "")
+	srv, p := newGitHubFake(t, http.StatusForbidden,
+		Comment{ID: 2, Body: Marker + " old", Author: "github-actions[bot]"})
+
+	var warn bytes.Buffer
+	require.NoError(t, upsert(context.Background(), p, "github", "", "report", true, &warn))
+
+	comments, _, requests := srv.snapshot()
+	require.Len(t, comments, 2)
+	require.Equal(t, Marker+" old", comments[0].Body)
+	require.NotContains(t, strings.Join(requests, "\n"), "PATCH")
+	require.Contains(t, warn.String(), "cannot identify the token's user")
+	require.Contains(t, warn.String(), "--comment-author")
+}
+
+func TestGitHubActionsOtherUserErrorStillWarns(t *testing.T) {
+	// only a 403 selects the Actions identity
+	t.Setenv("GITHUB_ACTIONS", "true")
+	srv, p := newGitHubFake(t, http.StatusInternalServerError,
+		Comment{ID: 2, Body: Marker + " old", Author: "github-actions[bot]"})
+
+	var warn bytes.Buffer
+	require.NoError(t, upsert(context.Background(), p, "github", "", "report", true, &warn))
+
+	comments, _, _ := srv.snapshot()
+	require.Len(t, comments, 2)
+	require.Contains(t, warn.String(), "cannot identify the token's user")
+}
+
+func TestAuthorOverrideSkipsUserLookup(t *testing.T) {
+	t.Setenv("GITHUB_ACTIONS", "")
+	srv, p := newGitHubFake(t, http.StatusForbidden,
+		Comment{ID: 1, Body: Marker + " mine", Author: "ci-bot"},
+		Comment{ID: 2, Body: Marker + " yours", Author: fakeUser},
+	)
+
+	var warn bytes.Buffer
+	require.NoError(t, upsert(context.Background(), p, "github", "ci-bot", "report", true, &warn))
+
+	comments, _, requests := srv.snapshot()
+	require.Len(t, comments, 2)
+	require.Equal(t, "report", comments[0].Body)
+	require.Equal(t, Marker+" yours", comments[1].Body, "other authors are left alone")
+	require.Equal(t, []string{
+		"GET /api/v3/repos/o/r/issues/1/comments",
+		"PATCH /api/v3/repos/o/r/issues/comments/1",
+	}, requests, "GET /user must not be called")
+	require.Empty(t, warn.String())
+}
+
+func TestGiteaActionsUserIsMatched(t *testing.T) {
+	// a Gitea Actions task token answers GET /user as the "gitea-actions" system user, which is
+	// also the author of the comments it posts, so no special casing is needed.
+	srv := newFakeServer(t, Comment{ID: 1, Body: Marker + " old", Author: "gitea-actions"})
+	srv.userAs = "gitea-actions"
+	p, err := NewGiteaPoster(srv.URL, "tok", "o/r", 1)
+	require.NoError(t, err)
+
+	require.NoError(t, upsert(context.Background(), p, "gitea", "", "report", true, io.Discard))
+
+	comments, _, _ := srv.snapshot()
+	require.Len(t, comments, 1)
+	require.Equal(t, "report", comments[0].Body)
+}
+
+func TestUpdateNotFoundSentinelPerPlatform(t *testing.T) {
+	srv := newFakeServer(t)
+	for _, platform := range config.CommentPlatforms {
+		t.Run(platform, func(t *testing.T) {
+			p, err := NewPoster(&config.PlatformConfig{
+				Type: platform, BaseURL: srv.URL, Token: "tok", Repository: "o/r", PullRequestID: 1,
+			})
+			require.NoError(t, err)
+			// the fake answers 404 for a comment id it does not hold
+			err = p.UpdateComment(context.Background(), 12345, "x")
+			require.ErrorIs(t, err, ErrNotFound)
+		})
+	}
+}
+
+func TestUpdateForbiddenIsNotNotFound(t *testing.T) {
+	srv := newFakeServer(t)
+	srv.patchStatus = http.StatusForbidden
+	for _, platform := range config.CommentPlatforms {
+		t.Run(platform, func(t *testing.T) {
+			p, err := NewPoster(&config.PlatformConfig{
+				Type: platform, BaseURL: srv.URL, Token: "tok", Repository: "o/r", PullRequestID: 1,
+			})
+			require.NoError(t, err)
+			err = p.UpdateComment(context.Background(), 1, "x")
+			require.Error(t, err)
+			require.NotErrorIs(t, err, ErrNotFound)
+		})
+	}
+}
+
+func TestCurrentUserPerPlatform(t *testing.T) {
+	srv := newFakeServer(t)
+	for _, platform := range config.CommentPlatforms {
+		t.Run(platform, func(t *testing.T) {
+			p, err := NewPoster(&config.PlatformConfig{
+				Type: platform, BaseURL: srv.URL, Token: "tok", Repository: "o/r", PullRequestID: 1,
+			})
+			require.NoError(t, err)
+			user, err := p.CurrentUser(context.Background())
+			require.NoError(t, err)
+			require.Equal(t, fakeUser, user)
+		})
+	}
+}
+
+func TestListCommentsReportsAuthor(t *testing.T) {
+	srv := newFakeServer(t, Comment{ID: 1, Body: "hi", Author: "human"})
+	for _, platform := range config.CommentPlatforms {
+		t.Run(platform, func(t *testing.T) {
+			p, err := NewPoster(&config.PlatformConfig{
+				Type: platform, BaseURL: srv.URL, Token: "tok", Repository: "o/r", PullRequestID: 1,
+			})
+			require.NoError(t, err)
+			comments, err := p.ListComments(context.Background())
+			require.NoError(t, err)
+			require.Equal(t, []Comment{{ID: 1, Body: "hi", Author: "human"}}, comments)
+		})
+	}
 }
 
 func TestIsPublicGitHub(t *testing.T) {
 	for _, u := range []string{"", "https://github.com", "https://api.github.com/", "HTTPS://API.GITHUB.COM"} {
-		assert.True(t, isPublicGitHub(u), u)
+		require.True(t, isPublicGitHub(u), u)
 	}
-	assert.False(t, isPublicGitHub("https://github.example.com"))
+	require.False(t, isPublicGitHub("https://github.example.com"))
 }
 
 func TestCodeCell(t *testing.T) {
-	assert.Equal(t, "`pkg/a.go`", codeCell("pkg/a.go"))
-	assert.Equal(t, "`pkg/a\\|b.go`", codeCell("pkg/a|b.go"))
-	assert.Equal(t, "`` pkg/a`b.go ``", codeCell("pkg/a`b.go"))
+	require.Equal(t, "`pkg/a.go`", codeCell("pkg/a.go"))
+	require.Equal(t, "`pkg/a\\|b.go`", codeCell("pkg/a|b.go"))
+	require.Equal(t, "`` pkg/a`b.go ``", codeCell("pkg/a`b.go"))
 }

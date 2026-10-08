@@ -236,6 +236,7 @@ comment:
     repository: group/project
     pullRequestId: 4
     updateExisting: true
+    author: ci-bot
 `
 	tmpFile := path.Join(t.TempDir(), "comment.yaml")
 	require.NoError(t, os.WriteFile(tmpFile, []byte(yaml), 0600))
@@ -247,6 +248,7 @@ comment:
 	require.Equal(t, "group/project", cfg.Comment.Platform.Repository)
 	require.Equal(t, 4, cfg.Comment.Platform.PullRequestID)
 	require.True(t, cfg.Comment.Platform.UpdateExisting)
+	require.Equal(t, "ci-bot", cfg.Comment.Platform.Author)
 	require.True(t, cfg.Comment.Platform.IncludeColors, "includeColors defaults to true")
 }
 

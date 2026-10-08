@@ -11,7 +11,6 @@ import (
 	"github.com/mach6/go-covercheck/pkg/config"
 	"github.com/mach6/go-covercheck/pkg/test"
 	"github.com/spf13/cobra"
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -29,8 +28,9 @@ func commentArgs(t *testing.T, baseURL string, extra ...string) []string {
 
 func Test_run_CommentPosted(t *testing.T) {
 	var (
-		mu     sync.Mutex
-		bodies []string
+		mu      sync.Mutex
+		bodies  []string
+		payload []string
 	)
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		var in struct {
@@ -39,19 +39,23 @@ func Test_run_CommentPosted(t *testing.T) {
 		_ = json.NewDecoder(r.Body).Decode(&in)
 		mu.Lock()
 		bodies = append(bodies, r.Method+" "+r.URL.Path)
+		payload = append(payload, in.Body)
 		mu.Unlock()
-		assert.Contains(t, in.Body, comment.Marker)
 		w.WriteHeader(http.StatusCreated)
 		_, _ = w.Write([]byte(`{"id":1}`))
 	}))
 	t.Cleanup(srv.Close)
 
 	cmd := setupTestCmd()
-	cmd.SetArgs(commentArgs(t, srv.URL))
+	cmd.SetArgs(commentArgs(t, srv.URL, "--comment-no-emoji"))
 	_, stdErr, err := runCmdForTest(t, cmd)
 	require.NoError(t, err)
 	require.Empty(t, stdErr)
 	require.Equal(t, []string{"POST /api/v1/repos/o/r/issues/3/comments"}, bodies)
+	require.Len(t, payload, 1)
+	require.Contains(t, payload[0], comment.Marker)
+	require.Contains(t, payload[0], "PASS")
+	require.NotContains(t, payload[0], "🟢")
 }
 
 func Test_run_CommentPostFailureIsAWarning(t *testing.T) {
@@ -95,6 +99,8 @@ func TestApplyConfigOverrides_CommentFlags(t *testing.T) {
 		CommentTokenFlag:    "tok",
 		CommentPRFlag:       "9",
 		CommentUpdateFlag:   "true",
+		CommentAuthorFlag:   "ci-bot",
+		CommentNoEmojiFlag:  "true",
 	} {
 		require.NoError(t, cmd.Flags().Set(flag, value))
 	}
@@ -108,7 +114,8 @@ func TestApplyConfigOverrides_CommentFlags(t *testing.T) {
 			Token:          "tok",
 			Repository:     "from/config",
 			PullRequestID:  9,
-			IncludeColors:  true,
+			IncludeColors:  false,
+			Author:         "ci-bot",
 			UpdateExisting: true,
 		},
 	}, cfg.Comment)
