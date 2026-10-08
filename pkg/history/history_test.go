@@ -437,3 +437,54 @@ func TestHistory_DeleteByRef_NonExistent(t *testing.T) {
 	require.False(t, deleted)
 	require.Len(t, h.Entries, 1)
 }
+
+func TestShortCommit(t *testing.T) {
+	tests := []struct {
+		name   string
+		commit string
+		want   string
+	}{
+		{"empty", "", ""},
+		{"short", "abc", "abc"},
+		{"exactly seven", "abcdef1", "abcdef1"},
+		{"full hash", "e402629a1b2c3d4e5f60718293a4b5c6d7e8f901", "e402629"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			require.Equal(t, tt.want, ShortCommit(tt.commit))
+		})
+	}
+}
+
+func TestHistory_FindByRef_ShortCommits(t *testing.T) {
+	const full = "e402629a1b2c3d4e5f60718293a4b5c6d7e8f901"
+	h := New("")
+	require.NotNil(t, h)
+	h.Entries = []Entry{
+		{Label: "empty", Commit: ""},
+		{Label: "short", Commit: "abc"},
+		{Label: "full", Commit: full},
+	}
+
+	require.NotPanics(t, func() {
+		require.Equal(t, "short", h.FindByRef("abc").Label)
+		require.Equal(t, "full", h.FindByRef("e402629").Label)
+		require.Equal(t, "full", h.FindByRef(full).Label)
+		require.Equal(t, "empty", h.FindByRef("empty").Label)
+		require.Nil(t, h.FindByRef("nope"))
+	})
+}
+
+func TestHistory_DeleteByRef_ShortCommits(t *testing.T) {
+	h := New("")
+	require.NotNil(t, h)
+	h.Entries = []Entry{
+		{Label: "empty", Commit: ""},
+		{Label: "short", Commit: "abc"},
+	}
+
+	require.NotPanics(t, func() {
+		require.True(t, h.DeleteByRef("abc"))
+		require.False(t, h.DeleteByRef("nope"))
+	})
+}

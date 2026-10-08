@@ -51,7 +51,7 @@ func getHistoryTableStyle(cfg *config.Config) table.Style {
 func CompareHistory(ref string, refEntry *history.Entry, results compute.Results) {
 	fmt.Printf("\n≡ Comparing against ref: %s [commit %s]\n",
 		color.New(color.FgBlue).Sprint(ref),
-		color.New(color.FgHiBlack).Sprint(refEntry.Commit[:7]),
+		color.New(color.FgHiBlack).Sprint(history.ShortCommit(refEntry.Commit)),
 	)
 
 	bPrintedFile := compareByFile(results, refEntry)
@@ -222,7 +222,7 @@ func ShowHistory(h *history.History, limit int, cfg *config.Config) {
 
 		t.AppendRow(table.Row{
 			fmt.Sprintf("%-10s", entry.Timestamp.Format("2006-01-02")),
-			fmt.Sprintf("%-7s", entry.Commit[:7]),
+			fmt.Sprintf("%-7s", history.ShortCommit(entry.Commit)),
 			fmt.Sprintf("%-15s", entry.Branch),
 			fmt.Sprintf("%-15s", wrapText(strings.Join(entry.Tags, ", "), wrapTextWidth)),
 			wrapText(fmt.Sprintf("%-15s", entry.Label), wrapTextWidth),

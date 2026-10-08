@@ -17,6 +17,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   bug when the same profile set is routed through both the `--inspect` path
   and the regular reporting path.
 
+### Fixed
+
+* History lookup (`FindByRef`, `DeleteByRef`) and the history/compare output no
+  longer panic when an entry's commit is shorter than 7 characters, such as in
+  a hand-edited or truncated history file.
+
 ## [v0.6.1] - 2025-08-05
 
 ## What's Changed

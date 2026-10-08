@@ -101,10 +101,22 @@ func (h *History) Save(limit int) error {
 	return os.WriteFile(h.path, b, 0600) //nolint:mnd
 }
 
+// shortCommitLen is the number of characters shown for an abbreviated commit hash.
+const shortCommitLen = 7
+
+// ShortCommit returns the abbreviated form of a commit hash. Commits shorter than
+// the abbreviation length (e.g. from a hand-edited history file) are returned as is.
+func ShortCommit(commit string) string {
+	if len(commit) <= shortCommitLen {
+		return commit
+	}
+	return commit[:shortCommitLen]
+}
+
 // FindByRef finds a History Entry that matches the ref string and returns it.
 func (h *History) FindByRef(ref string) *Entry {
 	for _, entry := range h.Entries {
-		if entry.Commit == ref || entry.Commit[:7] == ref ||
+		if entry.Commit == ref || ShortCommit(entry.Commit) == ref ||
 			entry.Branch == ref || entry.Label == ref {
 			return &entry
 		}
@@ -120,7 +132,7 @@ func (h *History) FindByRef(ref string) *Entry {
 // DeleteByRef deletes a History Entry that matches the ref string and returns true if found and deleted.
 func (h *History) DeleteByRef(ref string) bool {
 	for i, entry := range h.Entries {
-		if entry.Commit == ref || (len(entry.Commit) >= 7 && entry.Commit[:7] == ref) ||
+		if entry.Commit == ref || ShortCommit(entry.Commit) == ref ||
 			entry.Branch == ref || entry.Label == ref {
 			// Remove the entry at index i
 			h.Entries = append(h.Entries[:i], h.Entries[i+1:]...)
