@@ -226,3 +226,46 @@ func TestValidate_SyntaxStyle(t *testing.T) {
 		require.Contains(t, err.Error(), "syntax-style")
 	})
 }
+
+func loadYAMLForTest(t *testing.T, yaml string) *config.Config {
+	t.Helper()
+
+	p := path.Join(t.TempDir(), "config.yml")
+	require.NoError(t, os.WriteFile(p, []byte(yaml), 0600))
+	cfg, err := config.Load(p)
+	require.NoError(t, err)
+	return cfg
+}
+
+func TestLoad_TotalDefaultsToGlobalThresholds(t *testing.T) {
+	cfg := loadYAMLForTest(t, "statementThreshold: 90\nblockThreshold: 80\nlineThreshold: 85\n")
+	require.InDelta(t, 90.0, cfg.Total[config.StatementsSection], 0)
+	require.InDelta(t, 80.0, cfg.Total[config.BlocksSection], 0)
+	require.InDelta(t, 85.0, cfg.Total[config.LinesSection], 0)
+}
+
+func TestLoad_ExplicitTotalWinsOverGlobal(t *testing.T) {
+	cfg := loadYAMLForTest(t, "statementThreshold: 90\nblockThreshold: 80\nlineThreshold: 85\n"+
+		"total:\n  statements: 10\n  blocks: 0\n")
+	require.InDelta(t, 10.0, cfg.Total[config.StatementsSection], 0)
+	require.InDelta(t, 0.0, cfg.Total[config.BlocksSection], 0) // explicit 0 means disabled, not unset
+	require.InDelta(t, 85.0, cfg.Total[config.LinesSection], 0) // unset total follows its global
+}
+
+func TestLoad_NoThresholdsUsesBuiltInDefaults(t *testing.T) {
+	cfg := loadYAMLForTest(t, "sortBy: lines\n")
+	require.InDelta(t, config.StatementThresholdDefault, cfg.Total[config.StatementsSection], 0)
+	require.InDelta(t, config.BlockThresholdDefault, cfg.Total[config.BlocksSection], 0)
+	require.InDelta(t, config.LineThresholdDefault, cfg.Total[config.LinesSection], 0)
+}
+
+func TestValidate_DerivedTotalFollowsGlobalButExplicitDoesNot(t *testing.T) {
+	cfg := new(config.Config)
+	cfg.ApplyDefaults()
+	cfg.SetTotalThreshold(config.BlocksSection, 20)
+	cfg.StatementThreshold = 95
+	cfg.BlockThreshold = 95
+	require.NoError(t, cfg.Validate())
+	require.InDelta(t, 95.0, cfg.Total[config.StatementsSection], 0)
+	require.InDelta(t, 20.0, cfg.Total[config.BlocksSection], 0)
+}

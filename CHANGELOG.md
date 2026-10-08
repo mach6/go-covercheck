@@ -17,6 +17,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   bug when the same profile set is routed through both the `--inspect` path
   and the regular reporting path.
 
+### Fixed
+
+* Global `statementThreshold`, `blockThreshold`, and `lineThreshold` set in the
+  config file now carry over to the `total` thresholds that are not set
+  explicitly, as documented. Previously the totals stayed at the built-in
+  defaults (70/50/50) unless the global values were given as CLI flags.
+  `config.Config.SetTotalThreshold` was added for setting an explicit total.
+
 ## [v0.6.1] - 2025-08-05
 
 ## What's Changed

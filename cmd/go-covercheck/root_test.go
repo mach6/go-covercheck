@@ -466,3 +466,55 @@ func TestApplyConfigOverrides_TableStyleNoConfigFile(t *testing.T) {
 	applyConfigOverrides(cfg, cmd, true)
 	require.Equal(t, config.TableStyleLight, cfg.TableStyle)
 }
+
+func TestGetConfig_TotalThresholdPrecedence(t *testing.T) {
+	const (
+		globalOnly     = "statementThreshold: 90\nblockThreshold: 80\nlineThreshold: 85\n"
+		globalAndTotal = globalOnly + "total:\n  statements: 10\n  blocks: 0\n"
+	)
+	tests := []struct {
+		name       string
+		yaml       string
+		args       []string
+		statements float64
+		blocks     float64
+		lines      float64
+	}{
+		{"config global only", globalOnly, nil, 90, 80, 85},
+		{"config global and config total", globalAndTotal, nil, 10, 0, 85},
+		{"config global and total flag", globalOnly, []string{"-S", "20", "-B", "0"}, 20, 0, 85},
+		{"config total beats global flag", globalAndTotal, []string{"-s", "95", "-n", "60"}, 10, 0, 60},
+		{"config global overridden by global flag", globalOnly, []string{"-s", "95", "-b", "65", "-n", "60"}, 95, 65, 60},
+		{"total flag beats config and global flag", globalAndTotal, []string{"-s", "95", "-S", "30"}, 30, 0, 85},
+		{"explicit default total survives global flag", "total:\n  statements: 70\n", []string{"-s", "95"}, 70, 50, 50},
+		{"no thresholds uses defaults", "", nil, 70, 50, 50},
+		{"global flag only", "", []string{"-s", "95", "-b", "65", "-n", "60"}, 95, 65, 60},
+		{"global flag of 0 disables totals", "", []string{"-s", "0"}, 0, 50, 50},
+		{"total flag only", "", []string{"-S", "20"}, 20, 50, 50},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			path := test.CreateTempConfigFile(t, tt.yaml)
+			cmd := &cobra.Command{}
+			initFlags(cmd)
+			require.NoError(t, cmd.ParseFlags(append([]string{"--config", path}, tt.args...)))
+
+			cfg, err := getConfig(cmd)
+			require.NoError(t, err)
+			require.InDelta(t, tt.statements, cfg.Total[config.StatementsSection], 0)
+			require.InDelta(t, tt.blocks, cfg.Total[config.BlocksSection], 0)
+			require.InDelta(t, tt.lines, cfg.Total[config.LinesSection], 0)
+		})
+	}
+}
+
+func TestGetConfig_NoConfigFile_TotalThresholdFollowsGlobalFlag(t *testing.T) {
+	cmd := &cobra.Command{}
+	initFlags(cmd)
+	require.NoError(t, cmd.ParseFlags([]string{"--config", "does-not-exist.yml", "-s", "95"}))
+
+	cfg, err := getConfig(cmd)
+	require.NoError(t, err)
+	require.InDelta(t, 95.0, cfg.Total[config.StatementsSection], 0)
+	require.InDelta(t, 50.0, cfg.Total[config.BlocksSection], 0)
+}

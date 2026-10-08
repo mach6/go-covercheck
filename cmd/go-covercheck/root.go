@@ -479,9 +479,9 @@ func applyConfigOverrides(cfg *config.Config, cmd *cobra.Command, noConfigFile b
 	applyFloat64FlagOverride(cmd, StatementThresholdFlag, &cfg.StatementThreshold, noConfigFile)
 	applyFloat64FlagOverride(cmd, BlockThresholdFlag, &cfg.BlockThreshold, noConfigFile)
 	applyFloat64FlagOverride(cmd, LineThresholdFlag, &cfg.LineThreshold, noConfigFile)
-	applyFloat64TotalFlagOverride(cmd, TotalStatementThresholdFlag, config.StatementsSection, cfg.Total)
-	applyFloat64TotalFlagOverride(cmd, TotalBlockThresholdFlag, config.BlocksSection, cfg.Total)
-	applyFloat64TotalFlagOverride(cmd, TotalLineThresholdFlag, config.LinesSection, cfg.Total)
+	applyFloat64TotalFlagOverride(cmd, TotalStatementThresholdFlag, config.StatementsSection, cfg)
+	applyFloat64TotalFlagOverride(cmd, TotalBlockThresholdFlag, config.BlocksSection, cfg)
+	applyFloat64TotalFlagOverride(cmd, TotalLineThresholdFlag, config.LinesSection, cfg)
 	applyStringFlagOverride(cmd, SortByFlag, &cfg.SortBy, noConfigFile)
 	applyStringFlagOverride(cmd, SortOrderFlag, &cfg.SortOrder, noConfigFile)
 	applyStringArrayFlagOverride(cmd, SkipFlag, &cfg.Skip, noConfigFile)
@@ -501,20 +501,6 @@ func applyConfigOverrides(cfg *config.Config, cmd *cobra.Command, noConfigFile b
 	applyIntFlagOverride(cmd, InspectContextFlag, &cfg.InspectContext, noConfigFile)
 	applyStringFlagOverride(cmd, ModuleNameFlag, &cfg.ModuleName, noConfigFile)
 	applyStringFlagOverride(cmd, DiffFromFlag, &cfg.DiffFrom, noConfigFile)
-
-	// set cfg.Total thresholds to the global values, iff no override was specified for each.
-	if v, _ := cmd.Flags().GetFloat64(StatementThresholdFlag); !cmd.Flags().Changed(TotalStatementThresholdFlag) &&
-		cfg.Total[config.StatementsSection] == config.StatementThresholdDefault {
-		cfg.Total[config.StatementsSection] = v
-	}
-	if v, _ := cmd.Flags().GetFloat64(BlockThresholdFlag); !cmd.Flags().Changed(TotalBlockThresholdFlag) &&
-		cfg.Total[config.BlocksSection] == config.BlockThresholdDefault {
-		cfg.Total[config.BlocksSection] = v
-	}
-	if v, _ := cmd.Flags().GetFloat64(LineThresholdFlag); !cmd.Flags().Changed(TotalLineThresholdFlag) &&
-		cfg.Total[config.LinesSection] == config.LineThresholdDefault {
-		cfg.Total[config.LinesSection] = v
-	}
 }
 
 func applyFloat64FlagOverride(cmd *cobra.Command, flagName string, target *float64, noConfigFile bool) {
@@ -523,9 +509,9 @@ func applyFloat64FlagOverride(cmd *cobra.Command, flagName string, target *float
 	}
 }
 
-func applyFloat64TotalFlagOverride(cmd *cobra.Command, flagName string, section string, target map[string]float64) {
+func applyFloat64TotalFlagOverride(cmd *cobra.Command, flagName string, section string, cfg *config.Config) {
 	if v, _ := cmd.Flags().GetFloat64(flagName); cmd.Flags().Changed(flagName) {
-		target[section] = v
+		cfg.SetTotalThreshold(section, v)
 	}
 }
 

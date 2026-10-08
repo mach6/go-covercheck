@@ -120,6 +120,10 @@ type Config struct {
 	// not configurable via YAML
 	InspectFiles []string `yaml:"-"`
 	Inspect      bool     `yaml:"-"`
+
+	// derivedTotals records the total thresholds that were derived from the global thresholds
+	// (rather than set explicitly), keyed by section, so they can follow later changes to the globals.
+	derivedTotals map[string]float64
 }
 
 // Load a Config from a path or produce an error.
@@ -130,6 +134,9 @@ func Load(path string) (*Config, error) {
 	}
 	cfg := new(Config)
 	cfg.ApplyDefaults()
+	// Totals present in the file are explicit; any left out are derived from the global thresholds by Validate.
+	cfg.Total = nil
+	cfg.derivedTotals = nil
 	err = yaml.Unmarshal(data, cfg)
 	if err != nil {
 		return nil, err
@@ -231,6 +238,16 @@ func (c *Config) Validate() error { //nolint:cyclop
 	return nil
 }
 
+// SetTotalThreshold sets an explicit total threshold for a section (StatementsSection, BlocksSection, or
+// LinesSection), which then no longer follows the global threshold.
+func (c *Config) SetTotalThreshold(section string, threshold float64) {
+	if c.Total == nil {
+		c.Total = PerOverride{}
+	}
+	c.Total[section] = threshold
+	delete(c.derivedTotals, section)
+}
+
 func (c *Config) initPerFileWhenNil() {
 	if c.PerFile.Blocks == nil {
 		c.PerFile.Blocks = PerOverride{}
@@ -255,17 +272,27 @@ func (c *Config) initPerPackageWhenNil() {
 	}
 }
 
+// setTotalThresholds fills in each total threshold that is not explicitly set with the matching global
+// threshold, and keeps previously derived totals in sync with the global thresholds. A total of 0
+// (disabled) that is present is explicit and is never replaced.
 func (c *Config) setTotalThresholds(totalStatement, totalBlock, totalLine float64) {
 	if c.Total == nil {
 		c.Total = PerOverride{}
 	}
-	if _, exists := c.Total[StatementsSection]; !exists {
-		c.Total[StatementsSection] = totalStatement
+	if c.derivedTotals == nil {
+		c.derivedTotals = map[string]float64{}
 	}
-	if _, exists := c.Total[BlocksSection]; !exists {
-		c.Total[BlocksSection] = totalBlock
-	}
-	if _, exists := c.Total[LinesSection]; !exists {
-		c.Total[LinesSection] = totalLine
+	for section, global := range map[string]float64{
+		StatementsSection: totalStatement,
+		BlocksSection:     totalBlock,
+		LinesSection:      totalLine,
+	} {
+		current, exists := c.Total[section]
+		if derived, wasDerived := c.derivedTotals[section]; exists && (!wasDerived || current != derived) {
+			delete(c.derivedTotals, section)
+			continue
+		}
+		c.Total[section] = global
+		c.derivedTotals[section] = global
 	}
 }
