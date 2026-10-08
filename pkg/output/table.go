@@ -120,6 +120,7 @@ const (
 // accounting for the actual rendered widths of the other columns — it is
 // ellipsis-truncated via trimWithEllipsis rather than letting go-pretty clip
 // the whole row with its "≈" marker.
+//
 //nolint:cyclop // split into per-column + remaining-width passes; merging hurts readability
 func applyTableWidths(columnConfigs []table.ColumnConfig, cfg *config.Config, results compute.Results) {
 	uncoveredIdx := -1
