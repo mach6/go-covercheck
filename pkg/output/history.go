@@ -72,13 +72,9 @@ func compareByPackage(results compute.Results, refEntry *history.Entry) bool {
 			if curr.Package == prev.Package { //nolint:nestif
 				s, ss := formatDelta(curr.StatementPercentage - prev.StatementPercentage)
 				b, sb := formatDelta(curr.BlockPercentage - prev.BlockPercentage)
-				// Handle case where historical data might not have line coverage
-				// Only show line comparison if historical data has line coverage fields
-				l, sl := "", false
-				if prev.Lines != "" {
-					l, sl = formatDelta(curr.LinePercentage - prev.LinePercentage)
-				}
-				if ss || sb || sl {
+				l, sl := recordedDelta(prev.Lines, curr.LinePercentage, prev.LinePercentage)
+				f, sf := recordedDelta(prev.Functions, curr.FunctionPercentage, prev.FunctionPercentage)
+				if ss || sb || sl || sf {
 					if !bPrintedPkg {
 						fmt.Printf(" → By Package\n")
 						bPrintedPkg = true
@@ -96,6 +92,10 @@ func compareByPackage(results compute.Results, refEntry *history.Entry) bool {
 						compareShowL()
 						fmt.Printf("%s [%s]\n", curr.Package, l)
 					}
+					if sf {
+						compareShowF()
+						fmt.Printf("%s [%s]\n", curr.Package, f)
+					}
 				}
 			}
 		}
@@ -108,14 +108,12 @@ func compareByTotal(results compute.Results, refEntry *history.Entry) bool {
 	bPrintedTotal := false
 	deltaS, okS := formatDelta(results.ByTotal.Statements.Percentage - refEntry.Results.ByTotal.Statements.Percentage)
 	deltaB, okB := formatDelta(results.ByTotal.Blocks.Percentage - refEntry.Results.ByTotal.Blocks.Percentage)
-	// Handle case where historical data might not have line coverage
-	// Only show line comparison if historical data has line coverage fields
-	deltaL, okL := "", false
-	if refEntry.Results.ByTotal.Lines.Coverage != "" {
-		deltaL, okL = formatDelta(results.ByTotal.Lines.Percentage - refEntry.Results.ByTotal.Lines.Percentage)
-	}
+	deltaL, okL := recordedDelta(refEntry.Results.ByTotal.Lines.Coverage,
+		results.ByTotal.Lines.Percentage, refEntry.Results.ByTotal.Lines.Percentage)
+	deltaF, okF := recordedDelta(refEntry.Results.ByTotal.Functions.Coverage,
+		results.ByTotal.Functions.Percentage, refEntry.Results.ByTotal.Functions.Percentage)
 
-	if okS || okB || okL {
+	if okS || okB || okL || okF {
 		fmt.Printf(" → By Total\n")
 		bPrintedTotal = true
 		if okS {
@@ -130,6 +128,10 @@ func compareByTotal(results compute.Results, refEntry *history.Entry) bool {
 			compareShowL()
 			fmt.Printf("total [%s]\n", deltaL)
 		}
+		if okF {
+			compareShowF()
+			fmt.Printf("total [%s]\n", deltaF)
+		}
 	}
 	return bPrintedTotal
 }
@@ -143,13 +145,9 @@ func compareByFile(results compute.Results, refEntry *history.Entry) bool {
 			if curr.File == prev.File { //nolint:nestif
 				s, ss := formatDelta(curr.StatementPercentage - prev.StatementPercentage)
 				b, sb := formatDelta(curr.BlockPercentage - prev.BlockPercentage)
-				// Handle case where historical data might not have line coverage
-				// Only show line comparison if historical data has line coverage fields
-				l, sl := "", false
-				if prev.Lines != "" {
-					l, sl = formatDelta(curr.LinePercentage - prev.LinePercentage)
-				}
-				if ss || sb || sl {
+				l, sl := recordedDelta(prev.Lines, curr.LinePercentage, prev.LinePercentage)
+				f, sf := recordedDelta(prev.Functions, curr.FunctionPercentage, prev.FunctionPercentage)
+				if ss || sb || sl || sf {
 					if !bPrintedFile {
 						fmt.Printf(" → By File\n")
 						bPrintedFile = true
@@ -166,6 +164,10 @@ func compareByFile(results compute.Results, refEntry *history.Entry) bool {
 					if sl {
 						compareShowL()
 						fmt.Printf("%s [%s]\n", curr.File, l)
+					}
+					if sf {
+						compareShowF()
+						fmt.Printf("%s [%s]\n", curr.File, f)
 					}
 				}
 			}
@@ -210,14 +212,19 @@ func ShowHistory(h *history.History, limit int, cfg *config.Config) {
 			entry.Results.ByTotal.Blocks.Threshold)
 		lineColor := severityColor(entry.Results.ByTotal.Lines.Percentage,
 			entry.Results.ByTotal.Lines.Threshold)
+		funcColor := severityColor(entry.Results.ByTotal.Functions.Percentage,
+			entry.Results.ByTotal.Functions.Threshold)
 
 		wrapTextWidth := 20
 
-		// Build coverage display string - show line coverage only if data exists
+		// Build coverage display string - show line and function coverage only if data exists
 		coverageDisplay := stmtColor(fmt.Sprintf("%-7s", entry.Results.ByTotal.Statements.Coverage)) + " [S]\n" +
 			blockColor(fmt.Sprintf("%-7s", entry.Results.ByTotal.Blocks.Coverage)) + " [B]"
 		if entry.Results.ByTotal.Lines.Coverage != "" {
 			coverageDisplay += "\n" + lineColor(fmt.Sprintf("%-7s", entry.Results.ByTotal.Lines.Coverage)) + " [L]"
+		}
+		if entry.Results.ByTotal.Functions.Coverage != "" {
+			coverageDisplay += "\n" + funcColor(fmt.Sprintf("%-7s", entry.Results.ByTotal.Functions.Coverage)) + " [F]"
 		}
 
 		t.AppendRow(table.Row{
@@ -245,6 +252,17 @@ func formatDelta(delta float64) (string, bool) {
 		return fmt.Sprintf("−%-4.1f%%", -delta), true
 	}
 	return fmt.Sprintf("+%-4.1f%%", delta), true
+}
+
+// recordedDelta formats curr-prev like formatDelta, but only when the
+// historical entry recorded the metric. Entries saved before line or function
+// coverage existed have an empty coverage string for it, and comparing against
+// their zero percentage would report a bogus delta.
+func recordedDelta(prevCoverage string, curr, prev float64) (string, bool) {
+	if prevCoverage == "" {
+		return "", false
+	}
+	return formatDelta(curr - prev)
 }
 
 func wrapText(text string, width int) string {
@@ -281,4 +299,8 @@ func compareShowB() {
 
 func compareShowL() {
 	fmt.Printf("    [%s] ", color.New(color.FgYellow).Sprint("L"))
+}
+
+func compareShowF() {
+	fmt.Printf("    [%s] ", color.New(color.FgHiBlue).Sprint("F"))
 }

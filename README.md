@@ -7,13 +7,13 @@
 
 A fast, flexible CLI tool for enforcing test coverage thresholds in Go projects.
 
-> Fail builds when coverage drops below acceptable thresholds — by file, statement, block, or line level.
+> Fail builds when coverage drops below acceptable thresholds — by file, statement, block, line, or function level.
 
 ## ✨ Features
 
 - Enforce minimum coverage thresholds for files, packages, and the entire project.
 - Check coverage only on changed files in git diff.
-- Supports statement, block, and 🆕 line coverage separately.
+- Supports statement, block, 🆕 line, and 🆕 function coverage separately.
 - 🆕 Inspect uncovered source code with syntax highlighting (`--inspect`).
 - 🆕 Show uncovered line numbers inline in the coverage table.
 - Native `table`|`json`|`yaml`|`md`|`html`|`csv`|`tsv` output.
@@ -110,10 +110,11 @@ go-covercheck --init
 Here is a sample `.go-covercheck.yml` configuration file:
 
 ```yaml
-# Optional, global thresholds overriding the defaults (70 statements, 50 blocks, 50 lines)
+# Optional, global thresholds overriding the defaults (70 statements, 50 blocks, 50 lines, 0 functions)
 statementThreshold: 65.0
 blockThreshold: 60.0
 lineThreshold: 55.0
+functionThreshold: 60.0
 
 # Optional, table style for table output format (default: light)
 tableStyle: bold
@@ -123,6 +124,7 @@ total:
   statements: 75.0
   blocks: 70.0
   lines: 80.0
+  functions: 75.0
 ```
 
 ### 🧪 Run Tests
@@ -138,39 +140,43 @@ go test ./... --coverprofile coverage.out
 Use the `go-covercheck` CLI to check the coverage against the thresholds defined in the config file or CLI flags.
 
 ```text
-$ go-covercheck coverage.out
-┌────────────┬────────────┬─────────┬──────────┬─────────────┬──────────┬─────────┬─────────────────┐
-│            │ STATEMENTS │ BLOCKS  │  LINES   │ STATEMENT % │ BLOCK %  │ LINE %  │ UNCOVERED LINES │
-├────────────┼────────────┼─────────┼──────────┼─────────────┼──────────┼─────────┼─────────────────┤
-│ BY FILE    │            │         │          │             │          │         │                 │
-├────────────┼────────────┼─────────┼──────────┼─────────────┼──────────┼─────────┼─────────────────┤
-│ cmd/foo.go │        0/1 │     0/1 │      0/3 │         0.0 │      0.0 │     0.0 │ 1-3             │
-│ cmd/bar.go │     20/110 │    7/80 │   25/140 │        18.2 │      8.8 │    17.9 │ 3-8,12,15-22... │
-├────────────┼────────────┼─────────┼──────────┼─────────────┼──────────┼─────────┼─────────────────┤
-│ BY PACKAGE │            │         │          │             │          │         │                 │
-├────────────┼────────────┼─────────┼──────────┼─────────────┼──────────┼─────────┼─────────────────┤
-│ cmd        │     20/111 │    7/81 │   25/143 │        18.0 │      8.6 │    17.5 │                 │
-├────────────┼────────────┼─────────┼──────────┼─────────────┼──────────┼─────────┼─────────────────┤
-│ BY TOTAL   │            │         │          │             │          │         │                 │
-├────────────┼────────────┼─────────┼──────────┼─────────────┼──────────┼─────────┼─────────────────┤
-│            │     20/111 │    7/81 │   25/143 │        18.0 │      8.6 │    17.5 │                 │
-└────────────┴────────────┴─────────┴──────────┴─────────────┴──────────┴─────────┴─────────────────┘
+$ go-covercheck --function-threshold 50 coverage.out
+┌────────────┬────────────┬────────┬────────┬───────────┬─────────────┬─────────┬────────┬────────────┬─────────────────┐
+│            │ STATEMENTS │ BLOCKS │ LINES  │ FUNCTIONS │ STATEMENT % │ BLOCK % │ LINE % │ FUNCTION % │ UNCOVERED LINES │
+├────────────┼────────────┼────────┼────────┼───────────┼─────────────┼─────────┼────────┼────────────┼─────────────────┤
+│ BY FILE    │            │        │        │           │             │         │        │            │                 │
+├────────────┼────────────┼────────┼────────┼───────────┼─────────────┼─────────┼────────┼────────────┼─────────────────┤
+│ cmd/foo.go │        0/1 │    0/1 │    0/3 │       0/1 │         0.0 │     0.0 │    0.0 │        0.0 │ 1-3             │
+│ cmd/bar.go │     20/110 │   7/80 │ 25/140 │       4/9 │        18.2 │     8.8 │   17.9 │       44.4 │ 3-8,12,15-22... │
+├────────────┼────────────┼────────┼────────┼───────────┼─────────────┼─────────┼────────┼────────────┼─────────────────┤
+│ BY PACKAGE │            │        │        │           │             │         │        │            │                 │
+├────────────┼────────────┼────────┼────────┼───────────┼─────────────┼─────────┼────────┼────────────┼─────────────────┤
+│ cmd        │     20/111 │   7/81 │ 25/143 │      4/10 │        18.0 │     8.6 │   17.5 │       40.0 │                 │
+├────────────┼────────────┼────────┼────────┼───────────┼─────────────┼─────────┼────────┼────────────┼─────────────────┤
+│ BY TOTAL   │            │        │        │           │             │         │        │            │                 │
+├────────────┼────────────┼────────┼────────┼───────────┼─────────────┼─────────┼────────┼────────────┼─────────────────┤
+│            │     20/111 │   7/81 │ 25/143 │      4/10 │        18.0 │     8.6 │   17.5 │       40.0 │                 │
+└────────────┴────────────┴────────┴────────┴───────────┴─────────────┴─────────┴────────┴────────────┴─────────────────┘
 ✘ Coverage check failed
  → By File
     [S] cmd/foo.go [+70.0% required for 70.0% threshold]
     [B] cmd/foo.go [+50.0% required for 50.0% threshold]
     [L] cmd/foo.go [+50.0% required for 50.0% threshold]
+    [F] cmd/foo.go [+50.0% required for 50.0% threshold]
     [S] cmd/bar.go [+51.8% required for 70.0% threshold]
     [B] cmd/bar.go [+41.2% required for 50.0% threshold]
     [L] cmd/bar.go [+32.1% required for 50.0% threshold]
+    [F] cmd/bar.go [+5.6% required for 50.0% threshold]
  → By Package
     [S] cmd [+52.0% required for 70.0% threshold]
     [B] cmd [+41.4% required for 50.0% threshold]
     [L] cmd [+32.5% required for 50.0% threshold]
+    [F] cmd [+10.0% required for 50.0% threshold]
  → By Total
     [S] total [+52.0% required for 70.0% threshold]
     [B] total [+41.4% required for 50.0% threshold]
     [L] total [+32.5% required for 50.0% threshold]
+    [F] total [+10.0% required for 50.0% threshold]
 ```
 
 Note: if the file `coverage.out` is not specified, `go-covercheck` will look for a file named `coverage.out` in the current directory.
@@ -194,6 +200,7 @@ Flags:
   -D, --delete-history string             delete historical entry by ref [commit|branch|tag|label]
   -d, --diff-from string                  git reference (commit/branch/tag) to diff from; enables diff-only mode
   -f, --format string                     output format [table|json|yaml|md|html|csv|tsv] (default "table")
+  -g, --function-threshold float          global function threshold to enforce; table|md|html show function columns only when set [0=disabled]
   -h, --help                              help for go-covercheck
       --history-file string               path to go-covercheck history file (default ".go-covercheck.history.json")
       --init                              create a sample .go-covercheck.yml config file in the current directory
@@ -211,12 +218,13 @@ Flags:
   -H, --save-history                      add coverage result to history
   -I, --show-history                      show historical entries in tabular format
   -k, --skip stringArray                  regex string of file(s) and/or package(s) to skip
-      --sort-by string                    sort-by [file|blocks|statements|lines|statement-percent|block-percent|line-percent] (default "file")
+      --sort-by string                    sort-by [file|blocks|statements|lines|functions|statement-percent|block-percent|line-percent|function-percent] (default "file")
       --sort-order string                 sort order [asc|desc] (default "asc")
   -s, --statement-threshold float         global statement threshold to enforce [0=disabled] (default 70)
   -Y, --syntax-style string               syntax highlighting style for code [auto|github|github-dark|monokai|dracula|solarized-dark|vim|emacs|...]; auto picks github or github-dark based on detected terminal background (default "auto")
       --term-width int                    force output to specified column width [0=autodetect]
   -B, --total-block-threshold float       total block threshold to enforce [0=disabled]
+  -G, --total-function-threshold float    total function threshold to enforce [0=disabled]
   -N, --total-line-threshold float        total line threshold to enforce [0=disabled]
   -S, --total-statement-threshold float   total statement threshold to enforce [0=disabled]
   -v, --version                           version for go-covercheck
@@ -328,6 +336,30 @@ Configure with `lineThreshold` in `.go-covercheck.yml`, `--line-threshold` (`-n`
 and `--total-line-threshold` (`-N`) for the project total. Per-file and per-package overrides
 go under a `lines:` map alongside `statements:` and `blocks:`. Failures are reported with the
 `[L]` prefix in the summary.
+
+## 🧩 Function Coverage
+
+`go-covercheck` also counts functions per file, package, and in total, and can enforce a
+function coverage threshold. Every function and method declaration with a body is counted
+(the same set `go tool cover -func` reports, generic functions and methods included); a
+function is covered when any of its code ran. Closures count toward the function that
+declares them, while function literals assigned to package-level variables are not counted.
+Function coverage needs the source files. When a file's source cannot be found or does not
+parse, `go-covercheck` prints one `warning:` line per file to stderr (so json and yaml on stdout
+stay a single valid document) naming the file and the reason. The file reports `0/0` functions,
+which is neutral: it adds nothing to the function totals and never fails a threshold, the same as
+a file that declares none. Line coverage for such a file is estimated from the profile alone.
+
+Function thresholds are disabled (`0`) by default. Configure with `functionThreshold` in
+`.go-covercheck.yml`, `--function-threshold` (`-g`) on the CLI, and
+`--total-function-threshold` (`-G`) for the project total. Per-file and per-package overrides
+go under a `functions:` map. Sort with `--sort-by functions` or `--sort-by function-percent`.
+Failures are reported with the `[F]` prefix in the summary.
+
+The `Functions` and `Function %` columns of the `table`, `md`, and `html` outputs are shown only
+when a function threshold is in effect (a non-zero global threshold, total, or per-file or
+per-package override), which keeps the default table narrow. The `csv`, `tsv`, `json`, and `yaml`
+outputs always include the function fields, so their schema does not depend on configuration.
 
 ### 🎨 Table Styles
 
@@ -531,12 +563,15 @@ $ go-covercheck -f json coverage.out
       "statementCoverage": "150/150",
       "blockCoverage": "1/1",
       "lineCoverage": "200/200",
+      "functionCoverage": "12/12",
       "statementPercentage": 100,
       "blockPercentage": 100,
       "linePercentage": 100,
+      "functionPercentage": 100,
       "statementThreshold": 0,
       "blockThreshold": 0,
       "lineThreshold": 0,
+      "functionThreshold": 0,
       "failed": false,
       "file": "foo"
     }
@@ -546,12 +581,15 @@ $ go-covercheck -f json coverage.out
       "statementCoverage": "150/150",
       "blockCoverage": "1/1",
       "lineCoverage": "200/200",
+      "functionCoverage": "12/12",
       "statementPercentage": 100,
       "blockPercentage": 100,
       "linePercentage": 100,
+      "functionPercentage": 100,
       "statementThreshold": 0,
       "blockThreshold": 0,
       "lineThreshold": 0,
+      "functionThreshold": 0,
       "failed": false,
       "package": "."
     }
@@ -574,6 +612,12 @@ $ go-covercheck -f json coverage.out
       "threshold": 0,
       "percentage": 100,
       "failed": false
+    },
+    "functions": {
+      "coverage": "12/12",
+      "threshold": 0,
+      "percentage": 100,
+      "failed": false
     }
   }
 }
@@ -591,24 +635,30 @@ byFile:
   - statementCoverage: 150/150
     blockCoverage: 1/1
     lineCoverage: 200/200
+    functionCoverage: 12/12
     statementPercentage: 100
     blockPercentage: 100
     linePercentage: 100
+    functionPercentage: 100
     statementThreshold: 0
     blockThreshold: 0
     lineThreshold: 0
+    functionThreshold: 0
     failed: false
     file: foo
 byPackage:
   - statementCoverage: 150/150
     blockCoverage: 1/1
     lineCoverage: 200/200
+    functionCoverage: 12/12
     statementPercentage: 100
     blockPercentage: 100
     linePercentage: 100
+    functionPercentage: 100
     statementThreshold: 0
     blockThreshold: 0
     lineThreshold: 0
+    functionThreshold: 0
     failed: false
     package: .
 byTotal:
@@ -624,6 +674,11 @@ byTotal:
     failed: false
   lines:
     coverage: 200/200
+    threshold: 0
+    percentage: 100
+    failed: false
+  functions:
+    coverage: 12/12
     threshold: 0
     percentage: 100
     failed: false

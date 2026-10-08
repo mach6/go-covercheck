@@ -108,6 +108,23 @@ sortOrder: asc
 			shouldError:    false,
 		},
 		{
+			name: "sortBy functions",
+			yamlContent: `
+sortBy: functions
+`,
+			expectedSortBy: "functions",
+			expectedOrder:  "asc",
+		},
+		{
+			name: "sortBy function-percent",
+			yamlContent: `
+sortBy: function-percent
+sortOrder: desc
+`,
+			expectedSortBy: "function-percent",
+			expectedOrder:  "desc",
+		},
+		{
 			name: "invalid sortBy option",
 			yamlContent: `
 statementThreshold: 70.0
@@ -225,4 +242,60 @@ func TestValidate_SyntaxStyle(t *testing.T) {
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "syntax-style")
 	})
+}
+
+func TestLoad_FunctionThresholds(t *testing.T) {
+	yaml := `
+functionThreshold: 65.0
+perFile:
+  functions:
+    foo/bar.go: 90.0
+perPackage:
+  functions:
+    foo: 80.0
+total:
+  functions: 75.0
+`
+	tmpFile := path.Join(t.TempDir(), "test_config_functions.yaml")
+	require.NoError(t, os.WriteFile(tmpFile, []byte(yaml), 0600))
+
+	cfg, err := config.Load(tmpFile)
+	require.NoError(t, err)
+	require.InDelta(t, 65.0, cfg.FunctionThreshold, 0.001)
+	require.InDelta(t, 90.0, cfg.PerFile.Functions["foo/bar.go"], 0.001)
+	require.InDelta(t, 80.0, cfg.PerPackage.Functions["foo"], 0.001)
+	require.InDelta(t, 75.0, cfg.Total[config.FunctionsSection], 0.001)
+}
+
+func TestApplyDefaults_FunctionThresholdDisabled(t *testing.T) {
+	cfg := &config.Config{}
+	cfg.ApplyDefaults()
+	require.Zero(t, cfg.FunctionThreshold)
+	require.NotNil(t, cfg.PerFile.Functions)
+	require.NotNil(t, cfg.PerPackage.Functions)
+	v, ok := cfg.Total[config.FunctionsSection]
+	require.True(t, ok)
+	require.Zero(t, v)
+}
+
+func TestValidate_FunctionThreshold(t *testing.T) {
+	for _, tc := range []struct {
+		threshold float64
+		wantErr   bool
+	}{
+		{threshold: -0.1, wantErr: true},
+		{threshold: 0},
+		{threshold: 100},
+		{threshold: 100.1, wantErr: true},
+	} {
+		cfg := &config.Config{}
+		cfg.ApplyDefaults()
+		cfg.FunctionThreshold = tc.threshold
+		err := cfg.Validate()
+		if tc.wantErr {
+			require.EqualError(t, err, "function threshold must be between 0 and 100")
+		} else {
+			require.NoError(t, err)
+		}
+	}
 }
