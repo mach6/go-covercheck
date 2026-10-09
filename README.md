@@ -16,7 +16,7 @@ A fast, flexible CLI tool for enforcing test coverage thresholds in Go projects.
 - Supports statement, block, and 🆕 line coverage separately.
 - 🆕 Inspect uncovered source code with syntax highlighting (`--inspect`).
 - 🆕 Show uncovered line numbers inline in the coverage table.
-- Native `table`|`json`|`yaml`|`md`|`html`|`csv`|`tsv` output.
+- Native `table`|`json`|`yaml`|`md`|`html`|`csv`|`tsv`|`heatmap` output.
 - Configurable table styles (`default`|`light`|`bold`|`rounded`|`double`).
 - Configurable via a `.go-covercheck.yml` or CLI flags.
 - Sorting and colored table output.
@@ -193,8 +193,9 @@ Flags:
   -c, --config string                     path to YAML config file (default ".go-covercheck.yml")
   -D, --delete-history string             delete historical entry by ref [commit|branch|tag|label]
   -d, --diff-from string                  git reference (commit/branch/tag) to diff from; enables diff-only mode
-  -f, --format string                     output format [table|json|yaml|md|html|csv|tsv] (default "table")
+  -f, --format string                     output format [table|json|yaml|md|html|csv|tsv|heatmap] (default "table")
   -h, --help                              help for go-covercheck
+      --heatmap-png string                also write a coverage heat map PNG image to this path (ends in .png)
       --history-file string               path to go-covercheck history file (default ".go-covercheck.history.json")
       --init                              create a sample .go-covercheck.yml config file in the current directory
   -U, --inspect                           show uncovered source code
@@ -477,6 +478,7 @@ The available formats are:
 - `html`: Outputs the coverage details in HTML format.
 - `csv`: Outputs the coverage details in CSV format.
 - `tsv`: Outputs the coverage details in TSV (Tab-Separated Values) format.
+- `heatmap`: Outputs the coverage details as a colored grid, one cell per file and package.
 - `table`: Outputs the coverage details in a human-readable table format (default).
 
 
@@ -507,6 +509,53 @@ $ go-covercheck -f table coverage.out -uQ
 Note: `-u` (`--no-summary`) suppresses the failure summary, and `-Q`
 (`--no-uncovered-lines`) drops the "Uncovered Lines" column that is
 rendered by default.
+
+
+### 🔥 Heat Map
+The `heatmap` format draws a grid with one cell per file and per package, showing each name (20 columns wide; longer
+paths are shortened from the left so the file name stays visible) and its statement coverage. Cells follow the order
+set by `--sort-by` and `--sort-order`. As many cells as fit are placed on each row of the terminal width (see
+`--term-width`; 80 columns when it can't be detected), so 100 columns hold four cells per row. On very narrow
+terminals the cells shrink rather than overflow.
+
+The cell color is the [color legend](#-color-legend) applied to the item's statement coverage and its statement
+threshold, so a cell is red when coverage is at or below half of the goal, yellow when it is below the goal, and
+green when the goal is met. An item that fails on blocks or lines is never green. Items without a threshold are grey.
+When color is off (`--no-color`, `NO_COLOR`, or output that isn't a terminal), each level is shown by a shade glyph
+instead: `░` `▒` `█` `·`. The failure summary is printed after the grid, as with `table`.
+
+```text
+$ go-covercheck -f heatmap -w --term-width 60 coverage.out
+ ░  <= 50% of threshold   ▒  below threshold
+ █  threshold met   ·  no threshold
+
+By File
+ pkg/math/math.go       pkg/lines/lines.go
+ █ 100.0%               █ 85.3%
+
+By Package
+ pkg/math       pkg/lines
+ █ 100.0%       █ 85.3%
+
+By Total
+ █  Statements   85.7%  126/147
+ █  Blocks       83.8%  88/105
+ █  Lines        86.2%  150/174
+
+✔ All good
+```
+
+#### PNG heat map
+`--heatmap-png <path>` (or `heatmapPng:` in the config file) additionally writes the same heat map as a PNG image. It is
+an extra output, not a format, so the selected `--format` (and the exit code) is unchanged and CI can keep parsing
+`json` while also archiving the image. Nothing is printed for it, the path must end in `.png`, and a failure to write
+the file is reported on stderr with a non-zero exit.
+
+The image is 904 pixels wide and grows downward: a legend, then the file, package and total sections as 168x40 pixel
+cells, five per row, in the same order and with the same colors as the text heat map. Colors are always used,
+regardless of `--no-color`. Names are shortened from the left to fit, and characters outside printable ASCII are
+drawn as `?`. Very large reports that would exceed 16384 pixels in height are refused with an error; use `--skip` to
+narrow them.
 
 
 ### 📑 Other Tabular Formats

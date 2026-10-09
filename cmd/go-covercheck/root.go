@@ -109,6 +109,9 @@ const (
 	ModuleNameFlagShort = "m"
 	ModuleNameFlagUsage = "explicitly set module name for path normalization (overrides module inference)"
 
+	HeatmapPNGFlag      = "heatmap-png"
+	HeatmapPNGFlagUsage = "also write a coverage heat map PNG image to this path (ends in .png)"
+
 	InitFlag      = "init"
 	InitFlagUsage = "create a sample .go-covercheck.yml config file in the current directory"
 
@@ -186,7 +189,7 @@ var (
 		config.SortOrderDesc,
 	)
 
-	FormatFlagUsage = fmt.Sprintf("output format [%s|%s|%s|%s|%s|%s|%s]",
+	FormatFlagUsage = fmt.Sprintf("output format [%s|%s|%s|%s|%s|%s|%s|%s]",
 		config.FormatTable,
 		config.FormatJSON,
 		config.FormatYAML,
@@ -194,6 +197,7 @@ var (
 		config.FormatHTML,
 		config.FormatCSV,
 		config.FormatTSV,
+		config.FormatHeatmap,
 	)
 
 	SkipFlagDefault []string
@@ -499,6 +503,7 @@ func applyConfigOverrides(cfg *config.Config, cmd *cobra.Command, noConfigFile b
 	applyIntFlagOverride(cmd, TerminalWidthFlag, &cfg.TerminalWidth, noConfigFile)
 	applyIntFlagOverride(cmd, InspectContextFlag, &cfg.InspectContext, noConfigFile)
 	applyStringFlagOverride(cmd, ModuleNameFlag, &cfg.ModuleName, noConfigFile)
+	applyStringFlagOverride(cmd, HeatmapPNGFlag, &cfg.HeatmapPNG, noConfigFile)
 	applyStringFlagOverride(cmd, DiffFromFlag, &cfg.DiffFrom, noConfigFile)
 
 	// set cfg.Total thresholds to the global values, iff no override was specified for each.
@@ -731,6 +736,12 @@ func initFlags(cmd *cobra.Command) {
 		ModuleNameFlagShort,
 		"",
 		ModuleNameFlagUsage,
+	)
+
+	cmd.Flags().String(
+		HeatmapPNGFlag,
+		"",
+		HeatmapPNGFlagUsage,
 	)
 
 	cmd.Flags().Bool(
