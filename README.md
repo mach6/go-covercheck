@@ -23,6 +23,7 @@ A fast, flexible CLI tool for enforcing test coverage thresholds in Go projects.
 - Colored `json` and `yaml` output.
 - Built-in file or package regex filtering with `--skip`.
 - Save and compare against historical results from a commit, branch, tag, or user defined label.
+- 🆕 Post coverage results as a comment on GitHub, GitLab, Gitea, or Gogs pull/merge requests.
 - Works seamlessly in CI/CD environments.
 
 ## 🚫 Not Supported
@@ -190,6 +191,15 @@ Usage:
 Flags:
   -b, --block-threshold float             global block threshold to enforce [0=disabled] (default 50)
   -C, --compare-history string            compare current coverage against historical ref [commit|branch|tag|label]
+      --comment                           post coverage results as a comment on a pull/merge request
+      --comment-author string             login the comment is posted as; used with --comment-update to find the previous comment instead of looking up the token's user (GitHub Actions' GITHUB_TOKEN is github-actions[bot])
+      --comment-base-url string           base URL of a self-hosted platform instance (required for gogs)
+      --comment-no-emoji                  show pass/fail as plain PASS/FAIL text instead of colored emoji in the comment
+      --comment-platform string           platform to post the comment to [github|gitlab|gitea|gogs]
+      --comment-pr int                    pull/merge request number to comment on
+      --comment-repository string         repository to comment on as owner/repo (GitLab: group/project or project ID)
+      --comment-token string              API token for the comment platform; defaults to $GITHUB_TOKEN, $GITLAB_TOKEN, $GITEA_TOKEN, or $GOGS_TOKEN
+      --comment-update                    update the previous go-covercheck comment instead of adding a new one
   -c, --config string                     path to YAML config file (default ".go-covercheck.yml")
   -D, --delete-history string             delete historical entry by ref [commit|branch|tag|label]
   -d, --diff-from string                  git reference (commit/branch/tag) to diff from; enables diff-only mode
@@ -464,6 +474,97 @@ If the reference is not found, an error message will be displayed:
 $ go-covercheck --delete-history nonexistent
 Error: no history entry found for ref: nonexistent
 ```
+
+## 💬 Comment Posting
+
+`go-covercheck` can post its results as a Markdown comment on a GitHub, GitLab, Gitea, or Gogs
+pull/merge request. This is handy when it runs as a pre-merge gate in CI.
+
+- The comment shows the total statement, block, and line coverage against their thresholds, plus
+  any files and packages below threshold (capped at 50 rows each).
+- Pass/fail is shown with 🟢/🔴. Use `--comment-no-emoji` (or `includeColors: false`) for plain `PASS`/`FAIL` text.
+- With `--comment-update`, the previous `go-covercheck` comment is edited in place instead of
+  adding a new one each run. Only the newest comment containing the marker that was written by
+  the token's own account is edited; other people's comments are never touched. If that comment
+  was deleted, a new one is added. If the edit fails for any other reason (e.g. a permission
+  error), a warning is printed and no new comment is added.
+- "Your own" comments are found by looking up the token's user (`GET /user`). The default
+  `GITHUB_TOKEN` in GitHub Actions cannot call that endpoint (it answers 403), so when
+  `GITHUB_ACTIONS=true` and the lookup is refused, comments by `github-actions[bot]` are
+  updated. Gitea Actions needs nothing special: its job token reports itself as `gitea-actions`.
+  GitLab needs a personal, project, or group access token, since `CI_JOB_TOKEN` cannot write
+  notes. If the user cannot be determined, a warning is printed and a new comment is added; set
+  `--comment-author <login>` (config: `comment.platform.author`) to name the account explicitly
+  and skip the lookup.
+- Configuration is checked before coverage is computed. If posting fails at the API (e.g. a
+  network or permission error), a warning is printed and the exit code still reflects coverage only.
+
+### 🚀 CLI Usage
+
+```bash
+# GitHub (token read from $GITHUB_TOKEN)
+go-covercheck coverage.out --comment \
+  --comment-platform github \
+  --comment-repository owner/repo \
+  --comment-pr 123
+
+# GitLab: repository is group/project or a numeric project ID
+go-covercheck coverage.out --comment --comment-update \
+  --comment-platform gitlab \
+  --comment-token "$GITLAB_TOKEN" \
+  --comment-repository group/project \
+  --comment-pr 456
+
+# Self-hosted Gogs (base URL required)
+go-covercheck coverage.out --comment \
+  --comment-platform gogs \
+  --comment-base-url https://gogs.example.com \
+  --comment-repository org/repo \
+  --comment-pr 789
+```
+
+In GitHub Actions:
+
+```yaml
+- name: Coverage gate
+  env:
+    GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  run: |
+    go-covercheck coverage.out --comment --comment-update \
+      --comment-platform github \
+      --comment-repository ${{ github.repository }} \
+      --comment-pr ${{ github.event.pull_request.number }}
+```
+
+The job needs `pull-requests: write` permission.
+
+### ⚙️ Configuration
+
+```yaml
+comment:
+  enabled: true
+  platform:
+    type: github              # github|gitlab|gitea|gogs
+    # baseUrl: https://github.example.com   # self-hosted only; required for gogs
+    repository: owner/repo
+    pullRequestId: 123
+    includeColors: true       # default true
+    updateExisting: true      # default false
+```
+
+CLI flags override the config file.
+
+### 🔒 Authentication
+
+The token is taken from `--comment-token`, then `comment.platform.token`, then the platform's
+environment variable. Avoid committing tokens to the config file.
+
+| Platform | Environment variable | Token needs                          |
+|----------|----------------------|--------------------------------------|
+| GitHub   | `GITHUB_TOKEN`       | `pull-requests: write` (or `repo`)   |
+| GitLab   | `GITLAB_TOKEN`       | `api` scope                          |
+| Gitea    | `GITEA_TOKEN`        | write access to issues/pull requests |
+| Gogs     | `GOGS_TOKEN`         | write access to the repository       |
 
 ## 📤 Output Formats
 `go-covercheck` supports multiple output formats. The default is `table`, but you can specify other formats using the
