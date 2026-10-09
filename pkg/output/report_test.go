@@ -3,6 +3,7 @@ package output
 import (
 	"encoding/json"
 	"errors"
+	"strings"
 	"testing"
 
 	"github.com/fatih/color"
@@ -394,4 +395,140 @@ func TestPrintDiffModeInfo(t *testing.T) {
 		require.Empty(t, stdout)
 		require.Empty(t, stderr)
 	})
+}
+
+func TestFormatAndReport_CSVIncludesFunctionColumns(t *testing.T) {
+	cfg := new(config.Config)
+	cfg.ApplyDefaults()
+	cfg.Format = config.FormatCSV
+	cfg.NoColor = true
+	cfg.NoSummary = true
+	cfg.NoUncoveredLines = true
+	color.NoColor = cfg.NoColor
+	text.DisableColors()
+
+	by := compute.By{
+		Statements: "1/2", Blocks: "1/2", Lines: "1/2", Functions: "2/3",
+		StatementPercentage: 50, BlockPercentage: 50, LinePercentage: 50, FunctionPercentage: 66.666,
+	}
+	results := compute.Results{
+		ByFile:    []compute.ByFile{{File: "pkg/a.go", By: by}},
+		ByPackage: []compute.ByPackage{{Package: "pkg", By: by}},
+		ByTotal: compute.Totals{
+			Statements: compute.TotalStatements{Coverage: "1/2", Percentage: 50},
+			Blocks:     compute.TotalBlocks{Coverage: "1/2", Percentage: 50},
+			Lines:      compute.TotalLines{Coverage: "1/2", Percentage: 50},
+			Functions:  compute.TotalFunctions{Coverage: "2/3", Percentage: 66.666},
+		},
+	}
+
+	stdout, stderr := test.RepipeStdOutAndErrForTest(func() {
+		FormatAndReport(results, cfg, false)
+	})
+
+	require.Empty(t, stderr)
+	require.Contains(t, stdout, ",Statements,Blocks,Lines,Functions,Statement %,Block %,Line %,Function %\n")
+	require.Contains(t, stdout, "pkg/a.go,1/2,1/2,1/2,2/3,50.0,50.0,50.0,66.7\n")
+	require.Contains(t, stdout, "\n,1/2,1/2,1/2,2/3,50.0,50.0,50.0,66.7")
+}
+
+func renderForFormat(t *testing.T, format string, configure func(cfg *config.Config)) string {
+	t.Helper()
+	cfg := new(config.Config)
+	cfg.ApplyDefaults()
+	cfg.Format = format
+	cfg.NoColor = true
+	cfg.NoSummary = true
+	color.NoColor = true
+	text.DisableColors()
+	configure(cfg)
+
+	profiles := []*cover.Profile{{
+		FileName: "example/foo.go",
+		Blocks:   []cover.ProfileBlock{{StartLine: 1, EndLine: 1, NumStmt: 1, Count: 1}},
+	}}
+	stdout, _ := test.RepipeStdOutAndErrForTest(func() {
+		results, failed := compute.CollectResults(profiles, cfg)
+		FormatAndReport(results, cfg, failed)
+	})
+	return stdout
+}
+
+// headerRow returns the lowercased header of a rendered table: the thead of
+// html output, otherwise the first line naming the columns.
+func headerRow(t *testing.T, out string) string {
+	t.Helper()
+	out = strings.ToLower(out)
+	if start := strings.Index(out, "<thead>"); start >= 0 {
+		return out[start : strings.Index(out, "</thead>")+len("</thead>")]
+	}
+	for _, line := range strings.Split(out, "\n") {
+		if strings.Contains(line, "statements") {
+			return line
+		}
+	}
+	require.Fail(t, "no header row", out)
+	return ""
+}
+
+func TestRenderTable_FunctionColumns(t *testing.T) {
+	none := func(*config.Config) {}
+	tests := []struct {
+		name      string
+		format    string
+		configure func(cfg *config.Config)
+		want      bool
+	}{
+		{"table without threshold", config.FormatTable, none, false},
+		{"md without threshold", config.FormatMD, none, false},
+		{"html without threshold", config.FormatHTML, none, false},
+		{"csv without threshold", config.FormatCSV, none, true},
+		{"tsv without threshold", config.FormatTSV, none, true},
+		{"table with global threshold", config.FormatTable, func(c *config.Config) { c.FunctionThreshold = 50 }, true},
+		{"md with total threshold", config.FormatMD, func(c *config.Config) {
+			c.Total[config.FunctionsSection] = 50
+		}, true},
+		{"html with per-file override", config.FormatHTML, func(c *config.Config) {
+			c.PerFile.Functions = config.PerOverride{"foo.go": 50}
+		}, true},
+		{"table with per-package override", config.FormatTable, func(c *config.Config) {
+			c.PerPackage.Functions = config.PerOverride{"example": 50}
+		}, true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			header := headerRow(t, renderForFormat(t, tt.format, tt.configure))
+			require.Equal(t, tt.want, strings.Contains(header, "functions"), header)
+			require.Equal(t, tt.want, strings.Contains(header, "function %"), header)
+			require.Contains(t, header, "line %")
+		})
+	}
+}
+
+func TestRenderTable_RowsMatchHeaderWidth(t *testing.T) {
+	for _, withThreshold := range []bool{false, true} {
+		for _, format := range []string{config.FormatTable, config.FormatCSV} {
+			out := renderForFormat(t, format, func(c *config.Config) {
+				if withThreshold {
+					c.FunctionThreshold = 50
+				}
+			})
+			lines := strings.Split(strings.TrimSpace(out), "\n")
+			require.Greater(t, len(lines), 2)
+			sep := "│"
+			if format == config.FormatCSV {
+				sep = ","
+			}
+			var rows []string
+			for _, l := range lines {
+				if format == config.FormatCSV || strings.HasPrefix(l, sep) { // skip box-drawing rules
+					rows = append(rows, l)
+				}
+			}
+			want := strings.Count(rows[0], sep)
+			for _, l := range rows {
+				require.Equal(t, want, strings.Count(l, sep), "%s: %s", format, l)
+			}
+		}
+	}
 }

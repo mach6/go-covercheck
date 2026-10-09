@@ -64,6 +64,15 @@ const (
 	TotalLineThresholdFlagShort = "N"
 	TotalLineThresholdFlagUsage = "total line threshold to enforce [0=disabled]"
 
+	FunctionThresholdFlag      = "function-threshold"
+	FunctionThresholdFlagShort = "g"
+	FunctionThresholdFlagUsage = "global function threshold to enforce; table|md|html show function columns " +
+		"only when set [0=disabled]"
+
+	TotalFunctionThresholdFlag      = "total-function-threshold"
+	TotalFunctionThresholdFlagShort = "G"
+	TotalFunctionThresholdFlagUsage = "total function threshold to enforce [0=disabled]"
+
 	SortByFlag    = "sort-by"
 	SortOrderFlag = "sort-order"
 
@@ -171,14 +180,16 @@ var (
 	)
 
 	SortByFlagUsage = fmt.Sprintf(
-		"sort-by [%s|%s|%s|%s|%s|%s|%s]",
+		"sort-by [%s|%s|%s|%s|%s|%s|%s|%s|%s]",
 		config.SortByFile,
 		config.SortByBlocks,
 		config.SortByStatements,
 		config.SortByLines,
+		config.SortByFunctions,
 		config.SortByStatementPercent,
 		config.SortByBlockPercent,
 		config.SortByLinePercent,
+		config.SortByFunctionPercent,
 	)
 
 	SortOrderFlagUsage = fmt.Sprintf("sort order [%s|%s]",
@@ -292,6 +303,10 @@ func showCoverage(args []string, cfg *config.Config) (compute.Results, bool, err
 	}
 
 	results, failed := compute.CollectResults(filtered, cfg)
+	// Warnings go to stderr so json/yaml on stdout stays a single document.
+	for _, w := range results.Warnings {
+		fmt.Fprintln(os.Stderr, "warning: "+w)
+	}
 	output.FormatAndReport(results, cfg, failed)
 	return results, failed, nil
 }
@@ -478,9 +493,11 @@ func applyConfigOverrides(cfg *config.Config, cmd *cobra.Command, noConfigFile b
 	applyFloat64FlagOverride(cmd, StatementThresholdFlag, &cfg.StatementThreshold, noConfigFile)
 	applyFloat64FlagOverride(cmd, BlockThresholdFlag, &cfg.BlockThreshold, noConfigFile)
 	applyFloat64FlagOverride(cmd, LineThresholdFlag, &cfg.LineThreshold, noConfigFile)
+	applyFloat64FlagOverride(cmd, FunctionThresholdFlag, &cfg.FunctionThreshold, noConfigFile)
 	applyFloat64TotalFlagOverride(cmd, TotalStatementThresholdFlag, config.StatementsSection, cfg.Total)
 	applyFloat64TotalFlagOverride(cmd, TotalBlockThresholdFlag, config.BlocksSection, cfg.Total)
 	applyFloat64TotalFlagOverride(cmd, TotalLineThresholdFlag, config.LinesSection, cfg.Total)
+	applyFloat64TotalFlagOverride(cmd, TotalFunctionThresholdFlag, config.FunctionsSection, cfg.Total)
 	applyStringFlagOverride(cmd, SortByFlag, &cfg.SortBy, noConfigFile)
 	applyStringFlagOverride(cmd, SortOrderFlag, &cfg.SortOrder, noConfigFile)
 	applyStringArrayFlagOverride(cmd, SkipFlag, &cfg.Skip, noConfigFile)
@@ -502,17 +519,25 @@ func applyConfigOverrides(cfg *config.Config, cmd *cobra.Command, noConfigFile b
 	applyStringFlagOverride(cmd, DiffFromFlag, &cfg.DiffFrom, noConfigFile)
 
 	// set cfg.Total thresholds to the global values, iff no override was specified for each.
-	if v, _ := cmd.Flags().GetFloat64(StatementThresholdFlag); !cmd.Flags().Changed(TotalStatementThresholdFlag) &&
-		cfg.Total[config.StatementsSection] == config.StatementThresholdDefault {
-		cfg.Total[config.StatementsSection] = v
+	if cfg.Total == nil {
+		cfg.Total = config.PerOverride{}
 	}
-	if v, _ := cmd.Flags().GetFloat64(BlockThresholdFlag); !cmd.Flags().Changed(TotalBlockThresholdFlag) &&
-		cfg.Total[config.BlocksSection] == config.BlockThresholdDefault {
-		cfg.Total[config.BlocksSection] = v
-	}
-	if v, _ := cmd.Flags().GetFloat64(LineThresholdFlag); !cmd.Flags().Changed(TotalLineThresholdFlag) &&
-		cfg.Total[config.LinesSection] == config.LineThresholdDefault {
-		cfg.Total[config.LinesSection] = v
+	applyGlobalThresholdToTotal(cmd, cfg.Total, StatementThresholdFlag, TotalStatementThresholdFlag,
+		config.StatementsSection, config.StatementThresholdDefault)
+	applyGlobalThresholdToTotal(cmd, cfg.Total, BlockThresholdFlag, TotalBlockThresholdFlag,
+		config.BlocksSection, config.BlockThresholdDefault)
+	applyGlobalThresholdToTotal(cmd, cfg.Total, LineThresholdFlag, TotalLineThresholdFlag,
+		config.LinesSection, config.LineThresholdDefault)
+	applyGlobalThresholdToTotal(cmd, cfg.Total, FunctionThresholdFlag, TotalFunctionThresholdFlag,
+		config.FunctionsSection, config.FunctionThresholdDefault)
+}
+
+// applyGlobalThresholdToTotal sets total[section] to the value of globalFlag
+// when totalFlag was not given and the total still holds its default.
+func applyGlobalThresholdToTotal(cmd *cobra.Command, total config.PerOverride,
+	globalFlag, totalFlag, section string, defaultValue float64) {
+	if v, _ := cmd.Flags().GetFloat64(globalFlag); !cmd.Flags().Changed(totalFlag) && total[section] == defaultValue {
+		total[section] = v
 	}
 }
 
@@ -633,6 +658,13 @@ func initFlags(cmd *cobra.Command) {
 	)
 
 	cmd.Flags().Float64P(
+		FunctionThresholdFlag,
+		FunctionThresholdFlagShort,
+		config.FunctionThresholdDefault,
+		FunctionThresholdFlagUsage,
+	)
+
+	cmd.Flags().Float64P(
 		TotalStatementThresholdFlag,
 		TotalStatementThresholdFlagShort,
 		0,
@@ -651,6 +683,13 @@ func initFlags(cmd *cobra.Command) {
 		TotalLineThresholdFlagShort,
 		0,
 		TotalLineThresholdFlagUsage,
+	)
+
+	cmd.Flags().Float64P(
+		TotalFunctionThresholdFlag,
+		TotalFunctionThresholdFlagShort,
+		0,
+		TotalFunctionThresholdFlagUsage,
 	)
 
 	cmd.Flags().String(
