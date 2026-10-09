@@ -7,7 +7,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+* `--compare-history` with `-f json` or `-f yaml` now adds a `comparison` object
+  to the output instead of printing text after it. The output is a single valid
+  JSON or YAML document. Other formats are unchanged. The object has `ref`,
+  `commit`, `byFile`, `byPackage`, `added`, `removed` and `byTotal`. Each
+  `byFile`, `byPackage` and `byTotal` entry holds the change in percentage
+  points (current minus history) as `statements`, `blocks` and `lines`.
+  `lines` is left out when the history entry has no line coverage. These lists
+  only have files and packages in both runs whose coverage changed.
+  `added` and `removed` each have `files` and `packages` lists, sorted by name,
+  for items in only one run. Added items show their current coverage and
+  removed items show their historical coverage, as percentages. A renamed file
+  shows as one removed and one added. The text output has matching "Added" and
+  "Removed" sections. `byTotal` is left out when nothing changed. Without `--compare-history` the
+  output is exactly as before.
+
 ### Breaking
+
+* The comparison text printed by `--compare-history` in JSON and YAML output
+  is gone, replaced by the `comparison` object described above. Scripts that
+  parsed that text must read the object instead.
+* `output.CompareHistory` is replaced by `compute.BuildComparison` (returns a
+  `*compute.Comparison`) and `output.FormatAndReportWithComparison`, which
+  prints it. `output.FormatAndReport` is unchanged.
 
 * `compute.CollectResults` no longer normalizes `profile.FileName` internally.
   Callers that relied on the implicit normalization must now call

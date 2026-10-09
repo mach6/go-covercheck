@@ -382,10 +382,60 @@ $ go-covercheck --compare-history main
     [B] total [+7.3 %]
 ```
 
+Files and packages that were added or removed since that ref get their own sections:
+
+```text
+ → Added Files
+    [S] pkg/math/sub.go [100.0%]
+    [B] pkg/math/sub.go [100.0%]
+ → Removed Files
+    [S] pkg/math/old.go [40.0%]
+    [B] pkg/math/old.go [50.0%]
+```
+
 A label can also be used to compare against a specific history entry.
 
 ```shell
 go-covercheck --compare-history my-label
+```
+
+With `-f json` or `-f yaml`, the comparison is added to the output as a `comparison` object.
+Changes are in percentage points, current minus history, so a drop is negative.
+`byFile` and `byPackage` list files and packages that are in both runs and changed.
+`added` lists files and packages that are only in the current run, with their current coverage.
+`removed` lists files and packages that are only in the history entry, with their old coverage.
+Those two are percentages, not changes. Each list is sorted by name and is empty when there is nothing to show.
+A renamed file shows as one removed file and one added file.
+`byTotal` is left out when nothing changed. `lines` is left out when the history entry has no line coverage.
+
+```shell
+$ go-covercheck -f json --compare-history main
+{
+  "byFile": [ ... ],
+  "byPackage": [ ... ],
+  "byTotal": { ... },
+  "comparison": {
+    "ref": "main",
+    "commit": "e402629",
+    "byFile": [
+      { "file": "pkg/math/math.go", "statements": -25, "blocks": -25 }
+    ],
+    "byPackage": [],
+    "added": {
+      "files": [
+        { "file": "pkg/math/sub.go", "statements": 100, "blocks": 100, "lines": 100 }
+      ],
+      "packages": []
+    },
+    "removed": {
+      "files": [
+        { "file": "pkg/math/old.go", "statements": 40, "blocks": 50, "lines": 45 }
+      ],
+      "packages": []
+    },
+    "byTotal": { "statements": 22.2, "blocks": 26.8 }
+  }
+}
 ```
 ### 📊 Show History
 
