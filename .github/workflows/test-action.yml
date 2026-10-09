@@ -1,0 +1,43 @@
+name: Test go-covercheck action
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'action.yml'
+
+jobs:
+  test-action:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.24'
+
+      - name: Run tests to generate coverage
+        run: go test -v -coverprofile=coverage.out ./...
+
+      - name: Test go-covercheck action - basic usage
+        uses: ./
+        with:
+          coverage-file: coverage.out
+
+      - name: Test go-covercheck action - with custom thresholds
+        uses: ./
+        with:
+          coverage-file: coverage.out
+          statement-threshold: "75"
+          block-threshold: "60"
+          format: json
+
+      - name: Test go-covercheck action - with skip patterns
+        uses: ./
+        with:
+          coverage-file: coverage.out
+          skip: "test,mock"
+          no-color: "true"
