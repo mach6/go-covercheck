@@ -110,7 +110,8 @@ go-covercheck --init
 Here is a sample `.go-covercheck.yml` configuration file:
 
 ```yaml
-# Optional, global thresholds overriding the defaults (70 statements, 50 blocks, 50 lines)
+# Optional, global thresholds for each file and each package, overriding the defaults
+# (70 statements, 50 blocks, 50 lines). These do not change the totals; use `total:` below.
 statementThreshold: 65.0
 blockThreshold: 60.0
 lineThreshold: 55.0
@@ -118,7 +119,8 @@ lineThreshold: 55.0
 # Optional, table style for table output format (default: light)
 tableStyle: bold
 
-# Optional, by total thresholds overriding the global values above
+# Optional, thresholds for the project total. If you leave these out, the totals are
+# 70 statements, 50 blocks and 50 lines. They do not follow the global values above.
 total:
   statements: 75.0
   blocks: 70.0
@@ -328,6 +330,15 @@ Configure with `lineThreshold` in `.go-covercheck.yml`, `--line-threshold` (`-n`
 and `--total-line-threshold` (`-N`) for the project total. Per-file and per-package overrides
 go under a `lines:` map alongside `statements:` and `blocks:`. Failures are reported with the
 `[L]` prefix in the summary.
+
+### 🧮 How Total Thresholds Are Set
+
+The totals have their own defaults: 70 for statements, 50 for blocks and 50 for lines.
+
+- A global threshold in the config file (`statementThreshold`, `blockThreshold`, `lineThreshold`) does **not**
+  change the totals. Set `total:` in the config file to change them.
+- A global threshold on the command line (`-s`, `-b`, `-n`) also sets the matching total.
+- A total you set yourself wins. Use `total:` in the config file or `-S`, `-B`, `-N` on the command line.
 
 ### 🎨 Table Styles
 

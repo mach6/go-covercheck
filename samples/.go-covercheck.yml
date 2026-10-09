@@ -4,19 +4,25 @@
 # moduleName: "github.com/mach6/go-covercheck"
 
 # global threshold % for statement coverage.
-# global default for per file %, per package %, and total %.
+# global default for per file % and per package %.
+# does not change the total threshold. set `total:` below for that.
+# a -s flag on the command line also sets the total statement threshold.
 # default 70.
 # disabled with 0
 statementThreshold: 65.0
 
 # global threshold % for block coverage.
-# global default for per file %, per package %, and total %
+# global default for per file % and per package %.
+# does not change the total threshold. set `total:` below for that.
+# a -b flag on the command line also sets the total block threshold.
 # default 50.
 # disabled with 0
 blockThreshold: 60.0
 
 # global threshold % for line coverage.
-# global default for per file %, per package %, and total %
+# global default for per file % and per package %.
+# does not change the total threshold. set `total:` below for that.
+# a -n flag on the command line also sets the total line threshold.
 # default 50.
 # disabled with 0
 lineThreshold: 50.0
@@ -85,7 +91,8 @@ perPackage:
 
 
 # the total threshold overrides
-# default {"statements": statementThreshold, "blocks": blockThreshold, "lines": lineThreshold}
+# the totals have their own defaults. they do not follow the global thresholds above.
+# default {"statements": 70, "blocks": 50, "lines": 50}
 # disabled with 0
 total:
   statements: 65.0
