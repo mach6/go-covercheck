@@ -12,6 +12,7 @@ import (
 	"go/ast"
 	"go/parser"
 	"go/token"
+	"strconv"
 	"strings"
 
 	"golang.org/x/tools/cover"
@@ -30,6 +31,10 @@ func (p position) before(o position) bool {
 // Function is the source extent of a function or method declaration and
 // whether any coverage block inside it was executed.
 type Function struct {
+	// Name is the function name, qualified by its receiver for methods:
+	// "Foo", "T.Bar" or "(*T).Bar". Generic receivers keep their type
+	// parameters, as in "(*T[K,V]).Bar".
+	Name string
 	// StartLine and StartCol locate the func keyword.
 	StartLine, StartCol int
 	// EndLine and EndCol locate the position just past the closing brace.
@@ -72,6 +77,7 @@ func Collect(p *cover.Profile, sourceLines []string) ([]Function, error) {
 		start := fset.Position(fd.Pos())
 		end := fset.Position(fd.End())
 		fns = append(fns, Function{
+			Name:      funcName(fd),
 			StartLine: start.Line,
 			StartCol:  start.Column,
 			EndLine:   end.Line,
@@ -99,4 +105,64 @@ func Coverage(fns []Function) (int, int) {
 		}
 	}
 	return len(fns), covered
+}
+
+// funcName returns the declared name of fd, prefixed with the receiver type
+// for methods.
+func funcName(fd *ast.FuncDecl) string {
+	if fd.Recv == nil || len(fd.Recv.List) == 0 {
+		return fd.Name.Name
+	}
+	recv := receiverType(fd.Recv.List[0].Type)
+	if strings.HasPrefix(recv, "*") {
+		return "(" + recv + ")." + fd.Name.Name
+	}
+	return recv + "." + fd.Name.Name
+}
+
+// receiverType renders a receiver type expression such as T, *T, *T[K] or
+// T[K,V]. Anything unexpected renders as "?" so a name is always produced.
+func receiverType(e ast.Expr) string {
+	switch t := e.(type) {
+	case *ast.Ident:
+		return t.Name
+	case *ast.StarExpr:
+		return "*" + receiverType(t.X)
+	case *ast.ParenExpr:
+		return receiverType(t.X)
+	case *ast.IndexExpr:
+		return receiverType(t.X) + "[" + receiverType(t.Index) + "]"
+	case *ast.IndexListExpr:
+		params := make([]string, 0, len(t.Indices))
+		for _, idx := range t.Indices {
+			params = append(params, receiverType(idx))
+		}
+		return receiverType(t.X) + "[" + strings.Join(params, ",") + "]"
+	default:
+		return "?"
+	}
+}
+
+// Uncovered returns the functions in fns that were not covered, in source order.
+func Uncovered(fns []Function) []Function {
+	var out []Function
+	for i := range fns {
+		if !fns[i].Covered {
+			out = append(out, fns[i])
+		}
+	}
+	return out
+}
+
+// FormatUncovered lists the uncovered functions in fns as "Name:line" items
+// joined by ", " in source order, for example "Foo:12, (*T).Bar:30". The
+// line is where the func keyword is. It returns "" when every function is
+// covered. Names never contain ", ", so the list can be split on it.
+func FormatUncovered(fns []Function) string {
+	missed := Uncovered(fns)
+	items := make([]string, 0, len(missed))
+	for i := range missed {
+		items = append(items, missed[i].Name+":"+strconv.Itoa(missed[i].StartLine))
+	}
+	return strings.Join(items, ", ")
 }

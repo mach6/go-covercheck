@@ -130,6 +130,11 @@ const (
 	NoUncoveredLinesFlagUsage = "omit uncovered line numbers from all outputs (table column and structured " +
 		"json/yaml/md/csv/tsv fields); use --inspect to show them"
 
+	NoUncoveredFunctionsFlag      = "no-uncovered-functions"
+	NoUncoveredFunctionsFlagShort = "O"
+	NoUncoveredFunctionsFlagUsage = "omit uncovered function names from all outputs (table column and structured " +
+		"json/yaml/md/csv/tsv fields); use --inspect to show them"
+
 	InspectFlag      = "inspect"
 	InspectFlagShort = "U"
 	InspectFlagUsage = "show uncovered source code"
@@ -292,7 +297,7 @@ func showCoverage(args []string, cfg *config.Config) (compute.Results, bool, err
 	compute.NormalizeNames(profiles, cfg)
 	filtered := filters.FilterProfiles(profiles, cfg)
 
-	// If inspecting uncovered lines, handle that separately
+	// If inspecting uncovered code, handle that separately
 	if cfg.Inspect {
 		err := output.InspectUncoveredLines(filtered, cfg)
 		if err != nil {
@@ -509,6 +514,7 @@ func applyConfigOverrides(cfg *config.Config, cmd *cobra.Command, noConfigFile b
 	applyBoolFlagOverride(cmd, NoSummaryFlag, &cfg.NoSummary, noConfigFile)
 	applyBoolFlagOverride(cmd, NoColorFlag, &cfg.NoColor, noConfigFile)
 	applyBoolFlagOverride(cmd, NoUncoveredLinesFlag, &cfg.NoUncoveredLines, noConfigFile)
+	applyBoolFlagOverride(cmd, NoUncoveredFunctionsFlag, &cfg.NoUncoveredFunctions, noConfigFile)
 	applyBoolFlagOverride(cmd, InspectFlag, &cfg.Inspect, true)
 	if len(cfg.InspectFiles) > 0 {
 		cfg.Inspect = true
@@ -783,6 +789,13 @@ func initFlags(cmd *cobra.Command) {
 		NoUncoveredLinesFlagShort,
 		false,
 		NoUncoveredLinesFlagUsage,
+	)
+
+	cmd.Flags().BoolP(
+		NoUncoveredFunctionsFlag,
+		NoUncoveredFunctionsFlagShort,
+		false,
+		NoUncoveredFunctionsFlagUsage,
 	)
 
 	cmd.Flags().BoolP(

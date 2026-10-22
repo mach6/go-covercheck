@@ -16,6 +16,7 @@ A fast, flexible CLI tool for enforcing test coverage thresholds in Go projects.
 - Supports statement, block, 🆕 line, and 🆕 function coverage separately.
 - 🆕 Inspect uncovered source code with syntax highlighting (`--inspect`).
 - 🆕 Show uncovered line numbers inline in the coverage table.
+- Show which functions are uncovered, in the table, other outputs, and `--inspect`.
 - Native `table`|`json`|`yaml`|`md`|`html`|`csv`|`tsv` output.
 - Configurable table styles (`default`|`light`|`bold`|`rounded`|`double`).
 - Configurable via a `.go-covercheck.yml` or CLI flags.
@@ -119,6 +120,10 @@ functionThreshold: 60.0
 # Optional, table style for table output format (default: light)
 tableStyle: bold
 
+# Optional, leave uncovered line numbers / function names out of all outputs (default: false)
+noUncoveredLines: false
+noUncoveredFunctions: false
+
 # Optional, by total thresholds overriding the global values above
 total:
   statements: 75.0
@@ -141,22 +146,22 @@ Use the `go-covercheck` CLI to check the coverage against the thresholds defined
 
 ```text
 $ go-covercheck --function-threshold 50 coverage.out
-┌────────────┬────────────┬────────┬────────┬───────────┬─────────────┬─────────┬────────┬────────────┬─────────────────┐
-│            │ STATEMENTS │ BLOCKS │ LINES  │ FUNCTIONS │ STATEMENT % │ BLOCK % │ LINE % │ FUNCTION % │ UNCOVERED LINES │
-├────────────┼────────────┼────────┼────────┼───────────┼─────────────┼─────────┼────────┼────────────┼─────────────────┤
-│ BY FILE    │            │        │        │           │             │         │        │            │                 │
-├────────────┼────────────┼────────┼────────┼───────────┼─────────────┼─────────┼────────┼────────────┼─────────────────┤
-│ cmd/foo.go │        0/1 │    0/1 │    0/3 │       0/1 │         0.0 │     0.0 │    0.0 │        0.0 │ 1-3             │
-│ cmd/bar.go │     20/110 │   7/80 │ 25/140 │       4/9 │        18.2 │     8.8 │   17.9 │       44.4 │ 3-8,12,15-22... │
-├────────────┼────────────┼────────┼────────┼───────────┼─────────────┼─────────┼────────┼────────────┼─────────────────┤
-│ BY PACKAGE │            │        │        │           │             │         │        │            │                 │
-├────────────┼────────────┼────────┼────────┼───────────┼─────────────┼─────────┼────────┼────────────┼─────────────────┤
-│ cmd        │     20/111 │   7/81 │ 25/143 │      4/10 │        18.0 │     8.6 │   17.5 │       40.0 │                 │
-├────────────┼────────────┼────────┼────────┼───────────┼─────────────┼─────────┼────────┼────────────┼─────────────────┤
-│ BY TOTAL   │            │        │        │           │             │         │        │            │                 │
-├────────────┼────────────┼────────┼────────┼───────────┼─────────────┼─────────┼────────┼────────────┼─────────────────┤
-│            │     20/111 │   7/81 │ 25/143 │      4/10 │        18.0 │     8.6 │   17.5 │       40.0 │                 │
-└────────────┴────────────┴────────┴────────┴───────────┴─────────────┴─────────┴────────┴────────────┴─────────────────┘
+┌────────────┬────────────┬────────┬────────┬───────────┬─────────────┬─────────┬────────┬────────────┬─────────────────────┬─────────────────┐
+│            │ STATEMENTS │ BLOCKS │ LINES  │ FUNCTIONS │ STATEMENT % │ BLOCK % │ LINE % │ FUNCTION % │ UNCOVERED FUNCTIONS │ UNCOVERED LINES │
+├────────────┼────────────┼────────┼────────┼───────────┼─────────────┼─────────┼────────┼────────────┼─────────────────────┼─────────────────┤
+│ BY FILE    │            │        │        │           │             │         │        │            │                     │                 │
+├────────────┼────────────┼────────┼────────┼───────────┼─────────────┼─────────┼────────┼────────────┼─────────────────────┼─────────────────┤
+│ cmd/foo.go │        0/1 │    0/1 │    0/3 │       0/1 │         0.0 │     0.0 │    0.0 │        0.0 │ Run:3               │ 1-3             │
+│ cmd/bar.go │     20/110 │   7/80 │ 25/140 │       4/9 │        18.2 │     8.8 │   17.9 │       44.4 │ (*App).Stop:41, ... │ 3-8,12,15-22... │
+├────────────┼────────────┼────────┼────────┼───────────┼─────────────┼─────────┼────────┼────────────┼─────────────────────┼─────────────────┤
+│ BY PACKAGE │            │        │        │           │             │         │        │            │                     │                 │
+├────────────┼────────────┼────────┼────────┼───────────┼─────────────┼─────────┼────────┼────────────┼─────────────────────┼─────────────────┤
+│ cmd        │     20/111 │   7/81 │ 25/143 │      4/10 │        18.0 │     8.6 │   17.5 │       40.0 │                     │                 │
+├────────────┼────────────┼────────┼────────┼───────────┼─────────────┼─────────┼────────┼────────────┼─────────────────────┼─────────────────┤
+│ BY TOTAL   │            │        │        │           │             │         │        │            │                     │                 │
+├────────────┼────────────┼────────┼────────┼───────────┼─────────────┼─────────┼────────┼────────────┼─────────────────────┼─────────────────┤
+│            │     20/111 │   7/81 │ 25/143 │      4/10 │        18.0 │     8.6 │   17.5 │       40.0 │                     │                 │
+└────────────┴────────────┴────────┴────────┴───────────┴─────────────┴─────────┴────────┴────────────┴─────────────────────┴─────────────────┘
 ✘ Coverage check failed
  → By File
     [S] cmd/foo.go [+70.0% required for 70.0% threshold]
@@ -214,6 +219,7 @@ Flags:
   -w, --no-color                          disable color output
   -u, --no-summary                        suppress failure summary and only show tabular output [disabled for json|yaml]
   -t, --no-table                          suppress tabular output and only show failure summary [disabled for json|yaml]
+  -O, --no-uncovered-functions            omit uncovered function names from all outputs (table column and structured json/yaml/md/csv/tsv fields); use --inspect to show them
   -Q, --no-uncovered-lines                omit uncovered line numbers from all outputs (table column and structured json/yaml/md/csv/tsv fields); use --inspect to show them
   -H, --save-history                      add coverage result to history
   -I, --show-history                      show historical entries in tabular format
@@ -324,6 +330,19 @@ go-covercheck --inspect --inspect-context 5 coverage.out
 go-covercheck --inspect --syntax-style monokai coverage.out
 ```
 
+Each file also gets one line under its name that lists its uncovered functions, with the line
+of each one:
+
+```text
+--- pkg/server/server.go
+Uncovered functions: Load (line 12), (*Server).Start (line 88)
+```
+
+A file is shown if it has uncovered lines or uncovered functions. The function list does not
+repeat the code, because the uncovered lines already show the bodies. `--inspect-file` limits
+the list to the files you pick, and `--inspect-context` only changes the lines around each
+block of code. `--no-uncovered-lines` and `--no-uncovered-functions` do not affect `--inspect`.
+
 The default `auto` picks `github` or `github-dark` based on the detected
 terminal background. Any chroma style name is accepted; see
 [chroma](https://github.com/alecthomas/chroma) for the full list (e.g.
@@ -360,6 +379,27 @@ The `Functions` and `Function %` columns of the `table`, `md`, and `html` output
 when a function threshold is in effect (a non-zero global threshold, total, or per-file or
 per-package override), which keeps the default table narrow. The `csv`, `tsv`, `json`, and `yaml`
 outputs always include the function fields, so their schema does not depend on configuration.
+
+### Uncovered functions
+
+To see which functions are not covered, look at the "Uncovered Functions" column. It sits just
+before "Uncovered Lines". It follows the same rule as the other function columns: `table`, `md`,
+and `html` show it only when a function threshold is in effect, and `csv` and `tsv` always do.
+The `json` and `yaml` outputs gain an `uncoveredFunctions` field per file, which is left out when
+every function in the file is covered.
+
+Each entry is `Name:line`, where `line` is the line of the `func` keyword. Entries are
+separated by `, ` and sorted by line. Methods carry their receiver type:
+
+```text
+Load:12, Config.Validate:40, (*Server).Start:88, (*Cache[K,V]).Evict:131
+```
+
+A file whose source cannot be found or parsed has no function names, so the field is empty.
+
+Use `-O` (`--no-uncovered-functions`) or `noUncoveredFunctions: true` in the config file to leave
+the list out of every output. `-Q` (`--no-uncovered-lines`) does not hide it. To see the code
+itself, use `--inspect` (see [Inspect Uncovered Code](#-inspect-uncovered-code)).
 
 ### 🎨 Table Styles
 
@@ -538,7 +578,7 @@ $ go-covercheck -f table coverage.out -uQ
 ```
 Note: `-u` (`--no-summary`) suppresses the failure summary, and `-Q`
 (`--no-uncovered-lines`) drops the "Uncovered Lines" column that is
-rendered by default.
+rendered by default. `-O` (`--no-uncovered-functions`) drops the "Uncovered Functions" column.
 
 
 ### 📑 Other Tabular Formats

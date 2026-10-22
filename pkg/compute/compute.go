@@ -41,7 +41,8 @@ func collect(profiles []*cover.Profile, cfg *config.Config) (Results, bool) { //
 		sourceLines, readErr := lines.ReadSourceFile(p.FileName)
 		collectedBlocks := lines.CollectBlocksFromSource(p, sourceLines)
 		linesCount, lineHits := lines.CoverageFromBlocks(collectedBlocks)
-		functionCount, functionHits, fnErr := functionCoverage(p, sourceLines)
+		fns, fnErr := functions.Collect(p, sourceLines)
+		functionCount, functionHits := functions.Coverage(fns)
 		if w := sourceWarning(p.FileName, readErr, fnErr); w != "" {
 			results.Warnings = append(results.Warnings, w)
 		}
@@ -118,6 +119,9 @@ func collect(profiles []*cover.Profile, cfg *config.Config) (Results, bool) { //
 		if !cfg.NoUncoveredLines {
 			byFile.UncoveredLines = lines.FormatUncoveredFromBlocks(collectedBlocks)
 		}
+		if !cfg.NoUncoveredFunctions {
+			byFile.UncoveredFunctions = functions.FormatUncovered(fns)
+		}
 
 		results.ByFile = append(results.ByFile, byFile)
 
@@ -141,20 +145,6 @@ func collect(profiles []*cover.Profile, cfg *config.Config) (Results, bool) { //
 		results.ByTotal.Blocks.Failed ||
 		results.ByTotal.Lines.Failed ||
 		results.ByTotal.Functions.Failed
-}
-
-// functionCoverage returns the number of functions declared in p's source and
-// how many of them executed. When the source is unavailable or does not parse
-// there is nothing to count: the file reports 0/0 like a file that declares no
-// functions, which is neutral for the totals, and the parse error is returned
-// so the caller can warn about it.
-func functionCoverage(p *cover.Profile, sourceLines []string) (int, int, error) {
-	fns, err := functions.Collect(p, sourceLines)
-	if err != nil {
-		return 0, 0, err
-	}
-	count, hits := functions.Coverage(fns)
-	return count, hits, nil
 }
 
 // sourceWarning describes why file's source could not be used, or returns ""

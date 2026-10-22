@@ -9,12 +9,14 @@ import (
 
 	"github.com/fatih/color"
 	"github.com/mach6/go-covercheck/pkg/config"
+	"github.com/mach6/go-covercheck/pkg/functions"
 	"github.com/mach6/go-covercheck/pkg/lines"
 	"golang.org/x/term"
 	"golang.org/x/tools/cover"
 )
 
-// InspectUncoveredLines displays uncovered lines for the specified files.
+// InspectUncoveredLines displays uncovered code for the specified files: the
+// uncovered source lines, and for each file a list of its uncovered functions.
 func InspectUncoveredLines(profiles []*cover.Profile, cfg *config.Config) error {
 	var profilesToShow []*cover.Profile
 
@@ -42,8 +44,12 @@ func InspectUncoveredLines(profiles []*cover.Profile, cfg *config.Config) error 
 		sourceLines, _ := lines.ReadSourceFile(p.FileName)
 		blocks := lines.CollectBlocksFromSource(p, sourceLines)
 		uncovered := uncoveredHunks(p, sourceLines, blocks, cfg.InspectContext)
-		if len(uncovered) > 0 {
-			entries = append(entries, fileUncovered{filename: p.FileName, blocks: uncovered})
+		// A source that can't be read or parsed has no function names; the
+		// file is then listed by its uncovered lines alone.
+		fns, _ := functions.Collect(p, sourceLines)
+		missed := functions.Uncovered(fns)
+		if len(uncovered) > 0 || len(missed) > 0 {
+			entries = append(entries, fileUncovered{filename: p.FileName, blocks: uncovered, functions: missed})
 		}
 	}
 
@@ -143,8 +149,9 @@ func blockHasUnfilteredLine(block lines.Block) bool {
 }
 
 type fileUncovered struct {
-	filename string
-	blocks   []uncoveredBlock
+	filename  string
+	blocks    []uncoveredBlock
+	functions []functions.Function
 }
 
 type uncoveredBlock struct {
@@ -183,6 +190,10 @@ func buildUncoveredOutput(entries []fileUncovered, cfg *config.Config) string {
 		}
 		sb.WriteString(fileHeader + "\n")
 
+		if len(entry.functions) > 0 {
+			sb.WriteString(formatUncoveredFunctions(entry.functions, cfg) + "\n\n")
+		}
+
 		for _, block := range entry.blocks {
 			header := fmt.Sprintf("@@ Lines %d-%d @@", block.start, block.end)
 			if !cfg.NoColor {
@@ -201,6 +212,20 @@ func buildUncoveredOutput(entries []fileUncovered, cfg *config.Config) string {
 	}
 
 	return sb.String()
+}
+
+// formatUncoveredFunctions renders a file's uncovered functions as one header
+// line, for example "Uncovered functions: Foo (line 12), (*T).Bar (line 30)".
+func formatUncoveredFunctions(fns []functions.Function, cfg *config.Config) string {
+	items := make([]string, 0, len(fns))
+	for i := range fns {
+		items = append(items, fmt.Sprintf("%s (line %d)", fns[i].Name, fns[i].StartLine))
+	}
+	header := "Uncovered functions: " + strings.Join(items, ", ")
+	if !cfg.NoColor {
+		header = color.New(color.FgYellow).Sprint(header)
+	}
+	return header
 }
 
 // formatSourceLine formats a source line with proper coloring and indicators.

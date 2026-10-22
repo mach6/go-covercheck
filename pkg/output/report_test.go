@@ -404,6 +404,7 @@ func TestFormatAndReport_CSVIncludesFunctionColumns(t *testing.T) {
 	cfg.NoColor = true
 	cfg.NoSummary = true
 	cfg.NoUncoveredLines = true
+	cfg.NoUncoveredFunctions = true
 	color.NoColor = cfg.NoColor
 	text.DisableColors()
 

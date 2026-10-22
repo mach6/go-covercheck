@@ -50,6 +50,14 @@ noSummary: false
 # default false
 noColor: false
 
+# leave uncovered line numbers out of all outputs
+# default false
+noUncoveredLines: false
+
+# leave uncovered function names out of all outputs
+# default false
+noUncoveredFunctions: false
+
 # the format for output
 # table|json|yaml|md|html|csv|tsv
 # default table

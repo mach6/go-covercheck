@@ -35,6 +35,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   these in `compute.Results.Warnings`, which is excluded from json, yaml, and
   saved history.
 
+* Uncovered functions: you can now see which functions are not covered, not just
+  how many. Each file gets an `uncoveredFunctions` list of `Name:line` entries
+  (methods carry their receiver, as in `(*Server).Start:88`). It is a new
+  "Uncovered Functions" column in table, md, and html output (shown only when a
+  function threshold is in effect, like the other function columns), a column in
+  csv and tsv, and an `uncoveredFunctions` field in json and yaml. `--inspect`
+  prints an `Uncovered functions:` line under each file name. New
+  `--no-uncovered-functions` (`-O`) flag and `noUncoveredFunctions` config key
+  turn the list off; `--no-uncovered-lines` does not affect it. Library users
+  get `compute.By.UncoveredFunctions`, `functions.Function.Name`,
+  `functions.Uncovered`, and `functions.FormatUncovered`.
+
+### Changed
+
+* csv and tsv output has a new `Uncovered Functions` column, placed before
+  `Uncovered Lines`. Use `--no-uncovered-functions` to get the old columns.
+
 ### Fixed
 
 * History lookup (`FindByRef`, `DeleteByRef`) and the history/compare output no

@@ -113,6 +113,7 @@ const (
 	colLinePct        = "Line %"
 	colFunctionPct    = "Function %"
 	colUncoveredLines = "Uncovered Lines"
+	colUncoveredFuncs = "Uncovered Functions"
 )
 
 // applyTableWidths fills in WidthMax / WidthMaxEnforcer on the supplied column
@@ -132,7 +133,7 @@ func applyTableWidths(columnConfigs []table.ColumnConfig, cfg *config.Config, re
 			continue
 		}
 		width := fixedColumnWidth
-		if columnConfigs[i].Name == colName {
+		if columnConfigs[i].Name == colName || columnConfigs[i].Name == colUncoveredFuncs {
 			width = fixedColumnWidth * nameColumnWidthFactor
 		}
 		columnConfigs[i].WidthMax = width
@@ -192,6 +193,10 @@ func maxRenderedWidth(column string, results compute.Results) int {
 		}
 		for _, r := range results.ByPackage {
 			width = maxInt(width, displayWidth(r.Package))
+		}
+	case colUncoveredFuncs:
+		for _, r := range results.ByFile {
+			width = maxInt(width, displayWidth(r.UncoveredFunctions))
 		}
 	case colStatements, colBlocks, colLines, colFunctions:
 		width = maxInt(width, maxCoverageWidth(column, results))
@@ -270,6 +275,25 @@ func dropFunctionCells(row table.Row) table.Row {
 	return out
 }
 
+// showUncoveredFunctions reports whether the "Uncovered Functions" column is
+// rendered: under the same rule as the other function columns, unless
+// suppressed with --no-uncovered-functions.
+func showUncoveredFunctions(cfg *config.Config) bool {
+	return !cfg.NoUncoveredFunctions && showFunctionColumns(cfg)
+}
+
+// withUncoveredCells appends the trailing uncovered cells to row, in column
+// order, for the columns that are shown.
+func withUncoveredCells(row table.Row, cfg *config.Config, uncoveredFuncs, uncoveredLines string) table.Row {
+	if showUncoveredFunctions(cfg) {
+		row = append(row, uncoveredFuncs)
+	}
+	if !cfg.NoUncoveredLines {
+		row = append(row, uncoveredLines)
+	}
+	return row
+}
+
 func dropFunctionColumns(columnConfigs []table.ColumnConfig) []table.ColumnConfig {
 	out := make([]table.ColumnConfig, 0, len(columnConfigs)-2) //nolint:mnd
 	for _, cc := range columnConfigs {
@@ -310,10 +334,19 @@ func renderTable(results compute.Results, cfg *config.Config) {
 		headers = dropFunctionCells(headers)
 		columnConfigs = dropFunctionColumns(columnConfigs)
 	}
-	if !cfg.NoUncoveredLines {
-		headers = append(headers, "Uncovered Lines")
+	if showUncoveredFunctions(cfg) {
+		headers = append(headers, colUncoveredFuncs)
 		columnConfigs = append(columnConfigs, table.ColumnConfig{
-			Name:        "Uncovered Lines",
+			Name:        colUncoveredFuncs,
+			Align:       text.AlignLeft,
+			AlignHeader: text.AlignLeft,
+			AlignFooter: text.AlignLeft,
+		})
+	}
+	if !cfg.NoUncoveredLines {
+		headers = append(headers, colUncoveredLines)
+		columnConfigs = append(columnConfigs, table.ColumnConfig{
+			Name:        colUncoveredLines,
 			Align:       text.AlignLeft,
 			AlignHeader: text.AlignLeft,
 			AlignFooter: text.AlignLeft,
@@ -354,10 +387,7 @@ func renderTable(results compute.Results, cfg *config.Config) {
 		if !showFunctions {
 			row = dropFunctionCells(row)
 		}
-		if !cfg.NoUncoveredLines {
-			row = append(row, r.UncoveredLines)
-		}
-		t.AppendRow(row)
+		t.AppendRow(withUncoveredCells(row, cfg, r.UncoveredFunctions, r.UncoveredLines))
 	}
 
 	t.AppendSeparator()
@@ -384,11 +414,8 @@ func renderTable(results compute.Results, cfg *config.Config) {
 		if !showFunctions {
 			row = dropFunctionCells(row)
 		}
-		if !cfg.NoUncoveredLines {
-			// Packages don't have uncovered lines, so show empty string
-			row = append(row, "")
-		}
-		t.AppendRow(row)
+		// Packages don't have uncovered lines or functions, so show empty cells.
+		t.AppendRow(withUncoveredCells(row, cfg, "", ""))
 	}
 
 	stmtColor := severityColor(results.ByTotal.Statements.Percentage, results.ByTotal.Statements.Threshold)
@@ -414,10 +441,7 @@ func renderTable(results compute.Results, cfg *config.Config) {
 	if !showFunctions {
 		footer = dropFunctionCells(footer)
 	}
-	if !cfg.NoUncoveredLines {
-		footer = append(footer, "")
-	}
-	t.AppendFooter(footer)
+	t.AppendFooter(withUncoveredCells(footer, cfg, "", ""))
 
 	switch cfg.Format {
 	case config.FormatMD:

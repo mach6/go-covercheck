@@ -105,27 +105,28 @@ type PerThresholdOverride struct {
 
 // Config for application.
 type Config struct {
-	StatementThreshold float64              `yaml:"statementThreshold,omitempty"`
-	BlockThreshold     float64              `yaml:"blockThreshold,omitempty"`
-	LineThreshold      float64              `yaml:"lineThreshold,omitempty"`
-	FunctionThreshold  float64              `yaml:"functionThreshold,omitempty"`
-	SortBy             string               `yaml:"sortBy,omitempty"`
-	SortOrder          string               `yaml:"sortOrder,omitempty"`
-	Skip               []string             `yaml:"skip,omitempty"`
-	PerFile            PerThresholdOverride `yaml:"perFile,omitempty"`
-	PerPackage         PerThresholdOverride `yaml:"perPackage,omitempty"`
-	Total              PerOverride          `yaml:"total,omitempty"`
-	NoTable            bool                 `yaml:"noTable,omitempty"`
-	NoSummary          bool                 `yaml:"noSummary,omitempty"`
-	NoColor            bool                 `yaml:"noColor,omitempty"`
-	Format             string               `yaml:"format,omitempty"`
-	TableStyle         string               `yaml:"tableStyle,omitempty"`
-	TerminalWidth      int                  `yaml:"terminalWidth,omitempty"`
-	ModuleName         string               `yaml:"moduleName,omitempty"`
-	DiffFrom           string               `yaml:"diffFrom,omitempty"`
-	NoUncoveredLines   bool                 `yaml:"noUncoveredLines,omitempty"`
-	InspectContext     int                  `yaml:"inspectContext,omitempty"`
-	SyntaxStyle        string               `yaml:"syntaxStyle,omitempty"`
+	StatementThreshold   float64              `yaml:"statementThreshold,omitempty"`
+	BlockThreshold       float64              `yaml:"blockThreshold,omitempty"`
+	LineThreshold        float64              `yaml:"lineThreshold,omitempty"`
+	FunctionThreshold    float64              `yaml:"functionThreshold,omitempty"`
+	SortBy               string               `yaml:"sortBy,omitempty"`
+	SortOrder            string               `yaml:"sortOrder,omitempty"`
+	Skip                 []string             `yaml:"skip,omitempty"`
+	PerFile              PerThresholdOverride `yaml:"perFile,omitempty"`
+	PerPackage           PerThresholdOverride `yaml:"perPackage,omitempty"`
+	Total                PerOverride          `yaml:"total,omitempty"`
+	NoTable              bool                 `yaml:"noTable,omitempty"`
+	NoSummary            bool                 `yaml:"noSummary,omitempty"`
+	NoColor              bool                 `yaml:"noColor,omitempty"`
+	Format               string               `yaml:"format,omitempty"`
+	TableStyle           string               `yaml:"tableStyle,omitempty"`
+	TerminalWidth        int                  `yaml:"terminalWidth,omitempty"`
+	ModuleName           string               `yaml:"moduleName,omitempty"`
+	DiffFrom             string               `yaml:"diffFrom,omitempty"`
+	NoUncoveredLines     bool                 `yaml:"noUncoveredLines,omitempty"`
+	NoUncoveredFunctions bool                 `yaml:"noUncoveredFunctions,omitempty"`
+	InspectContext       int                  `yaml:"inspectContext,omitempty"`
+	SyntaxStyle          string               `yaml:"syntaxStyle,omitempty"`
 	// not configurable via YAML
 	InspectFiles []string `yaml:"-"`
 	Inspect      bool     `yaml:"-"`

@@ -21,6 +21,7 @@ type By struct {
 	FunctionThreshold             float64 `json:"functionThreshold"        yaml:"functionThreshold"`
 	Failed                        bool    `json:"failed"                   yaml:"failed"`
 	UncoveredLines                string  `json:"uncoveredLines,omitempty" yaml:"uncoveredLines,omitempty"`
+	UncoveredFunctions            string  `json:"uncoveredFunctions,omitempty" yaml:"uncoveredFunctions,omitempty"`
 	stmts, blocks, lines          int
 	stmtHits, blockHits, lineHits int
 	functions, functionHits       int
