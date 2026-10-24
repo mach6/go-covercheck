@@ -206,8 +206,8 @@ func TestRenderHeatmap_Color(t *testing.T) {
 	var buf bytes.Buffer
 	output.RenderHeatmap(&buf, results, &config.Config{TerminalWidth: 80})
 	out := buf.String()
-	require.Contains(t, out, "\x1b[42;30m") // green background: threshold met
-	require.Contains(t, out, "\x1b[41;37m") // red background: far below threshold
+	require.Contains(t, out, "\x1b[42;30m")   // green background: threshold met
+	require.Contains(t, out, "\x1b[41;37m")   // red background: far below threshold
 	require.NotContains(t, out, "█ S 100.0%") // color replaces the in-cell glyph
 
 	buf.Reset()
