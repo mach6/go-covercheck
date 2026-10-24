@@ -46,7 +46,7 @@ func TestHeatFor(t *testing.T) {
 		{"99 percent of goal", 69.3, 70, false, "mid"},
 		{"goal met", 70, 70, false, "met"},
 		{"above goal", 100, 70, false, "met"},
-		{"met on statements but failed elsewhere", 80, 70, true, "mid"},
+		{"rounds up to the goal but is below it", 69.8, 70, true, "mid"},
 		{"low stays low when failed", 10, 70, true, "low"},
 	}
 	glyphs := map[string]string{"none": "·", "low": "░", "mid": "▒", "met": "█"}
@@ -56,7 +56,7 @@ func TestHeatFor(t *testing.T) {
 			results := compute.Results{ByFile: []compute.ByFile{heatByFile("f.go", tc.actual, tc.goal, tc.failed)}}
 			output.RenderHeatmap(&buf, results, &config.Config{NoColor: true})
 			// the cell glyph precedes the percentage in the second line of the cell
-			require.Contains(t, buf.String(), fmt.Sprintf(" %s %.1f%%", glyphs[tc.want], tc.actual))
+			require.Contains(t, buf.String(), fmt.Sprintf(" %s S %.1f%%", glyphs[tc.want], tc.actual))
 		})
 	}
 }
@@ -81,11 +81,11 @@ func TestRenderHeatmap_PlainGolden(t *testing.T) {
 		"",
 		"By File",
 		" cmd/main.go            …dir/name/handler.go   pkg/x.go",
-		" █ 100.0%               ▒ 50.0%                ░ 10.0%",
+		" █ S 100.0%             ▒ S 50.0%              ░ S 10.0%",
 		"",
 		"By Package",
 		" pkg",
-		" · 30.0%",
+		" · S 30.0%",
 		"",
 		"By Total",
 		" ▒  Statements   50.0%  5/10",
@@ -123,7 +123,7 @@ func TestRenderHeatmap_ZeroWidthFallsBackTo80(t *testing.T) {
 	}
 	out := renderPlain(t, compute.Results{ByFile: files}, 0)
 	// 80 columns fit three 23 wide cells per row; ten files make four rows.
-	require.Equal(t, 10, strings.Count(out, " ▒ 50.0%"))
+	require.Equal(t, 10, strings.Count(out, " ▒ S 50.0%"))
 	require.Contains(t, out, " f0.go                  f1.go                  f2.go\n")
 	require.Contains(t, out, " f9.go\n")
 	for _, line := range strings.Split(out, "\n") {
@@ -208,7 +208,7 @@ func TestRenderHeatmap_Color(t *testing.T) {
 	out := buf.String()
 	require.Contains(t, out, "\x1b[42;30m") // green background: threshold met
 	require.Contains(t, out, "\x1b[41;37m") // red background: far below threshold
-	require.NotContains(t, out, "█ 100.0%") // color replaces the in-cell glyph
+	require.NotContains(t, out, "█ S 100.0%") // color replaces the in-cell glyph
 
 	buf.Reset()
 	output.RenderHeatmap(&buf, results, &config.Config{TerminalWidth: 80, NoColor: true})
@@ -223,7 +223,7 @@ func TestRenderHeatmap_NoColorOnNonTTY(t *testing.T) {
 	output.RenderHeatmap(&buf, compute.Results{ByFile: []compute.ByFile{heatByFile("a.go", 80, 70, false)}},
 		&config.Config{TerminalWidth: 80})
 	require.NotContains(t, buf.String(), "\x1b[")
-	require.Contains(t, buf.String(), "█ 80.0%")
+	require.Contains(t, buf.String(), "█ S 80.0%")
 }
 
 func TestFormatAndReport_Heatmap(t *testing.T) {
@@ -251,7 +251,7 @@ func TestFormatAndReport_Heatmap(t *testing.T) {
 	require.Empty(t, stderr)
 	require.Contains(t, stdout, "By File")
 	require.Contains(t, stdout, "example/foo.go")
-	require.Contains(t, stdout, "▒ 50.0%")
+	require.Contains(t, stdout, "▒ S 50.0%")
 	require.Contains(t, stdout, "Coverage check failed")
 }
 
@@ -277,4 +277,64 @@ func TestHeatmapTotals_Functions(t *testing.T) {
 
 	results.ByTotal.Functions.Threshold = 70
 	require.Contains(t, renderPlain(t, results, 80), "Functions")
+}
+
+func worstResults() compute.Results {
+	by := compute.By{
+		StatementPercentage: 90, StatementThreshold: 70,
+		BlockPercentage: 30, BlockThreshold: 70,
+		LinePercentage: 60, LineThreshold: 70,
+		FunctionPercentage: 100, FunctionThreshold: 80,
+	}
+	return compute.Results{
+		ByFile:    []compute.ByFile{{File: "a.go", By: by}},
+		ByPackage: []compute.ByPackage{{Package: "pkg", By: by}},
+	}
+}
+
+func TestRenderHeatmap_WorstMetric(t *testing.T) {
+	r := worstResults()
+	// blocks are furthest below their goal, so they color the cell and are named in it
+	out := renderPlain(t, r, 80)
+	require.Contains(t, out, "By File\n")
+	require.Contains(t, out, " ░ B 30.0%")
+
+	// lines are the worst when blocks are fine
+	r.ByFile[0].BlockPercentage = 70
+	require.Contains(t, renderPlain(t, r, 80), " ▒ L 60.0%")
+
+	// a metric without a threshold is ignored
+	r.ByFile[0].LineThreshold = 0
+	r.ByFile[0].BlockThreshold = 0
+	r.ByFile[0].FunctionThreshold = 0
+	require.Contains(t, renderPlain(t, r, 80), " █ S 90.0%")
+
+	// no thresholds at all: grey, showing statements
+	r.ByFile[0].StatementThreshold = 0
+	require.Contains(t, renderPlain(t, r, 80), " · S 90.0%")
+}
+
+func TestRenderHeatmap_FunctionsCountWhenThresholdSet(t *testing.T) {
+	r := worstResults()
+	r.ByFile[0].StatementPercentage, r.ByFile[0].BlockPercentage, r.ByFile[0].LinePercentage = 100, 100, 100
+	r.ByFile[0].FunctionPercentage = 20
+	require.Contains(t, renderPlain(t, r, 80), " ░ F 20.0%")
+	r.ByFile[0].FunctionThreshold = 0
+	require.NotContains(t, renderPlain(t, r, 80), "F 20.0%")
+}
+
+func TestRenderHeatmap_SingleMetric(t *testing.T) {
+	for metric, want := range map[string]string{
+		config.HeatmapMetricStatements: "By File - Statements\n a.go",
+		config.HeatmapMetricBlocks:     " ░ 30.0%",
+		config.HeatmapMetricLines:      " ▒ 60.0%",
+		config.HeatmapMetricFunctions:  " █ 100.0%",
+	} {
+		var buf bytes.Buffer
+		output.RenderHeatmap(&buf, worstResults(), &config.Config{NoColor: true, TerminalWidth: 80, HeatmapMetric: metric})
+		out := buf.String()
+		require.Contains(t, out, want, metric)
+		require.Contains(t, out, "By Package - ", metric)
+		require.NotRegexp(t, `[SBLF] \d`, out[strings.Index(out, "By File"):strings.Index(out, "By Total")], metric)
+	}
 }

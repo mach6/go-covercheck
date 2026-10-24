@@ -10,7 +10,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 * `heatmap` output format (`--format heatmap`): a grid of colored cells per file and
-  package, colored relative to each item's statement threshold.
+  package, colored by the metric (statements, blocks, lines or functions) furthest below its
+  threshold, which the cell names. `--heatmap-metric` (config `heatmapMetric`) picks a single
+  metric instead.
 * `--heatmap-png <path>` (config `heatmapPng`): also write the heat map as a PNG image,
   alongside whichever report format is selected.
 

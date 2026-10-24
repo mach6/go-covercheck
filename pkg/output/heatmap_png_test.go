@@ -21,7 +21,7 @@ import (
 func writeAndDecode(t *testing.T, results compute.Results) image.Image {
 	t.Helper()
 	path := filepath.Join(t.TempDir(), "heat.png")
-	require.NoError(t, output.WriteHeatmapPNG(path, results))
+	require.NoError(t, output.WriteHeatmapPNG(path, results, &config.Config{}))
 	data, err := os.ReadFile(path) //nolint:gosec // test temp path
 	require.NoError(t, err)
 	img, err := png.Decode(bytes.NewReader(data))
@@ -48,7 +48,7 @@ func TestWriteHeatmapPNG_SeverityColors(t *testing.T) {
 	results := compute.Results{
 		ByFile: []compute.ByFile{
 			heatByFile("met.go", 100, 70, false),
-			heatByFile("failed-but-high.go", 90, 70, true), // never green: expect yellow
+			heatByFile("rounds-up.go", 69.8, 70, true), // below the goal: never green, expect yellow
 			heatByFile("low.go", 10, 70, false),
 			heatByFile("nogoal.go", 90, 0, false),
 		},
@@ -71,7 +71,7 @@ func TestWriteHeatmapPNG_SeverityColors(t *testing.T) {
 
 func TestWriteHeatmapPNG_FailedNeverGreen(t *testing.T) {
 	img := writeAndDecode(t, compute.Results{
-		ByFile: []compute.ByFile{heatByFile("a.go", 100, 70, true)},
+		ByFile: []compute.ByFile{heatByFile("a.go", 69.8, 70, true)},
 	})
 	// only the legend swatch is green
 	require.Less(t, count(img, output.HeatColor(output.HeatMet)), 168*40/2)
@@ -112,7 +112,7 @@ func TestWriteHeatmapPNG_Empty(t *testing.T) {
 
 func TestWriteHeatmapPNG_UnwritablePath(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "missing-dir", "heat.png")
-	err := output.WriteHeatmapPNG(path, compute.Results{})
+	err := output.WriteHeatmapPNG(path, compute.Results{}, &config.Config{})
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "create heat map")
 	require.NoFileExists(t, path)
@@ -124,7 +124,7 @@ func TestWriteHeatmapPNG_TooTall(t *testing.T) {
 		r.ByFile = append(r.ByFile, heatByFile(fmt.Sprintf("f%d.go", i), 50, 70, false))
 	}
 	path := filepath.Join(t.TempDir(), "heat.png")
-	err := output.WriteHeatmapPNG(path, r)
+	err := output.WriteHeatmapPNG(path, r, &config.Config{})
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "pixel limit")
 	require.NoFileExists(t, path)

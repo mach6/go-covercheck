@@ -31,13 +31,13 @@ const (
 	defaultHeatmapWidth = 80
 	heatmapCellInner    = 20 // target display columns for a cell's content; wide enough to tell similar paths apart
 	heatmapMinInner     = 8  // fits "▒ 100.0%"
+	heatmapLabelWidth   = 2  // "L " before the percentage
 	heatmapCellPadding  = 2  // one column of padding on each side of the content
 	heatmapCellGap      = 1
 )
 
 // heatFor classifies actual against goal. A failed item is never reported as
-// met, so a file that fails on blocks, lines or functions is not painted green because its
-// statement coverage happens to reach the goal.
+// met, so an item below its goal is not painted green when it rounds up to it.
 func heatFor(actual, goal float64, failed bool) heat {
 	if goal <= 0 {
 		return heatNone
@@ -96,9 +96,10 @@ func (h heat) attrs() []color.Attribute {
 }
 
 type heatCell struct {
-	name string
-	pct  float64
-	heat heat
+	name  string
+	pct   float64
+	heat  heat
+	label string // metric letter shown before the percentage, when the cell is not tied to one metric
 }
 
 type heatmapRenderer struct {
@@ -151,10 +152,10 @@ func (r *heatmapRenderer) bold(s string) string {
 }
 
 func (r *heatmapRenderer) cell(c heatCell) [2]string {
-	pct := fmt.Sprintf("%s %.1f%%", c.heat.glyph(), c.pct)
-	if r.colors {
-		pct = fmt.Sprintf("%.1f%%", c.pct)
+	if r.inner < heatmapMinInner+heatmapLabelWidth {
+		c.label = "" // no room for the metric letter; the percentage is never cut
 	}
+	pct := c.text(!r.colors)
 	return [2]string{
 		r.paint(fit(c.name, r.inner), c.heat),
 		r.paint(fit(pct, r.inner), c.heat),
@@ -222,19 +223,95 @@ func (r *heatmapRenderer) totals(t compute.Totals) {
 	_, _ = fmt.Fprintln(r.w)
 }
 
-// heatCells builds the file and package cells shared by the text and PNG heat maps.
-func heatCells(results compute.Results) ([]heatCell, []heatCell) {
-	files := make([]heatCell, 0, len(results.ByFile))
-	for _, f := range results.ByFile {
-		files = append(files, heatCell{f.File, f.StatementPercentage,
-			heatFor(f.StatementPercentage, f.StatementThreshold, f.Failed)})
+// heatMetric picks one coverage metric out of a result.
+type heatMetric struct {
+	key   string // config.HeatmapMetric* value
+	name  string
+	short string // the letter used in the failure summary
+	of    func(compute.By) (pct, goal float64)
+}
+
+var heatMetrics = []heatMetric{
+	{config.HeatmapMetricStatements, colStatements, "S",
+		func(b compute.By) (float64, float64) { return b.StatementPercentage, b.StatementThreshold }},
+	{config.HeatmapMetricBlocks, colBlocks, "B",
+		func(b compute.By) (float64, float64) { return b.BlockPercentage, b.BlockThreshold }},
+	{config.HeatmapMetricLines, colLines, "L",
+		func(b compute.By) (float64, float64) { return b.LinePercentage, b.LineThreshold }},
+	{config.HeatmapMetricFunctions, colFunctions, "F",
+		func(b compute.By) (float64, float64) { return b.FunctionPercentage, b.FunctionThreshold }},
+}
+
+// heatCellFor colors an item by one metric against that metric's own threshold, so
+// an item below its goal is never painted green.
+func heatCellFor(name string, by compute.By, m heatMetric, label bool) heatCell {
+	pct, goal := m.of(by)
+	c := heatCell{name: name, pct: pct, heat: heatFor(pct, goal, pct < goal)}
+	if label {
+		c.label = m.short
 	}
-	pkgs := make([]heatCell, 0, len(results.ByPackage))
+	return c
+}
+
+// worstHeatCell colors an item by the metric furthest below its threshold,
+// measured as a share of that threshold, and labels the cell with that metric.
+// Metrics without a threshold are ignored; an item with none is grey and shows
+// its statement coverage.
+func worstHeatCell(name string, by compute.By) heatCell {
+	worst, worstShare := -1, 0.0
+	for i, m := range heatMetrics {
+		pct, goal := m.of(by)
+		if goal <= 0 {
+			continue
+		}
+		if share := pct / goal; worst < 0 || share < worstShare {
+			worst, worstShare = i, share
+		}
+	}
+	if worst < 0 {
+		return heatCellFor(name, by, heatMetrics[0], true)
+	}
+	return heatCellFor(name, by, heatMetrics[worst], true)
+}
+
+// heatSections builds the file and package grids shared by the text and PNG
+// heat maps. metric is a config.HeatmapMetric* value; empty means worst.
+func heatSections(results compute.Results, metric string) (files, pkgs heatSection) {
+	cell := func(name string, by compute.By) heatCell { return worstHeatCell(name, by) }
+	suffix := ""
+	for _, m := range heatMetrics {
+		if m.key == metric {
+			cell = func(name string, by compute.By) heatCell { return heatCellFor(name, by, m, false) }
+			suffix = " - " + m.name
+		}
+	}
+	files = heatSection{title: "By File" + suffix, cells: make([]heatCell, 0, len(results.ByFile))}
+	for _, f := range results.ByFile {
+		files.cells = append(files.cells, cell(f.File, f.By))
+	}
+	pkgs = heatSection{title: "By Package" + suffix, cells: make([]heatCell, 0, len(results.ByPackage))}
 	for _, p := range results.ByPackage {
-		pkgs = append(pkgs, heatCell{p.Package, p.StatementPercentage,
-			heatFor(p.StatementPercentage, p.StatementThreshold, p.Failed)})
+		pkgs.cells = append(pkgs.cells, cell(p.Package, p.By))
 	}
 	return files, pkgs
+}
+
+// heatSection is one titled grid of cells.
+type heatSection struct {
+	title string
+	cells []heatCell
+}
+
+// text is the second line of a cell: the metric letter when there is one, then the percentage.
+func (c heatCell) text(withGlyph bool) string {
+	s := fmt.Sprintf("%.1f%%", c.pct)
+	if c.label != "" {
+		s = c.label + " " + s
+	}
+	if withGlyph {
+		s = c.heat.glyph() + " " + s
+	}
+	return s
 }
 
 type heatTotal struct {
@@ -267,11 +344,11 @@ func heatTotals(t compute.Totals) []heatTotal {
 func renderHeatmap(w io.Writer, results compute.Results, cfg *config.Config) {
 	r := newHeatmapRenderer(w, cfg)
 
-	files, pkgs := heatCells(results)
+	files, pkgs := heatSections(results, cfg.HeatmapMetric)
 
 	r.legend()
-	r.section("By File", files)
-	r.section("By Package", pkgs)
+	r.section(files.title, files.cells)
+	r.section(pkgs.title, pkgs.cells)
 	r.totals(results.ByTotal)
 }
 

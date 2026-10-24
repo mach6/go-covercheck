@@ -104,6 +104,6 @@ func FormatAndReport(results compute.Results, cfg *config.Config, hasFailure boo
 	}
 
 	if cfg.HeatmapPNG != "" {
-		bailOnError(WriteHeatmapPNG(cfg.HeatmapPNG, results))
+		bailOnError(WriteHeatmapPNG(cfg.HeatmapPNG, results, cfg))
 	}
 }

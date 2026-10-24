@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/mach6/go-covercheck/pkg/compute"
+	"github.com/mach6/go-covercheck/pkg/config"
 	"golang.org/x/image/font"
 	"golang.org/x/image/font/basicfont"
 	"golang.org/x/image/math/fixed"
@@ -121,14 +122,15 @@ func (c *pngCanvas) section(title string, y int, cells []heatCell) int {
 	for i, cell := range cells {
 		x := pngMargin + (i%pngCols)*(pngCellW+pngGap)
 		cy := y + (i/pngCols)*(pngCellH+pngGap)
-		c.cell(x, cy, pngText(cell.name, pngNameChars), fmt.Sprintf("%.1f%%", cell.pct), cell.heat)
+		c.cell(x, cy, pngText(cell.name, pngNameChars), cell.text(false), cell.heat)
 	}
 	return y + pngRows(len(cells))*(pngCellH+pngGap) + pngGap
 }
 
 // renderHeatmapImage draws the heat map. The colors follow the text heat map.
-func renderHeatmapImage(results compute.Results) (image.Image, error) {
-	files, pkgs := heatCells(results)
+func renderHeatmapImage(results compute.Results, cfg *config.Config) (image.Image, error) {
+	filesSec, pkgsSec := heatSections(results, cfg.HeatmapMetric)
+	files, pkgs := filesSec.cells, pkgsSec.cells
 	totals := heatTotals(results.ByTotal)
 	empty := isEmptyResults(results)
 
@@ -165,8 +167,8 @@ func renderHeatmapImage(results compute.Results) (image.Image, error) {
 		return c.img, nil
 	}
 
-	y = c.section("By File", y, files)
-	y = c.section("By Package", y, pkgs)
+	y = c.section(filesSec.title, y, files)
+	y = c.section(pkgsSec.title, y, pkgs)
 	c.text("By Total", pngMargin, y, pngInk)
 	y += pngLineH + pngGap
 	for i, t := range totals {
@@ -178,8 +180,8 @@ func renderHeatmapImage(results compute.Results) (image.Image, error) {
 
 // WriteHeatmapPNG renders the coverage heat map and writes it to path.
 // Nothing is written to path unless the image renders.
-func WriteHeatmapPNG(path string, results compute.Results) error {
-	img, err := renderHeatmapImage(results)
+func WriteHeatmapPNG(path string, results compute.Results, cfg *config.Config) error {
+	img, err := renderHeatmapImage(results, cfg)
 	if err != nil {
 		return err
 	}

@@ -68,6 +68,12 @@ format: table
 # default off
 # heatmapPng: coverage-heatmap.png
 
+# the metric heat map cells are colored by
+# worst|statements|blocks|lines|functions
+# worst colors each cell by the metric furthest below its threshold and names that metric in the cell
+# default worst
+heatmapMetric: worst
+
 # the table style for table output format
 # default|light|bold|rounded|double
 # default light

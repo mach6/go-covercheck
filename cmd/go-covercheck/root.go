@@ -126,6 +126,9 @@ const (
 	HeatmapPNGFlag      = "heatmap-png"
 	HeatmapPNGFlagUsage = "also write a coverage heat map PNG image to this path (ends in .png)"
 
+	HeatmapMetricFlag      = "heatmap-metric"
+	HeatmapMetricFlagUsage = "metric the heat map colors cells by [worst|statements|blocks|lines|functions]"
+
 	InitFlag      = "init"
 	InitFlagUsage = "create a sample .go-covercheck.yml config file in the current directory"
 
@@ -593,6 +596,7 @@ func applyConfigOverrides(cfg *config.Config, cmd *cobra.Command, noConfigFile b
 	applyIntFlagOverride(cmd, InspectContextFlag, &cfg.InspectContext, noConfigFile)
 	applyStringFlagOverride(cmd, ModuleNameFlag, &cfg.ModuleName, noConfigFile)
 	applyStringFlagOverride(cmd, HeatmapPNGFlag, &cfg.HeatmapPNG, noConfigFile)
+	applyStringFlagOverride(cmd, HeatmapMetricFlag, &cfg.HeatmapMetric, noConfigFile)
 	applyStringFlagOverride(cmd, DiffFromFlag, &cfg.DiffFrom, noConfigFile)
 	applyBoolFlagOverride(cmd, CommentFlag, &cfg.Comment.Enabled, noConfigFile)
 	applyStringFlagOverride(cmd, CommentPlatformFlag, &cfg.Comment.Platform.Type, noConfigFile)
@@ -864,6 +868,12 @@ func initFlags(cmd *cobra.Command) {
 		HeatmapPNGFlag,
 		"",
 		HeatmapPNGFlagUsage,
+	)
+
+	cmd.Flags().String(
+		HeatmapMetricFlag,
+		config.HeatmapMetricWorst,
+		HeatmapMetricFlagUsage,
 	)
 
 	cmd.Flags().Bool(

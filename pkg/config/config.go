@@ -48,6 +48,14 @@ const (
 	FormatHeatmap = "heatmap"
 	FormatDefault = FormatTable
 
+	// HeatmapMetricWorst colors each heat map cell by whichever metric is furthest
+	// below its threshold; the others pick a single metric.
+	HeatmapMetricWorst      = "worst"
+	HeatmapMetricStatements = "statements"
+	HeatmapMetricBlocks     = "blocks"
+	HeatmapMetricLines      = "lines"
+	HeatmapMetricFunctions  = "functions"
+
 	TableStyleDefault  = "default"
 	TableStyleLight    = "light"
 	TableStyleBold     = "bold"
@@ -163,6 +171,7 @@ type Config struct {
 	TerminalWidth        int                  `yaml:"terminalWidth,omitempty"`
 	ModuleName           string               `yaml:"moduleName,omitempty"`
 	HeatmapPNG           string               `yaml:"heatmapPng,omitempty"`
+	HeatmapMetric        string               `yaml:"heatmapMetric,omitempty"`
 	DiffFrom             string               `yaml:"diffFrom,omitempty"`
 	NoUncoveredLines     bool                 `yaml:"noUncoveredLines,omitempty"`
 	NoUncoveredFunctions bool                 `yaml:"noUncoveredFunctions,omitempty"`
@@ -205,6 +214,7 @@ func (c *Config) ApplyDefaults() {
 	c.Skip = []string{}
 	c.InspectFiles = []string{}
 	c.Format = FormatDefault
+	c.HeatmapMetric = HeatmapMetricWorst
 	c.TableStyle = TableStyleDefValue
 	c.SyntaxStyle = SyntaxStyleDefault
 	c.InspectContext = InspectContextDefault
@@ -279,6 +289,16 @@ func (c *Config) Validate() error { //nolint:cyclop
 	default:
 		return fmt.Errorf("format must be one of %s|%s|%s|%s|%s|%s|%s|%s",
 			FormatJSON, FormatYAML, FormatTable, FormatCSV, FormatHTML, FormatTSV, FormatMD, FormatHeatmap)
+	}
+
+	switch c.HeatmapMetric {
+	case "", HeatmapMetricWorst, HeatmapMetricStatements, HeatmapMetricBlocks, HeatmapMetricLines,
+		HeatmapMetricFunctions:
+		break
+	default:
+		return fmt.Errorf("heatmap-metric must be one of %s|%s|%s|%s|%s",
+			HeatmapMetricWorst, HeatmapMetricStatements, HeatmapMetricBlocks, HeatmapMetricLines,
+			HeatmapMetricFunctions)
 	}
 
 	if c.HeatmapPNG != "" && !strings.HasSuffix(strings.ToLower(c.HeatmapPNG), ".png") {

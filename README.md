@@ -217,6 +217,7 @@ Flags:
   -f, --format string                     output format [table|json|yaml|md|html|csv|tsv|heatmap] (default "table")
   -g, --function-threshold float          global function threshold to enforce; table|md|html show function columns only when set [0=disabled]
   -h, --help                              help for go-covercheck
+      --heatmap-metric string             metric the heat map colors cells by [worst|statements|blocks|lines|functions] (default "worst")
       --heatmap-png string                also write a coverage heat map PNG image to this path (ends in .png)
       --history-file string               path to go-covercheck history file (default ".go-covercheck.history.json")
       --init                              create a sample .go-covercheck.yml config file in the current directory
@@ -679,36 +680,47 @@ rendered by default. `-O` (`--no-uncovered-functions`) drops the "Uncovered Func
 
 ### 🔥 Heat Map
 The `heatmap` format draws a grid with one cell per file and per package, showing each name (20 columns wide; longer
-paths are shortened from the left so the file name stays visible) and its statement coverage. Cells follow the order
+paths are shortened from the left so the file name stays visible) and its coverage. Cells follow the order
 set by `--sort-by` and `--sort-order`. As many cells as fit are placed on each row of the terminal width (see
 `--term-width`; 80 columns when it can't be detected), so 100 columns hold four cells per row. On very narrow
 terminals the cells shrink rather than overflow.
 
-The cell color is the [color legend](#-color-legend) applied to the item's statement coverage and its statement
-threshold, so a cell is red when coverage is at or below half of the goal, yellow when it is below the goal, and
-green when the goal is met. An item that fails on blocks, lines or functions is never green. The total `Functions` row appears only when a function threshold is set. Items without a threshold are grey.
-When color is off (`--no-color`, `NO_COLOR`, or output that isn't a terminal), each level is shown by a shade glyph
-instead: `░` `▒` `█` `·`. The failure summary is printed after the grid, as with `table`.
+By default (`--heatmap-metric worst`) each cell is colored by whichever metric is furthest below its own
+threshold, and names that metric in the cell: `S` statements, `B` blocks, `L` lines, `F` functions, the same letters
+as the failure summary. A red cell therefore means something is wrong, and the letter says what. Metrics without a
+threshold are ignored, and functions only count when a function threshold is set. An item with no thresholds at all
+is grey and shows its statement coverage.
+
+`--heatmap-metric statements|blocks|lines|functions` (or `heatmapMetric:` in the config file) colors every cell by
+that one metric against its threshold instead. The cell then shows only the percentage and the section titles name
+the metric (`By File - Lines`).
+
+The color is the [color legend](#-color-legend) applied to the chosen metric and its threshold, so a cell is red when
+coverage is at or below half of the goal, yellow when it is below the goal, and green when the goal is met. An item
+below its goal is never green. When color is off (`--no-color`, `NO_COLOR`, or output that isn't a terminal), each
+level is shown by a shade glyph instead: `░` `▒` `█` `·`. By Total lists Statements, Blocks and Lines, plus Functions
+when a function threshold is set. The failure summary is printed after the grid, as with `table`.
 
 ```text
-$ go-covercheck -f heatmap -w --term-width 60 coverage.out
+$ go-covercheck -f heatmap -w --term-width 60 -s 90 -n 85 -g 60 coverage.out
  ░  <= 50% of threshold   ▒  below threshold
  █  threshold met   ·  no threshold
 
 By File
  pkg/math/math.go       pkg/lines/lines.go
- █ 100.0%               █ 85.3%
+ █ S 100.0%             ▒ L 80.3%
 
 By Package
  pkg/math       pkg/lines
- █ 100.0%       █ 85.3%
+ █ S 100.0%     ▒ L 80.3%
 
 By Total
  █  Statements   85.7%  126/147
  █  Blocks       83.8%  88/105
  █  Lines        86.2%  150/174
+ █  Functions    90.0%  18/20
 
-✔ All good
+✘ Coverage check failed
 ```
 
 #### PNG heat map
