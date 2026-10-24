@@ -9,6 +9,9 @@ on:
 jobs:
   build-test-lint:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
 
     steps:
       - name: Checkout code
@@ -28,9 +31,30 @@ jobs:
         run: go test -v -coverprofile=coverage.out ./...
 
       - name: Coverage Check
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          COMMENT_ENABLED: >-
+            ${{ github.event_name == 'pull_request' &&
+                github.event.pull_request.head.repo.full_name == github.repository &&
+                github.actor != 'dependabot[bot]' }}
+          COMMENT_REPOSITORY: ${{ github.repository }}
+          COMMENT_PR: ${{ github.event.pull_request.number }}
         run: |
-          go install github.com/mach6/go-covercheck/cmd/go-covercheck@v0.6.1
-          go-covercheck coverage.out -C v0.6.1
+          mkdir -p .agents
+          go build -o .agents/go-covercheck ./cmd/go-covercheck
+          args=(coverage.out -C v0.6.1 --comment="$COMMENT_ENABLED")
+          if [[ "$COMMENT_ENABLED" == "true" ]]; then
+            args+=(
+              --comment-platform github
+              --comment-base-url https://github.com
+              --comment-repository "$COMMENT_REPOSITORY"
+              --comment-pr "$COMMENT_PR"
+              --comment-update
+              --comment-author 'github-actions[bot]'
+            )
+          fi
+          .agents/go-covercheck "${args[@]}"
 
       - name: Build
         run: go build -v ./...
