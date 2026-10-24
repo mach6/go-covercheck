@@ -5,6 +5,8 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"slices"
+	"strings"
 
 	"github.com/alecthomas/chroma/v2/styles"
 	"gopkg.in/yaml.v3"
@@ -86,6 +88,10 @@ const (
 	// terminal background.
 	SyntaxStyleAuto = "auto"
 
+	CommentPlatformGitHub = "github"
+	CommentPlatformGitLab = "gitlab"
+	CommentPlatformGitea  = "gitea"
+
 	StatementsSection = "statements"
 	BlocksSection     = "blocks"
 	LinesSection      = "lines"
@@ -101,6 +107,39 @@ type PerThresholdOverride struct {
 	Blocks     PerOverride `yaml:"blocks"`
 	Lines      PerOverride `yaml:"lines"`
 	Functions  PerOverride `yaml:"functions"`
+}
+
+// CommentPlatforms lists the supported comment platforms.
+var CommentPlatforms = []string{
+	CommentPlatformGitHub, CommentPlatformGitLab, CommentPlatformGitea,
+}
+
+// CommentConfig holds settings for posting results as a pull/merge request comment.
+type CommentConfig struct {
+	Enabled  bool           `yaml:"enabled,omitempty"`
+	Platform PlatformConfig `yaml:"platform,omitempty"`
+}
+
+// PlatformConfig holds the platform, credentials, and target for comment posting.
+type PlatformConfig struct {
+	// Type is one of CommentPlatforms.
+	Type string `yaml:"type,omitempty"`
+	// BaseURL is the server URL, needed for self-hosted instances.
+	BaseURL string `yaml:"baseUrl,omitempty"`
+	// Token authenticates with the platform API. Prefer the flag or an environment variable
+	// over storing it in the config file.
+	Token string `yaml:"token,omitempty"`
+	// Repository is "owner/repo" (or a GitLab "group/project" path or numeric project ID).
+	Repository string `yaml:"repository,omitempty"`
+	// PullRequestID is the pull request or merge request number.
+	PullRequestID int `yaml:"pullRequestId,omitempty"`
+	// Author is the login or username the comment is posted as. When set, it is used to find
+	// the previous comment to update, and the current-user lookup is skipped.
+	Author string `yaml:"author,omitempty"`
+	// IncludeColors shows pass/fail with colored emoji instead of plain text. Defaults to true.
+	IncludeColors bool `yaml:"includeColors"`
+	// UpdateExisting edits the previous go-covercheck comment instead of adding a new one.
+	UpdateExisting bool `yaml:"updateExisting,omitempty"`
 }
 
 // Config for application.
@@ -127,6 +166,7 @@ type Config struct {
 	NoUncoveredFunctions bool                 `yaml:"noUncoveredFunctions,omitempty"`
 	InspectContext       int                  `yaml:"inspectContext,omitempty"`
 	SyntaxStyle          string               `yaml:"syntaxStyle,omitempty"`
+	Comment              CommentConfig        `yaml:"comment,omitempty"`
 	// not configurable via YAML
 	InspectFiles []string `yaml:"-"`
 	Inspect      bool     `yaml:"-"`
@@ -166,6 +206,7 @@ func (c *Config) ApplyDefaults() {
 	c.TableStyle = TableStyleDefValue
 	c.SyntaxStyle = SyntaxStyleDefault
 	c.InspectContext = InspectContextDefault
+	c.Comment.Platform.IncludeColors = true
 
 	c.initPerFileWhenNil()
 	c.initPerPackageWhenNil()
@@ -244,6 +285,11 @@ func (c *Config) Validate() error { //nolint:cyclop
 	default:
 		return fmt.Errorf("table-style must be one of %s|%s|%s|%s|%s",
 			TableStyleDefault, TableStyleLight, TableStyleBold, TableStyleRounded, TableStyleDouble)
+	}
+
+	c.Comment.Platform.Type = strings.ToLower(c.Comment.Platform.Type)
+	if t := c.Comment.Platform.Type; t != "" && !slices.Contains(CommentPlatforms, t) {
+		return fmt.Errorf("comment platform must be one of %s", strings.Join(CommentPlatforms, "|"))
 	}
 
 	if c.NoSummary && c.NoTable && c.Format != FormatJSON && c.Format != FormatYAML {
