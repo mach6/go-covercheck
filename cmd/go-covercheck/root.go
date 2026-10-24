@@ -25,6 +25,8 @@ import (
 
 // Constants for this application.
 const (
+	envTrue = "true"
+
 	ConfigFlag      = "config"
 	ConfigFlagShort = "c"
 	ConfigFlagUsage = "path to YAML config file"
@@ -320,7 +322,7 @@ func postComment(results compute.Results, failed bool, cfg *config.Config) {
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), commentTimeout)
 	defer cancel()
-	if err := comment.Post(ctx, results, failed, &cfg.Comment); err != nil {
+	if err := comment.Post(ctx, results, failed, cfg); err != nil {
 		fmt.Fprintf(os.Stderr, "warning: failed to post coverage comment: %v\n", err)
 	}
 }
@@ -451,7 +453,7 @@ func isCIEnvWithColor(env []string) bool {
 	}
 
 	// Detect 'act' runner
-	if os.Getenv("ACT") == "true" || os.Getenv("ACT") == "1" {
+	if os.Getenv("ACT") == envTrue || os.Getenv("ACT") == "1" {
 		return true
 	}
 	return false

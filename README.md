@@ -553,7 +553,8 @@ Error: no history entry found for ref: nonexistent
 pull/merge request. This is handy when it runs as a pre-merge gate in CI.
 
 - The comment shows the total statement, block, and line coverage against their thresholds, plus
-  any files and packages below threshold (capped at 50 rows each).
+  any files and packages below threshold (capped at 50 rows each). Function coverage is included in both
+  the totals and failing file/package tables when a function threshold is enabled.
 - Pass/fail is shown with 🟢/🔴. Use `--comment-no-emoji` (or `includeColors: false`) for plain `PASS`/`FAIL` text.
 - With `--comment-update`, the previous `go-covercheck` comment is edited in place instead of
   adding a new one each run. Only the newest comment containing the marker that was written by

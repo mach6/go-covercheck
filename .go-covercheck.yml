@@ -1,6 +1,7 @@
 blockThreshold: 50
 statementThreshold: 65
 lineThreshold: 70
+functionThreshold: 65
 
 sortBy: statement-percent
 sortOrder: desc
@@ -12,3 +13,4 @@ total:
   statements: 80.0
   blocks: 75
   lines: 85.0
+  functions: 95

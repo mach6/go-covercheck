@@ -59,19 +59,20 @@ func Validate(cfg *config.CommentConfig) error {
 	return nil
 }
 
-// Post formats results and posts them as a comment. failed is the overall outcome of the
-// check. When UpdateExisting is set, an earlier go-covercheck comment is edited in place
-// instead of adding a new one.
-func Post(ctx context.Context, results compute.Results, failed bool, cfg *config.CommentConfig) error {
-	if err := Validate(cfg); err != nil {
+// Post formats results using cfg and posts them with ctx, returning any posting error.
+// failed is the overall check outcome. cfg supplies comment settings and function coverage
+// enablement. With UpdateExisting, an earlier go-covercheck comment is edited in place.
+func Post(ctx context.Context, results compute.Results, failed bool, cfg *config.Config) error {
+	if err := Validate(&cfg.Comment); err != nil {
 		return err
 	}
-	poster, err := NewPoster(&cfg.Platform)
+	p := &cfg.Comment.Platform
+	poster, err := NewPoster(p)
 	if err != nil {
 		return err
 	}
-	body := FormatMarkdown(results, failed, cfg.Platform.IncludeColors)
-	return upsert(ctx, poster, cfg.Platform.Type, cfg.Platform.Author, body, cfg.Platform.UpdateExisting, os.Stderr)
+	body := FormatMarkdown(results, failed, cfg)
+	return upsert(ctx, poster, p.Type, p.Author, body, p.UpdateExisting, os.Stderr)
 }
 
 // upsert creates a comment, or with updateExisting edits the newest comment that carries

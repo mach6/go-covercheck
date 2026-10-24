@@ -2,8 +2,11 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"sync"
 	"testing"
 
@@ -137,4 +140,71 @@ func Test_run_CommentPostedEvenWhenHistoryFails(t *testing.T) {
 	_, _, err := runCmdForTest(t, cmd)
 	require.Error(t, err)
 	require.True(t, posted)
+}
+
+func Test_run_CommentFunctionCoverage(t *testing.T) {
+	tests := []struct {
+		name       string
+		thresholds string
+		enabled    bool
+	}{
+		{"disabled", "", false},
+		{"global flag", "", true},
+		{"total", "total:\n  functions: 50\n", true},
+		{"file override", "perFile:\n  functions:\n    %s: 50\n", true},
+		{"package override", "perPackage:\n  functions:\n    %s: 50\n", true},
+		{"unmatched file override", "perFile:\n  functions:\n    absent.go: 50\n", true},
+		{"unmatched package override", "perPackage:\n  functions:\n    absent: 50\n", true},
+		{"zero overrides", "perFile:\n  functions:\n    absent.go: 0\nperPackage:\n  functions:\n    absent: 0\n", false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			dir := t.TempDir()
+			source := filepath.Join(dir, "example.go")
+			sourceText := "package example\nfunc One() { println(1) }\nfunc Two() { println(2) }\n"
+			require.NoError(t, os.WriteFile(source, []byte(sourceText), 0o600))
+			profile := test.CreateTempCoverageFile(t,
+				fmt.Sprintf("mode: set\n%s:2.12,2.26 1 1\n%s:3.12,3.26 1 1\n", source, source))
+			thresholds := tt.thresholds
+			switch tt.name {
+			case "file override":
+				thresholds = fmt.Sprintf(thresholds, source)
+			case "package override":
+				thresholds = fmt.Sprintf(thresholds, dir)
+			}
+			configPath := test.CreateTempConfigFile(t, "statementThreshold: 1\nblockThreshold: 1\nlineThreshold: 1\n"+thresholds)
+			var payload string
+			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				var in struct {
+					Body string `json:"body"`
+				}
+				_ = json.NewDecoder(r.Body).Decode(&in)
+				payload = in.Body
+				w.WriteHeader(http.StatusCreated)
+				_, _ = w.Write([]byte(`{"id":1}`))
+			}))
+			t.Cleanup(srv.Close)
+			cmd := setupTestCmd()
+			args := []string{"--config", configPath, "--comment", "--comment-platform", "gitea",
+				"--comment-base-url", srv.URL, "--comment-token", "tok", "--comment-repository", "o/r",
+				"--comment-pr", "3", "--comment-no-emoji", profile}
+			if tt.name == "global flag" {
+				args = append(args, "-g", "50")
+			}
+			cmd.SetArgs(args)
+			_, stdErr, err := runCmdForTest(t, cmd)
+			require.NoError(t, err)
+			require.NotContains(t, stdErr, "warning: failed to post coverage comment")
+			require.Contains(t, payload, comment.Marker)
+			if tt.enabled {
+				threshold := "0.0"
+				if tt.name == "global flag" || tt.name == "total" {
+					threshold = "50.0"
+				}
+				require.Contains(t, payload, "| Functions | 2/2 | 100.0% | "+threshold+"% | PASS |")
+			} else {
+				require.NotContains(t, payload, "Functions")
+			}
+		})
+	}
 }

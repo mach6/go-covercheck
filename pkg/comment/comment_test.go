@@ -218,7 +218,7 @@ func TestPostToEachPlatform(t *testing.T) {
 			}}
 
 			// first run adds a comment
-			require.NoError(t, Post(context.Background(), testResults(true), true, cfg))
+			require.NoError(t, Post(context.Background(), testResults(true), true, &config.Config{Comment: *cfg}))
 			comments, auth, _ := srv.snapshot()
 			require.Len(t, comments, 2)
 			require.Equal(t, other, comments[0])
@@ -230,7 +230,7 @@ func TestPostToEachPlatform(t *testing.T) {
 
 			// second run with update edits the same comment
 			cfg.Platform.UpdateExisting = true
-			require.NoError(t, Post(context.Background(), testResults(false), false, cfg))
+			require.NoError(t, Post(context.Background(), testResults(false), false, &config.Config{Comment: *cfg}))
 			comments, _, requests := srv.snapshot()
 			require.Len(t, comments, 2)
 			require.Equal(t, other, comments[0])
@@ -240,7 +240,7 @@ func TestPostToEachPlatform(t *testing.T) {
 
 			// without update, a new comment is added
 			cfg.Platform.UpdateExisting = false
-			require.NoError(t, Post(context.Background(), testResults(false), false, cfg))
+			require.NoError(t, Post(context.Background(), testResults(false), false, &config.Config{Comment: *cfg}))
 			comments, _, _ = srv.snapshot()
 			require.Len(t, comments, 3)
 		})
@@ -259,7 +259,7 @@ func TestPostReportsAPIErrors(t *testing.T) {
 				Type: platform, BaseURL: srv.URL, Token: "tok", Repository: "o/r", PullRequestID: 1,
 				UpdateExisting: true,
 			}}
-			require.Error(t, Post(context.Background(), testResults(false), false, cfg))
+			require.Error(t, Post(context.Background(), testResults(false), false, &config.Config{Comment: *cfg}))
 		})
 	}
 }
@@ -324,8 +324,10 @@ func TestNewPosterErrors(t *testing.T) {
 }
 
 func TestFormatMarkdown(t *testing.T) {
+	cfg := &config.Config{}
+	cfg.ApplyDefaults()
 	t.Run("passed", func(t *testing.T) {
-		md := FormatMarkdown(testResults(false), false, true)
+		md := FormatMarkdown(testResults(false), false, cfg)
 		require.True(t, strings.HasPrefix(md, Marker))
 		require.Contains(t, md, "🟢 **Coverage check passed**")
 		require.Contains(t, md, "| Lines | 16/20 | 80.0% | 50.0% | 🟢 |")
@@ -333,7 +335,7 @@ func TestFormatMarkdown(t *testing.T) {
 	})
 
 	t.Run("failed", func(t *testing.T) {
-		md := FormatMarkdown(testResults(true), true, true)
+		md := FormatMarkdown(testResults(true), true, cfg)
 		require.Contains(t, md, "🔴 **Coverage check failed**")
 		require.Contains(t, md, "| Statements | 8/10 | 40.0% | 70.0% | 🔴 |")
 		require.Contains(t, md, "### Files Below Threshold")
@@ -342,7 +344,7 @@ func TestFormatMarkdown(t *testing.T) {
 	})
 
 	t.Run("no colors", func(t *testing.T) {
-		md := FormatMarkdown(testResults(true), true, false)
+		md := FormatMarkdown(testResults(true), true, &config.Config{})
 		require.Contains(t, md, "FAIL **Coverage check failed**")
 		require.NotContains(t, md, "🔴")
 		require.NotContains(t, md, "🟢")
@@ -357,7 +359,7 @@ func TestFormatMarkdown(t *testing.T) {
 			f.File = "f" + strconv.Itoa(i) + ".go"
 			results.ByFile = append(results.ByFile, f)
 		}
-		md := FormatMarkdown(results, true, true)
+		md := FormatMarkdown(results, true, cfg)
 		require.Contains(t, md, "…and 5 more")
 		require.Equal(t, maxRows, strings.Count(md, "| `f"))
 	})
@@ -688,4 +690,102 @@ func TestCodeCell(t *testing.T) {
 	require.Equal(t, "`pkg/a.go`", codeCell("pkg/a.go"))
 	require.Equal(t, "`pkg/a\\|b.go`", codeCell("pkg/a|b.go"))
 	require.Equal(t, "`` pkg/a`b.go ``", codeCell("pkg/a`b.go"))
+}
+
+func functionResults(failed bool) compute.Results {
+	results := testResults(false)
+	pct, covered := 60.0, "3/5"
+	if failed {
+		pct, covered = 40, "2/5"
+	}
+	results.ByTotal.Functions = compute.TotalFunctions{
+		Coverage: covered, Percentage: pct, Threshold: 50, Failed: failed,
+	}
+	for i := range results.ByFile {
+		results.ByFile[i].FunctionPercentage = pct
+		results.ByFile[i].FunctionThreshold = 50
+		results.ByFile[i].Failed = failed
+	}
+	for i := range results.ByPackage {
+		results.ByPackage[i].FunctionPercentage = pct
+		results.ByPackage[i].FunctionThreshold = 50
+		results.ByPackage[i].Failed = failed
+	}
+	return results
+}
+
+func TestFormatMarkdownFunctions(t *testing.T) {
+	tests := []struct {
+		name    string
+		failed  bool
+		colors  bool
+		status  string
+		covered string
+		pct     string
+	}{
+		{"plain pass", false, false, "PASS", "3/5", "60.0"},
+		{"plain fail", true, false, "FAIL", "2/5", "40.0"},
+		{"colored pass", false, true, "\U0001f7e2", "3/5", "60.0"},
+		{"colored fail", true, true, "\U0001f534", "2/5", "40.0"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			results := functionResults(tt.failed)
+			cfg := &config.Config{
+				FunctionThreshold: 50,
+				Comment:           config.CommentConfig{Platform: config.PlatformConfig{IncludeColors: tt.colors}},
+			}
+			md := FormatMarkdown(results, tt.failed, cfg)
+			require.Contains(t, md, "| Functions | "+tt.covered+" | "+tt.pct+"% | 50.0% | "+tt.status+" |")
+			if !tt.failed {
+				require.NotContains(t, md, "Below Threshold")
+				return
+			}
+			require.Contains(t, md, tt.status+" **Coverage check failed**")
+			passing := "PASS"
+			if tt.colors {
+				passing = "\U0001f7e2"
+			}
+			for _, scope := range []struct{ heading, label, name string }{
+				{"Files Below Threshold", "File", "pkg/a/a.go"},
+				{"Packages Below Threshold", "Package", "pkg/a"},
+			} {
+				require.Contains(t, md, "### "+scope.heading)
+				require.Contains(t, md, "| "+scope.label+" | Statements | Blocks | Lines | Functions |")
+				require.Contains(t, md, "| `"+scope.name+"` | "+passing+" 80.0% / 70.0% | "+
+					passing+" 80.0% / 50.0% | "+passing+" 80.0% / 50.0% | "+tt.status+" 40.0% / 50.0% |")
+			}
+		})
+	}
+}
+
+func TestFormatMarkdownFunctionsDisabled(t *testing.T) {
+	results := testResults(true)
+	results.ByTotal.Functions = compute.TotalFunctions{Coverage: "3/5", Percentage: 60}
+	results.ByFile[0].Functions = "3/5"
+	results.ByFile[0].FunctionPercentage = 60
+	results.ByPackage[0].Functions = "3/5"
+	results.ByPackage[0].FunctionPercentage = 60
+	md := FormatMarkdown(results, true, &config.Config{})
+	require.NotContains(t, md, "Functions")
+	require.Contains(t, md, "| File | Statements | Blocks | Lines |\n|------|------------|--------|-------|\n")
+	require.Contains(t, md, "| Package | Statements | Blocks | Lines |\n|------|------------|--------|-------|\n")
+	require.Contains(t, md, "| `pkg/a/a.go` | FAIL 40.0% / 70.0% | FAIL 40.0% / 50.0% | FAIL 40.0% / 50.0% |\n")
+}
+
+func TestPostFunctionOnlyFailure(t *testing.T) {
+	srv := newFakeServer(t)
+	cfg := &config.Config{
+		FunctionThreshold: 50,
+		Comment: config.CommentConfig{Platform: config.PlatformConfig{
+			Type: "gitea", BaseURL: srv.URL, Token: "tok", Repository: "o/r", PullRequestID: 1,
+		}},
+	}
+	require.NoError(t, Post(context.Background(), functionResults(true), true, cfg))
+	comments, _, _ := srv.snapshot()
+	require.Len(t, comments, 1)
+	require.Contains(t, comments[0].Body, "| Functions | 2/5 | 40.0% | 50.0% | FAIL |")
+	require.Contains(t, comments[0].Body, "| File | Statements | Blocks | Lines | Functions |")
+	require.Contains(t, comments[0].Body, "| Package | Statements | Blocks | Lines | Functions |")
+	require.Equal(t, 2, strings.Count(comments[0].Body, "| FAIL 40.0% / 50.0% |"))
 }
