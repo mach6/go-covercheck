@@ -697,7 +697,7 @@ the metric (`By File - Lines`).
 
 The color is the [color legend](#-color-legend) applied to the chosen metric and its threshold, so a cell is red when
 coverage is at or below half of the goal, yellow when it is below the goal, and green when the goal is met. An item
-below its goal is never green. When color is off (`--no-color`, `NO_COLOR`, or output that isn't a terminal), each
+below its goal is never green. When color is off (`--no-color`, `NO_COLOR`, or `FORCE_COLOR=0` with output that isn't a terminal), each
 level is shown by a shade glyph instead: `░` `▒` `█` `·`. By Total lists Statements, Blocks and Lines, plus Functions
 when a function threshold is set. The failure summary is printed after the grid, as with `table`.
 

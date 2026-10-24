@@ -273,10 +273,21 @@ func TestHeatmapTotals_Functions(t *testing.T) {
 	results := compute.Results{}
 	results.ByTotal.Functions.Coverage = "3/4"
 	results.ByTotal.Functions.Percentage = 75
-	require.NotContains(t, renderPlain(t, results, 80), "Functions")
+	render := func(cfg *config.Config) string {
+		var buf bytes.Buffer
+		cfg.NoColor, cfg.TerminalWidth = true, 80
+		output.RenderHeatmap(&buf, results, cfg)
+		return buf.String()
+	}
+	require.NotContains(t, render(&config.Config{}), "Functions")
+
+	// any function threshold shows the row, as in the table, even when the total's own is disabled
+	require.Contains(t, render(&config.Config{FunctionThreshold: 80}), " ·  Functions")
+	perFile := &config.Config{PerFile: config.PerThresholdOverride{Functions: config.PerOverride{"a.go": 80}}}
+	require.Contains(t, render(perFile), " ·  Functions")
 
 	results.ByTotal.Functions.Threshold = 70
-	require.Contains(t, renderPlain(t, results, 80), "Functions")
+	require.Contains(t, render(&config.Config{Total: config.PerOverride{config.FunctionsSection: 70}}), " █  Functions")
 }
 
 func worstResults() compute.Results {

@@ -131,7 +131,7 @@ func (c *pngCanvas) section(title string, y int, cells []heatCell) int {
 func renderHeatmapImage(results compute.Results, cfg *config.Config) (image.Image, error) {
 	filesSec, pkgsSec := heatSections(results, cfg.HeatmapMetric)
 	files, pkgs := filesSec.cells, pkgsSec.cells
-	totals := heatTotals(results.ByTotal)
+	totals := heatTotals(results.ByTotal, cfg.HasFunctionThreshold())
 	empty := isEmptyResults(results)
 
 	height := pngMargin + pngLineH + pngGap + pngSwatch + pngDoubleGap

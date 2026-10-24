@@ -214,9 +214,9 @@ func (r *heatmapRenderer) legend() {
 	_, _ = fmt.Fprintln(r.w, b.String()+"\n")
 }
 
-func (r *heatmapRenderer) totals(t compute.Totals) {
+func (r *heatmapRenderer) totals(t compute.Totals, showFunctions bool) {
 	_, _ = fmt.Fprintln(r.w, r.bold("By Total"))
-	for _, row := range heatTotals(t) {
+	for _, row := range heatTotals(t, showFunctions) {
 		swatch := r.paint(row.heat.glyph(), row.heat)
 		_, _ = fmt.Fprintf(r.w, "%s %-10s %6.1f%%  %s\n", swatch, row.name, row.pct, row.coverage)
 	}
@@ -321,9 +321,10 @@ type heatTotal struct {
 	heat     heat
 }
 
-// heatTotals lists the total rows. Functions appears only when a function
-// threshold is set, as in the table.
-func heatTotals(t compute.Totals) []heatTotal {
+// heatTotals lists the total rows. Functions appears only when showFunctions is
+// set (any function threshold is in effect, as in the table); it is grey when
+// the total's own threshold is disabled.
+func heatTotals(t compute.Totals, showFunctions bool) []heatTotal {
 	rows := []heatTotal{
 		{colStatements, t.Statements.Coverage, t.Statements.Percentage,
 			heatFor(t.Statements.Percentage, t.Statements.Threshold, t.Statements.Failed)},
@@ -332,7 +333,7 @@ func heatTotals(t compute.Totals) []heatTotal {
 		{colLines, t.Lines.Coverage, t.Lines.Percentage,
 			heatFor(t.Lines.Percentage, t.Lines.Threshold, t.Lines.Failed)},
 	}
-	if t.Functions.Threshold > 0 {
+	if showFunctions {
 		rows = append(rows, heatTotal{colFunctions, t.Functions.Coverage, t.Functions.Percentage,
 			heatFor(t.Functions.Percentage, t.Functions.Threshold, t.Functions.Failed)})
 	}
@@ -349,7 +350,7 @@ func renderHeatmap(w io.Writer, results compute.Results, cfg *config.Config) {
 	r.legend()
 	r.section(files.title, files.cells)
 	r.section(pkgs.title, pkgs.cells)
-	r.totals(results.ByTotal)
+	r.totals(results.ByTotal, cfg.HasFunctionThreshold())
 }
 
 func renderHeatmapToStdout(results compute.Results, cfg *config.Config) {
