@@ -276,8 +276,8 @@ func worstHeatCell(name string, by compute.By) heatCell {
 
 // heatSections builds the file and package grids shared by the text and PNG
 // heat maps. metric is a config.HeatmapMetric* value; empty means worst.
-func heatSections(results compute.Results, metric string) (files, pkgs heatSection) {
-	cell := func(name string, by compute.By) heatCell { return worstHeatCell(name, by) }
+func heatSections(results compute.Results, metric string) (heatSection, heatSection) {
+	cell := worstHeatCell
 	suffix := ""
 	for _, m := range heatMetrics {
 		if m.key == metric {
@@ -285,11 +285,11 @@ func heatSections(results compute.Results, metric string) (files, pkgs heatSecti
 			suffix = " - " + m.name
 		}
 	}
-	files = heatSection{title: "By File" + suffix, cells: make([]heatCell, 0, len(results.ByFile))}
+	files := heatSection{title: "By File" + suffix, cells: make([]heatCell, 0, len(results.ByFile))}
 	for _, f := range results.ByFile {
 		files.cells = append(files.cells, cell(f.File, f.By))
 	}
-	pkgs = heatSection{title: "By Package" + suffix, cells: make([]heatCell, 0, len(results.ByPackage))}
+	pkgs := heatSection{title: "By Package" + suffix, cells: make([]heatCell, 0, len(results.ByPackage))}
 	for _, p := range results.ByPackage {
 		pkgs.cells = append(pkgs.cells, cell(p.Package, p.By))
 	}
