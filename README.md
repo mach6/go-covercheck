@@ -95,6 +95,93 @@ Or you can use a tag which maps to a specific version:
 docker pull ghcr.io/mach6/go-covercheck:0.6.1
 ```
 
+### 🚀 GitHub Action
+
+You can use the official GitHub Action to run go-covercheck in your CI/CD workflows:
+
+```yaml
+- name: Run coverage check
+  uses: mach6/go-covercheck@v1
+  with:
+    coverage-file: coverage.out
+```
+
+#### GitHub Action Inputs
+
+| Input | Description | Required | Default |
+|-------|-------------|----------|---------|
+| `coverage-file` | Path to the coverage profile file | No | `coverage.out` |
+| `config-file` | Path to the go-covercheck config file | No | _(uses config default)_ |
+| `statement-threshold` | Global statement threshold percentage to enforce | No | _(uses config default)_ |
+| `block-threshold` | Global block threshold percentage to enforce | No | _(uses config default)_ |
+| `total-statement-threshold` | Total statement threshold percentage to enforce | No | _(uses config default)_ |
+| `total-block-threshold` | Total block threshold percentage to enforce | No | _(uses config default)_ |
+| `format` | Output format (table\|json\|yaml\|md\|html\|csv\|tsv) | No | _(uses config default)_ |
+| `sort-by` | Column to sort results by | No | _(uses config default)_ |
+| `sort-order` | Sort order (asc\|desc) | No | _(uses config default)_ |
+| `skip` | Regex patterns of files/packages to skip (newline or comma separated) | No | _(uses config default)_ |
+| `no-table` | Hide the results table (true\|false) | No | `false` |
+| `no-summary` | Hide the summary (true\|false) | No | `false` |
+| `no-color` | Disable color output (true\|false) | No | `false` |
+| `term-width` | Terminal width override | No | _(uses config default)_ |
+| `save-history` | Save the coverage result to history (true\|false) | No | `false` |
+| `history-file` | Path to the history file | No | _(uses config default)_ |
+| `label` | Label for the history entry | No | _(uses config default)_ |
+| `compare-history` | Compare against a history entry (ref or label) | No | _(uses config default)_ |
+| `show-history` | Show history instead of checking coverage (true\|false) | No | `false` |
+| `limit-history` | Limit the number of history entries shown | No | _(uses config default)_ |
+| `line-threshold` | Global line threshold percentage to enforce | No | _(uses config default)_ |
+| `total-line-threshold` | Total line threshold percentage to enforce | No | _(uses config default)_ |
+| `function-threshold` | Global function threshold percentage to enforce | No | _(uses config default)_ |
+| `total-function-threshold` | Total function threshold percentage to enforce | No | _(uses config default)_ |
+| `table-style` | Table style for the table output | No | _(uses config default)_ |
+| `diff-from` | Only enforce coverage on code changed since this git ref | No | _(uses config default)_ |
+| `module-name` | Go module name override | No | _(uses config default)_ |
+| `no-uncovered-lines` | Hide uncovered lines (true\|false) | No | `false` |
+| `no-uncovered-functions` | Hide uncovered functions (true\|false) | No | `false` |
+| `comment` | Post results as a comment on the pull request (true\|false). Needs pull-requests write permission | No | `false` |
+| `comment-token` | Token used to post the comment | No | `${{ github.token }}` |
+| `version` | go-covercheck version to install. Defaults to the ref this action was used at, else latest | No | _(uses config default)_ |
+
+> The action installs go-covercheck with `go install`, so run `actions/setup-go` first. `skip` accepts newline or
+> comma separated regexes. Inputs are passed to the CLI through environment variables, never interpolated into the
+> shell script. Set `comment: true` (with `pull-requests: write`) to post results on the pull request.
+
+#### GitHub Action Examples
+
+**Basic usage:**
+```yaml
+steps:
+  - uses: actions/checkout@v7
+  - uses: actions/setup-go@v7
+    with:
+      go-version-file: go.mod
+  - run: go test -v -coverprofile=coverage.out ./...
+  - uses: mach6/go-covercheck@v1
+    with:
+      coverage-file: coverage.out
+```
+
+**With custom thresholds:**
+```yaml
+- uses: mach6/go-covercheck@v1
+  with:
+    coverage-file: coverage.out
+    statement-threshold: "80"
+    block-threshold: "70"
+    format: json
+```
+
+**With skip patterns and history:**
+```yaml
+- uses: mach6/go-covercheck@v1
+  with:
+    coverage-file: coverage.out
+    skip: "mocks,testdata,cmd"
+    save-history: "true"
+    label: "v1.2.3"
+```
+
 ## 📋 Usage
 
 ### ⚙️ Configure
