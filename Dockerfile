@@ -18,5 +18,6 @@ RUN go get ./... \
 
 FROM scratch
 
+COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/ca-certificates.crt
 COPY --from=builder /tmp/build/go-covercheck /
 CMD ["/go-covercheck"]
