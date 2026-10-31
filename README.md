@@ -95,6 +95,23 @@ Or you can use a tag which maps to a specific version:
 docker pull ghcr.io/mach6/go-covercheck:0.6.1
 ```
 
+### 🚀 GitHub Action
+
+`go-covercheck` is also available as a [GitHub Action](https://github.com/mach6/go-covercheck-action) which runs it in
+your workflows. On Linux runners it uses the Docker image above; elsewhere it builds the release with `go install`.
+
+```yaml
+- uses: actions/setup-go@v7
+  with:
+    go-version-file: go.mod
+- run: go test -coverprofile=coverage.out ./...
+- uses: mach6/go-covercheck-action@v1
+  with:
+    coverage-file: coverage.out
+```
+
+See the [action's README](https://github.com/mach6/go-covercheck-action#readme) for all inputs, including PR comments.
+
 ## 📋 Usage
 
 ### ⚙️ Configure
