@@ -59,9 +59,20 @@ noUncoveredLines: false
 noUncoveredFunctions: false
 
 # the format for output
-# table|json|yaml|md|html|csv|tsv
+# table|json|yaml|md|html|csv|tsv|heatmap
 # default table
 format: table
+
+# also write a coverage heat map image to this path, in addition to the normal output
+# must end in .png
+# default off
+# heatmapPng: coverage-heatmap.png
+
+# the metric heat map cells are colored by
+# worst|statements|blocks|lines|functions
+# worst colors each cell by the metric furthest below its threshold and names that metric in the cell
+# default worst
+heatmapMetric: worst
 
 # the table style for table output format
 # default|light|bold|rounded|double

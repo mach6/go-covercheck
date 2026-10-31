@@ -16,6 +16,7 @@ require (
 	github.com/spf13/cobra v1.10.2
 	github.com/stretchr/testify v1.12.1
 	gitlab.com/gitlab-org/api/client-go v1.46.0
+	golang.org/x/image v0.46.0
 	golang.org/x/term v0.47.0
 	golang.org/x/tools v0.52.0
 	gopkg.in/yaml.v3 v3.0.1
