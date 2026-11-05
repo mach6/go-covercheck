@@ -181,6 +181,10 @@ type Config struct {
 	// not configurable via YAML
 	InspectFiles []string `yaml:"-"`
 	Inspect      bool     `yaml:"-"`
+
+	// inheritedTotals holds the total thresholds that were filled in from a global threshold
+	// rather than set explicitly, with the value each was filled in with.
+	inheritedTotals map[string]float64
 }
 
 // Load a Config from a path or produce an error.
@@ -191,6 +195,10 @@ func Load(path string) (*Config, error) {
 	}
 	cfg := new(Config)
 	cfg.ApplyDefaults()
+	// Only the totals set in the file stay. Validate fills the rest from the global thresholds,
+	// so a total follows its global threshold unless the file overrides it.
+	cfg.Total = PerOverride{}
+	cfg.inheritedTotals = nil
 	err = yaml.Unmarshal(data, cfg)
 	if err != nil {
 		return nil, err
@@ -333,6 +341,24 @@ func (c *Config) Validate() error { //nolint:cyclop
 	return nil
 }
 
+// FollowGlobalThresholds moves each total threshold that was filled in from a global threshold to the
+// current global threshold. Call it after changing a global threshold, for example from a command-line flag.
+// A total that was set explicitly, or changed since it was filled in, is left as it is.
+func (c *Config) FollowGlobalThresholds() {
+	globals := map[string]float64{
+		StatementsSection: c.StatementThreshold,
+		BlocksSection:     c.BlockThreshold,
+		LinesSection:      c.LineThreshold,
+		FunctionsSection:  c.FunctionThreshold,
+	}
+	for section, filled := range c.inheritedTotals {
+		if current, ok := c.Total[section]; ok && current == filled {
+			c.Total[section] = globals[section]
+			c.inheritedTotals[section] = globals[section]
+		}
+	}
+}
+
 func (c *Config) initPerFileWhenNil() {
 	if c.PerFile.Blocks == nil {
 		c.PerFile.Blocks = PerOverride{}
@@ -367,16 +393,21 @@ func (c *Config) setTotalThresholds(totalStatement, totalBlock, totalLine, total
 	if c.Total == nil {
 		c.Total = PerOverride{}
 	}
-	if _, exists := c.Total[StatementsSection]; !exists {
-		c.Total[StatementsSection] = totalStatement
+	c.fillTotal(StatementsSection, totalStatement)
+	c.fillTotal(BlocksSection, totalBlock)
+	c.fillTotal(LinesSection, totalLine)
+	c.fillTotal(FunctionsSection, totalFunction)
+}
+
+// fillTotal sets the total threshold for section to value unless one is already set,
+// and remembers that it was filled in rather than set explicitly.
+func (c *Config) fillTotal(section string, value float64) {
+	if _, exists := c.Total[section]; exists {
+		return
 	}
-	if _, exists := c.Total[BlocksSection]; !exists {
-		c.Total[BlocksSection] = totalBlock
+	c.Total[section] = value
+	if c.inheritedTotals == nil {
+		c.inheritedTotals = map[string]float64{}
 	}
-	if _, exists := c.Total[LinesSection]; !exists {
-		c.Total[LinesSection] = totalLine
-	}
-	if _, exists := c.Total[FunctionsSection]; !exists {
-		c.Total[FunctionsSection] = totalFunction
-	}
+	c.inheritedTotals[section] = value
 }
