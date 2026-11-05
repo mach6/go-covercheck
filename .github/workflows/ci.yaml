@@ -43,7 +43,7 @@ jobs:
         run: |
           mkdir -p .agents
           go build -o .agents/go-covercheck ./cmd/go-covercheck
-          args=(coverage.out -C v0.6.1 --comment="$COMMENT_ENABLED")
+          args=(coverage.out -C v0.7.0 --comment="$COMMENT_ENABLED")
           if [[ "$COMMENT_ENABLED" == "true" ]]; then
             args+=(
               --comment-platform github
