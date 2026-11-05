@@ -13,6 +13,10 @@ var (
 	MatchesInspectFile   = matchesInspectFile
 	RenderHeatmap        = renderHeatmap
 	FitHeatmapText       = fit
+
+	PrintComparison = printComparison
+	WrapText        = wrapText
+	FormatDelta     = formatDelta
 )
 
 const FixedColumnWidth = fixedColumnWidth

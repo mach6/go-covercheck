@@ -289,8 +289,8 @@ func run(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	// showCoverage and get the results.
-	results, failed, err := showCoverage(args, cfg)
+	// collect the coverage results.
+	results, failed, err := collectCoverage(args, cfg)
 	if err != nil {
 		return err
 	}
@@ -300,11 +300,19 @@ func run(cmd *cobra.Command, args []string) error {
 		return nil
 	}
 
+	// compare against history, when requested. A failed comparison is
+	// reported after the results, so the results are always shown.
+	comparison, compareErr := compareHistory(cmd, results)
+	output.FormatAndReportWithComparison(results, comparison, cfg, failed)
+
 	// post before history operations so a history error does not suppress the comment.
 	postComment(results, failed, cfg)
 
-	// handle history operations (compare and save)
-	if err := handleHistoryOperations(cmd, results, cfg); err != nil {
+	if compareErr != nil {
+		return compareErr
+	}
+
+	if err := handleSaveHistory(cmd, results, cfg); err != nil {
 		return err
 	}
 
@@ -357,7 +365,7 @@ func handleNonCoverageOperationsWhichShouldExit(cmd *cobra.Command, cfg *config.
 	return false, nil
 }
 
-func showCoverage(args []string, cfg *config.Config) (compute.Results, bool, error) {
+func collectCoverage(args []string, cfg *config.Config) (compute.Results, bool, error) {
 	// we need coverage profile input from here on.
 	profiles, err := getCoverProfileData(args)
 	if err != nil {
@@ -385,7 +393,6 @@ func showCoverage(args []string, cfg *config.Config) (compute.Results, bool, err
 	for _, w := range results.Warnings {
 		fmt.Fprintln(os.Stderr, "warning: "+w)
 	}
-	output.FormatAndReport(results, cfg, failed)
 	return results, failed, nil
 }
 

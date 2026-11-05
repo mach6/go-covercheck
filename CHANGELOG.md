@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * CSV and TSV output has new columns, so existing columns have moved. Read columns by name, not by position.
 * Building from source needs Go 1.27 or newer.
 * Library users: `compute.CollectResults` no longer tidies file names itself. Call `compute.NormalizeNames` first. The command line does this for you.
+* With JSON or YAML output, `--compare-history` no longer prints text after the output. Read the new `comparison` section instead.
 
 ### Added
 
@@ -23,10 +24,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * Function coverage, with `--function-threshold` (`-g`), `--total-function-threshold` (`-G`) and `functionThreshold` in the config file. It is off by default.
 * Uncovered functions are listed in reports. `--no-uncovered-functions` (`-O`) hides them.
 * `--diff-from` (`-d`) checks only the files changed since a git ref.
+* With JSON or YAML output, `--compare-history` adds a `comparison` section, so the output stays one valid document. Comparisons also list files and packages that are new or gone since the saved run.
 * `--table-style` picks the table look: default, light, bold, rounded or double.
 * `--format heatmap` shows coverage as a grid of colored cells. `--heatmap-png` also saves it as an image, and `--heatmap-metric` picks which measure sets the colors.
 * `--comment` posts the results as a comment on a pull or merge request on GitHub, GitLab or Gitea.
 * The README now points to the GitHub Action for running go-covercheck in workflows.
+
+### Deprecated
+
+* Library users: `output.CompareHistory` still works but is deprecated. Use `compute.BuildComparison` and `output.FormatAndReportWithComparison`.
 
 ### Changed
 

@@ -47,135 +47,6 @@ func getHistoryTableStyle(cfg *config.Config) table.Style {
 	}
 }
 
-// CompareHistory shows the comparison output for a ref: and the results.
-func CompareHistory(ref string, refEntry *history.Entry, results compute.Results) {
-	fmt.Printf("\n≡ Comparing against ref: %s [commit %s]\n",
-		color.New(color.FgBlue).Sprint(ref),
-		color.New(color.FgHiBlack).Sprint(history.ShortCommit(refEntry.Commit)),
-	)
-
-	bPrintedFile := compareByFile(results, refEntry)
-	bPrintedPkg := compareByPackage(results, refEntry)
-	bPrintedTotal := compareByTotal(results, refEntry)
-
-	if !bPrintedTotal && !bPrintedPkg && !bPrintedFile {
-		fmt.Println(" → No change")
-	}
-}
-
-//nolint:dupl,gocognit,cyclop // structurally parallel to compareByFile but operates on different types
-func compareByPackage(results compute.Results, refEntry *history.Entry) bool {
-	// ByPackage
-	bPrintedPkg := false
-	for _, curr := range results.ByPackage {
-		for _, prev := range refEntry.Results.ByPackage {
-			if curr.Package == prev.Package { //nolint:nestif
-				s, ss := formatDelta(curr.StatementPercentage - prev.StatementPercentage)
-				b, sb := formatDelta(curr.BlockPercentage - prev.BlockPercentage)
-				l, sl := recordedDelta(prev.Lines, curr.LinePercentage, prev.LinePercentage)
-				f, sf := recordedDelta(prev.Functions, curr.FunctionPercentage, prev.FunctionPercentage)
-				if ss || sb || sl || sf {
-					if !bPrintedPkg {
-						fmt.Printf(" → By Package\n")
-						bPrintedPkg = true
-					}
-
-					if ss {
-						compareShowS()
-						fmt.Printf("%s [%s]\n", curr.Package, s)
-					}
-					if sb {
-						compareShowB()
-						fmt.Printf("%s [%s]\n", curr.Package, b)
-					}
-					if sl {
-						compareShowL()
-						fmt.Printf("%s [%s]\n", curr.Package, l)
-					}
-					if sf {
-						compareShowF()
-						fmt.Printf("%s [%s]\n", curr.Package, f)
-					}
-				}
-			}
-		}
-	}
-	return bPrintedPkg
-}
-
-func compareByTotal(results compute.Results, refEntry *history.Entry) bool {
-	// Totals
-	bPrintedTotal := false
-	deltaS, okS := formatDelta(results.ByTotal.Statements.Percentage - refEntry.Results.ByTotal.Statements.Percentage)
-	deltaB, okB := formatDelta(results.ByTotal.Blocks.Percentage - refEntry.Results.ByTotal.Blocks.Percentage)
-	deltaL, okL := recordedDelta(refEntry.Results.ByTotal.Lines.Coverage,
-		results.ByTotal.Lines.Percentage, refEntry.Results.ByTotal.Lines.Percentage)
-	deltaF, okF := recordedDelta(refEntry.Results.ByTotal.Functions.Coverage,
-		results.ByTotal.Functions.Percentage, refEntry.Results.ByTotal.Functions.Percentage)
-
-	if okS || okB || okL || okF {
-		fmt.Printf(" → By Total\n")
-		bPrintedTotal = true
-		if okS {
-			compareShowS()
-			fmt.Printf("total [%s]\n", deltaS)
-		}
-		if okB {
-			compareShowB()
-			fmt.Printf("total [%s]\n", deltaB)
-		}
-		if okL {
-			compareShowL()
-			fmt.Printf("total [%s]\n", deltaL)
-		}
-		if okF {
-			compareShowF()
-			fmt.Printf("total [%s]\n", deltaF)
-		}
-	}
-	return bPrintedTotal
-}
-
-//nolint:dupl,gocognit,cyclop // structurally parallel to compareByPackage but operates on different types
-func compareByFile(results compute.Results, refEntry *history.Entry) bool {
-	// ByFile
-	bPrintedFile := false
-	for _, curr := range results.ByFile {
-		for _, prev := range refEntry.Results.ByFile {
-			if curr.File == prev.File { //nolint:nestif
-				s, ss := formatDelta(curr.StatementPercentage - prev.StatementPercentage)
-				b, sb := formatDelta(curr.BlockPercentage - prev.BlockPercentage)
-				l, sl := recordedDelta(prev.Lines, curr.LinePercentage, prev.LinePercentage)
-				f, sf := recordedDelta(prev.Functions, curr.FunctionPercentage, prev.FunctionPercentage)
-				if ss || sb || sl || sf {
-					if !bPrintedFile {
-						fmt.Printf(" → By File\n")
-						bPrintedFile = true
-					}
-
-					if ss {
-						compareShowS()
-						fmt.Printf("%s [%s]\n", curr.File, s)
-					}
-					if sb {
-						compareShowB()
-						fmt.Printf("%s [%s]\n", curr.File, b)
-					}
-					if sl {
-						compareShowL()
-						fmt.Printf("%s [%s]\n", curr.File, l)
-					}
-					if sf {
-						compareShowF()
-						fmt.Printf("%s [%s]\n", curr.File, f)
-					}
-				}
-			}
-		}
-	}
-	return bPrintedFile
-}
-
 // ShowHistory displays a summary table of the history entries.
 func ShowHistory(h *history.History, limit int, cfg *config.Config) {
 	count := limit
@@ -254,15 +125,13 @@ func formatDelta(delta float64) (string, bool) {
 	return fmt.Sprintf("+%-4.1f%%", delta), true
 }
 
-// recordedDelta formats curr-prev like formatDelta, but only when the
-// historical entry recorded the metric. Entries saved before line or function
-// coverage existed have an empty coverage string for it, and comparing against
-// their zero percentage would report a bogus delta.
-func recordedDelta(prevCoverage string, curr, prev float64) (string, bool) {
-	if prevCoverage == "" {
-		return "", false
-	}
-	return formatDelta(curr - prev)
+// CompareHistory prints the comparison of results against refEntry, the history entry found for ref.
+//
+// Deprecated: use compute.BuildComparison to build the comparison and
+// FormatAndReportWithComparison to print it with the report. CompareHistory is kept so existing
+// callers keep compiling.
+func CompareHistory(ref string, refEntry *history.Entry, results compute.Results) {
+	printComparison(compute.BuildComparison(ref, history.ShortCommit(refEntry.Commit), refEntry.Results, results))
 }
 
 func wrapText(text string, width int) string {

@@ -65,8 +65,24 @@ func reportHeatmap(results compute.Results, cfg *config.Config, hasFailure, isEm
 	renderSummary(hasFailure, results, cfg)
 }
 
+// report is the JSON and YAML document: the results, plus the comparison when one was requested.
+type report struct {
+	compute.Results `yaml:",inline"`
+	Comparison      *compute.Comparison `json:"comparison,omitempty" yaml:"comparison,omitempty"`
+}
+
 // FormatAndReport writes out formatted profile results.
 func FormatAndReport(results compute.Results, cfg *config.Config, hasFailure bool) {
+	FormatAndReportWithComparison(results, nil, cfg, hasFailure)
+}
+
+// FormatAndReportWithComparison writes out formatted profile results and, when comparison is not nil,
+// the comparison against history. JSON and YAML include it as a "comparison" object.
+// Other formats print it as text after the report.
+func FormatAndReportWithComparison(results compute.Results, comparison *compute.Comparison, cfg *config.Config,
+	hasFailure bool,
+) {
+	doc := report{Results: results, Comparison: comparison}
 	isEmpty := isEmptyResults(results)
 	switch cfg.Format {
 	case config.FormatTable, config.FormatMD, config.FormatHTML, config.FormatCSV, config.FormatTSV:
@@ -77,28 +93,18 @@ func FormatAndReport(results compute.Results, cfg *config.Config, hasFailure boo
 			_ = os.Stdout.Sync()
 			renderSummary(hasFailure, results, cfg)
 		}
+		if comparison != nil {
+			printComparison(comparison)
+		}
 	case config.FormatHeatmap:
 		reportHeatmap(results, cfg, hasFailure, isEmpty)
+		if comparison != nil {
+			printComparison(comparison)
+		}
 	case config.FormatJSON:
-		if cfg.NoColor {
-			enc := json.NewEncoder(os.Stdout)
-			enc.SetIndent("", "  ")
-			err := enc.Encode(results)
-			bailOnError(err)
-		} else {
-			jsonString, err := json.MarshalIndent(results, "", "  ")
-			bailOnError(err)
-			fmt.Println(highlightJSONSyntax(string(jsonString), cfg))
-		}
+		reportJSON(doc, cfg)
 	case config.FormatYAML:
-		if cfg.NoColor {
-			err := yaml.NewEncoder(os.Stdout).Encode(results)
-			bailOnError(err)
-		} else {
-			yamlData, err := yaml.Marshal(results)
-			bailOnError(err)
-			fmt.Println(highlightYAMLSyntax(string(yamlData), cfg))
-		}
+		reportYAML(doc, cfg)
 	default:
 		bailOnError(errors.New(color.RedString("Unsupported format: %s", cfg.Format)))
 	}
@@ -106,4 +112,26 @@ func FormatAndReport(results compute.Results, cfg *config.Config, hasFailure boo
 	if cfg.HeatmapPNG != "" {
 		bailOnError(WriteHeatmapPNG(cfg.HeatmapPNG, results, cfg))
 	}
+}
+
+func reportJSON(doc report, cfg *config.Config) {
+	if cfg.NoColor {
+		enc := json.NewEncoder(os.Stdout)
+		enc.SetIndent("", "  ")
+		bailOnError(enc.Encode(doc))
+		return
+	}
+	jsonString, err := json.MarshalIndent(doc, "", "  ")
+	bailOnError(err)
+	fmt.Println(highlightJSONSyntax(string(jsonString), cfg))
+}
+
+func reportYAML(doc report, cfg *config.Config) {
+	if cfg.NoColor {
+		bailOnError(yaml.NewEncoder(os.Stdout).Encode(doc))
+		return
+	}
+	yamlData, err := yaml.Marshal(doc)
+	bailOnError(err)
+	fmt.Println(highlightYAMLSyntax(string(yamlData), cfg))
 }

@@ -2,6 +2,8 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
+	"os"
 	"path"
 	"strings"
 	"testing"
@@ -325,6 +327,154 @@ func Test_run_CompareHistory(t *testing.T) {
 	require.Contains(t, stdOut, "Comparing against ref: main")
 }
 
+func Test_run_CompareHistory_JSON(t *testing.T) {
+	path := test.CreateTempHistoryFile(t, test.TestCoverageHistory)
+
+	cmd := setupTestCmd()
+	cmd.SetArgs([]string{
+		"--history-file", path, "-f", "json", "--no-color",
+		"--compare-history", "main",
+		"-s", "1", "-b", "1", "-S", "2", "-B", "2",
+		test.CreateTempCoverageFile(t, test.TestCoverageOut)},
+	)
+
+	stdOut, stdErr, err := runCmdForTest(t, cmd)
+	require.NoError(t, err)
+	requireOnlyWarnings(t, stdErr)
+
+	// stdout must be a single JSON document, with no trailing comparison text.
+	var doc struct {
+		Comparison struct {
+			Ref       string `json:"ref"`
+			Commit    string `json:"commit"`
+			ByPackage []struct {
+				Package    string  `json:"package"`
+				Statements float64 `json:"statements"`
+			} `json:"byPackage"`
+			ByTotal struct {
+				Statements float64 `json:"statements"`
+			} `json:"byTotal"`
+		} `json:"comparison"`
+	}
+	require.NoError(t, json.Unmarshal([]byte(stdOut), &doc))
+	require.Equal(t, "main", doc.Comparison.Ref)
+	require.Equal(t, "e402629", doc.Comparison.Commit)
+	require.Len(t, doc.Comparison.ByPackage, 1)
+	require.Equal(t, "github.com/mach6/go-covercheck/pkg/math", doc.Comparison.ByPackage[0].Package)
+	require.InDelta(t, -25.0, doc.Comparison.ByPackage[0].Statements, 0.001)
+	require.InDelta(t, 22.2, doc.Comparison.ByTotal.Statements, 0.1)
+}
+
+func Test_run_CompareHistory_JSON_AddedAndRemoved(t *testing.T) {
+	path := test.CreateTempHistoryFile(t, test.TestCoverageHistory)
+	// history has pkg/math/math.go only, so this file is added and math.go is removed.
+	coverage := "mode: set\ngithub.com/mach6/go-covercheck/pkg/other/other.go:5.49,6.16 1 1\n"
+
+	cmd := setupTestCmd()
+	cmd.SetArgs([]string{
+		"--history-file", path, "-f", "json", "--no-color",
+		"--compare-history", "main",
+		test.CreateTempCoverageFile(t, coverage)},
+	)
+
+	stdOut, stdErr, err := runCmdForTest(t, cmd)
+	require.NoError(t, err)
+	requireOnlyWarnings(t, stdErr)
+
+	var doc struct {
+		Comparison struct {
+			Added struct {
+				Files []struct {
+					File       string  `json:"file"`
+					Statements float64 `json:"statements"`
+				} `json:"files"`
+				Packages []struct {
+					Package string `json:"package"`
+				} `json:"packages"`
+			} `json:"added"`
+			Removed struct {
+				Files []struct {
+					File string `json:"file"`
+				} `json:"files"`
+				Packages []struct {
+					Package string `json:"package"`
+				} `json:"packages"`
+			} `json:"removed"`
+		} `json:"comparison"`
+	}
+	require.NoError(t, json.Unmarshal([]byte(stdOut), &doc))
+	require.Len(t, doc.Comparison.Added.Files, 1)
+	require.Equal(t, "github.com/mach6/go-covercheck/pkg/other/other.go", doc.Comparison.Added.Files[0].File)
+	require.InDelta(t, 100.0, doc.Comparison.Added.Files[0].Statements, 0.001)
+	require.Len(t, doc.Comparison.Added.Packages, 1)
+	require.Equal(t, "github.com/mach6/go-covercheck/pkg/other", doc.Comparison.Added.Packages[0].Package)
+	require.Len(t, doc.Comparison.Removed.Files, 1)
+	require.Equal(t, "github.com/mach6/go-covercheck/pkg/math/math.go", doc.Comparison.Removed.Files[0].File)
+	require.Len(t, doc.Comparison.Removed.Packages, 1)
+}
+
+func Test_run_CompareHistory_YAML(t *testing.T) {
+	path := test.CreateTempHistoryFile(t, test.TestCoverageHistory)
+
+	cmd := setupTestCmd()
+	cmd.SetArgs([]string{
+		"--history-file", path, "-f", "yaml", "--no-color",
+		"--compare-history", "main",
+		"-s", "1", "-b", "1", "-S", "2", "-B", "2",
+		test.CreateTempCoverageFile(t, test.TestCoverageOut)},
+	)
+
+	stdOut, stdErr, err := runCmdForTest(t, cmd)
+	require.NoError(t, err)
+	requireOnlyWarnings(t, stdErr)
+
+	var doc map[string]any
+	require.NoError(t, yaml.Unmarshal([]byte(stdOut), &doc))
+	comparison, ok := doc["comparison"].(map[string]any)
+	require.True(t, ok)
+	require.Equal(t, "main", comparison["ref"])
+	require.Equal(t, "e402629", comparison["commit"])
+}
+
+func Test_run_CompareHistoryBadRef_JSONStillReportsResults(t *testing.T) {
+	path := test.CreateTempHistoryFile(t, test.TestCoverageHistory)
+
+	cmd := setupTestCmd()
+	cmd.SetArgs([]string{
+		"--history-file", path, "-f", "json", "--no-color",
+		"--compare-history", "unknown",
+		"-s", "1", "-b", "1", "-S", "2", "-B", "2",
+		test.CreateTempCoverageFile(t, test.TestCoverageOut)},
+	)
+
+	stdOut, _, err := runCmdForTest(t, cmd)
+	require.ErrorContains(t, err, "no history entry found for ref: unknown")
+
+	var doc map[string]any
+	require.NoError(t, json.Unmarshal([]byte(stdOut), &doc))
+	require.Contains(t, doc, "byTotal")
+	require.NotContains(t, doc, "comparison")
+}
+
+func Test_run_CompareAndSaveHistory_DoesNotStoreComparison(t *testing.T) {
+	path := test.CreateTempHistoryFile(t, test.TestCoverageHistory)
+
+	cmd := setupTestCmd()
+	cmd.SetArgs([]string{
+		"--history-file", path, "-f", "json", "--no-color",
+		"--compare-history", "main", "--save-history",
+		"-s", "1", "-b", "1", "-S", "2", "-B", "2",
+		test.CreateTempCoverageFile(t, test.TestCoverageOut)},
+	)
+
+	_, _, err := runCmdForTest(t, cmd)
+	require.NoError(t, err)
+
+	saved, err := os.ReadFile(path) //nolint:gosec // test temp file
+	require.NoError(t, err)
+	require.NotContains(t, string(saved), "comparison")
+}
+
 func Test_run_CompareHistoryFails(t *testing.T) {
 	path := test.CreateTempHistoryFile(t, test.InvalidTestCoverageHistory)
 
@@ -491,6 +641,74 @@ func Test_run_TotalThresholdsFollowGlobalFlags(t *testing.T) {
 			r := new(compute.Results)
 			require.NoError(t, yaml.Unmarshal([]byte(stdOut), &r))
 			require.InDelta(t, tt.wantStatements, r.ByTotal.Statements.Threshold, 0.001)
+		})
+	}
+}
+
+func Test_run_CompareHistory_FollowsSortFlags(t *testing.T) {
+	// 10 single-statement blocks per file. z.go has 1 covered (10%), a.go 5 (50%), m.go 9 (90%),
+	// so by statement percentage the order is z, a, m, which is not the name order a, m, z.
+	var cov strings.Builder
+	cov.WriteString("mode: set\n")
+	for file, covered := range map[string]int{"z.go": 1, "a.go": 5, "m.go": 9} {
+		for i := range 10 {
+			count := 0
+			if i < covered {
+				count = 1
+			}
+			fmt.Fprintf(&cov, "example.com/m/%s:%d.1,%d.10 1 %d\n", file, i+1, i+1, count)
+		}
+	}
+	// the saved run had every file at 20%, so every file changed.
+	entry := func(file string) string {
+		return `{"statementCoverage":"2/10","blockCoverage":"2/10","statementPercentage":20,"blockPercentage":20,` +
+			`"statementThreshold":0,"blockThreshold":0,"failed":false,"file":"` + file + `"}`
+	}
+	historyJSON := `{"entries":[{"commit":"e40262964cc463a18753e2834c04230c2a356f20","branch":"main",` +
+		`"timestamp":"2025-07-18T08:41:38Z","results":{"byFile":[` + entry("m.go") + `,` + entry("a.go") + `,` +
+		entry("z.go") + `],"byPackage":[],"byTotal":{"statements":{"coverage":"6/30","threshold":0,` +
+		`"percentage":20,"failed":false},"blocks":{"coverage":"6/30","threshold":0,"percentage":20,"failed":false}}}}]}`
+	historyPath := test.CreateTempHistoryFile(t, historyJSON)
+
+	tests := map[string][]string{
+		"asc":  {"z.go", "a.go", "m.go"},
+		"desc": {"m.go", "a.go", "z.go"},
+	}
+	for order, want := range tests {
+		t.Run(order, func(t *testing.T) {
+			cmd := setupTestCmd()
+			cmd.SetArgs([]string{
+				"--history-file", historyPath, "-f", "yaml", "--no-color",
+				"--compare-history", "main", "--sort-by", "statement-percent", "--sort-order", order,
+				"-s", "0", "-b", "0", "-n", "0", "-S", "0", "-B", "0", "-N", "0",
+				test.CreateTempCoverageFile(t, cov.String())},
+			)
+			stdOut, _, err := runCmdForTest(t, cmd)
+			require.NoError(t, err)
+
+			var doc struct {
+				ByFile []struct {
+					File string `yaml:"file"`
+				} `yaml:"byFile"`
+				Comparison struct {
+					ByFile []struct {
+						File string `yaml:"file"`
+					} `yaml:"byFile"`
+				} `yaml:"comparison"`
+			}
+			require.NoError(t, yaml.Unmarshal([]byte(stdOut), &doc))
+
+			report := make([]string, 0, len(doc.ByFile))
+			comparison := make([]string, 0, len(doc.Comparison.ByFile))
+			for _, f := range doc.ByFile {
+				report = append(report, path.Base(f.File))
+			}
+			for _, f := range doc.Comparison.ByFile {
+				comparison = append(comparison, path.Base(f.File))
+			}
+			// the report follows --sort-by and --sort-order, and so does the comparison.
+			require.Equal(t, want, report)
+			require.Equal(t, want, comparison)
 		})
 	}
 }
@@ -670,5 +888,16 @@ func TestApplyConfigOverrides_FunctionThresholdFlags(t *testing.T) {
 			require.InDelta(t, tt.wantGlobal, cfg.FunctionThreshold, 0.001)
 			require.InDelta(t, tt.wantTotal, cfg.Total[config.FunctionsSection], 0.001)
 		})
+	}
+}
+
+// requireOnlyWarnings checks that stderr holds nothing but "warning:" lines, such as the ones
+// reported for source files that cannot be found.
+func requireOnlyWarnings(t *testing.T, stdErr string) {
+	t.Helper()
+	for _, line := range strings.Split(strings.TrimSpace(stdErr), "\n") {
+		if line != "" {
+			require.True(t, strings.HasPrefix(line, "warning: "), "unexpected stderr line: %q", line)
+		}
 	}
 }

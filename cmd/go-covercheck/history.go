@@ -15,26 +15,14 @@ import (
 	"golang.org/x/term"
 )
 
-func handleHistoryOperations(cmd *cobra.Command, results compute.Results, cfg *config.Config) error {
-	historyLimit, _ := cmd.Flags().GetInt(HistoryLimitFlag)
-
-	// compare results against history, when requested
-	compareRef, _ := cmd.Flags().GetString(CompareHistoryFlag)
-	if compareRef != "" {
-		if err := compareHistory(cmd, compareRef, results); err != nil {
-			return err
-		}
-	}
-
+func handleSaveHistory(cmd *cobra.Command, results compute.Results, cfg *config.Config) error {
 	// save results to history, when requested.
 	bSaveHistory, _ := cmd.Flags().GetBool(SaveHistoryFlag)
-	if bSaveHistory {
-		if err := saveHistory(cmd, results, historyLimit, cfg); err != nil {
-			return err
-		}
+	if !bSaveHistory {
+		return nil
 	}
-
-	return nil
+	historyLimit, _ := cmd.Flags().GetInt(HistoryLimitFlag)
+	return saveHistory(cmd, results, historyLimit, cfg)
 }
 
 func getHistory(cmd *cobra.Command) (*history.History, error) {
@@ -83,18 +71,23 @@ func saveHistory(cmd *cobra.Command, results compute.Results, historyLimit int, 
 	return nil
 }
 
-func compareHistory(cmd *cobra.Command, compareRef string, results compute.Results) error {
+// compareHistory compares results against the --compare-history ref, when requested.
+func compareHistory(cmd *cobra.Command, results compute.Results) (*compute.Comparison, error) {
+	compareRef, _ := cmd.Flags().GetString(CompareHistoryFlag)
+	if compareRef == "" {
+		return nil, nil //nolint:nilnil // no comparison requested
+	}
+
 	h, err := getHistory(cmd)
 	if err != nil {
-		return fmt.Errorf("failed to load history: %w", err)
+		return nil, fmt.Errorf("failed to load history: %w", err)
 	}
 
 	refEntry := h.FindByRef(compareRef)
 	if refEntry == nil {
-		return fmt.Errorf("no history entry found for ref: %s", compareRef)
+		return nil, fmt.Errorf("no history entry found for ref: %s", compareRef)
 	}
-	output.CompareHistory(compareRef, refEntry, results)
-	return nil
+	return compute.BuildComparison(compareRef, history.ShortCommit(refEntry.Commit), refEntry.Results, results), nil
 }
 
 func showHistory(cmd *cobra.Command, historyLimit int, cfg *config.Config) error {
