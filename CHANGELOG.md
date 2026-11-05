@@ -7,65 +7,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Added
-
-* `heatmap` output format (`--format heatmap`): a grid of colored cells per file and
-  package, colored by the metric (statements, blocks, lines or functions) furthest below its
-  threshold, which the cell names. `--heatmap-metric` (config `heatmapMetric`) picks a single
-  metric instead.
-* `--heatmap-png <path>` (config `heatmapPng`): also write the heat map as a PNG image,
-  alongside whichever report format is selected.
-
 ### Breaking
 
-* `compute.CollectResults` no longer normalizes `profile.FileName` internally.
-  Callers that relied on the implicit normalization must now call
-  `compute.NormalizeNames(profiles, cfg)` themselves before invoking
-  `CollectResults`. The `go-covercheck` CLI does this automatically; only
-  direct API consumers are affected. This removes a double-normalization
-  bug when the same profile set is routed through both the `--inspect` path
-  and the regular reporting path.
+* Line coverage is now checked by default, at 50%. Builds that passed before can fail. Set `lineThreshold` to 0 to turn it off.
+* Total thresholds now follow the matching global threshold unless `total:` sets them. A config that raised a global threshold now checks the total at that level too.
+* CSV and TSV output has new columns, so existing columns have moved. Read columns by name, not by position.
+* Building from source needs Go 1.27 or newer.
+* Library users: `compute.CollectResults` no longer tidies file names itself. Call `compute.NormalizeNames` first. The command line does this for you.
 
 ### Added
 
-* Function coverage: functions are counted per file, per package, and in total,
-  with a function covered when any of its code ran. New `functionThreshold`
-  config key and `--function-threshold` (`-g`) / `--total-function-threshold`
-  (`-G`) flags, `functions:` maps under `perFile`, `perPackage`, and `total`,
-  and `--sort-by functions|function-percent`. The threshold defaults to `0`
-  (disabled). Table, md, html, csv, and tsv output gain `Functions` and
-  `Function %` columns (table, md, and html show them only when a function
-  threshold is in effect; csv and tsv always do); json and yaml gain `functionCoverage`,
-  `functionPercentage`, `functionThreshold`, and `byTotal.functions`; history
-  show/compare report function coverage when the entry has it. A file whose
-  source cannot be found or parsed reports `0/0` functions, which is neutral
-  for totals and thresholds, and now produces a `warning:` line on stderr
-  (also covering the line-coverage estimate for that file). Library users get
-  these in `compute.Results.Warnings`, which is excluded from json, yaml, and
-  saved history.
-
-* Uncovered functions: you can now see which functions are not covered, not just
-  how many. Each file gets an `uncoveredFunctions` list of `Name:line` entries
-  (methods carry their receiver, as in `(*Server).Start:88`). It is a new
-  "Uncovered Functions" column in table, md, and html output (shown only when a
-  function threshold is in effect, like the other function columns), a column in
-  csv and tsv, and an `uncoveredFunctions` field in json and yaml. `--inspect`
-  prints an `Uncovered functions:` line under each file name. New
-  `--no-uncovered-functions` (`-O`) flag and `noUncoveredFunctions` config key
-  turn the list off; `--no-uncovered-lines` does not affect it. Library users
-  get `compute.By.UncoveredFunctions`, `functions.Function.Name`,
-  `functions.Uncovered`, and `functions.FormatUncovered`.
+* Line coverage, with `--line-threshold` (`-n`), `--total-line-threshold` (`-N`) and `lineThreshold` in the config file.
+* Uncovered lines are listed in reports. `--no-uncovered-lines` (`-Q`) hides them.
+* `--inspect` (`-U`) shows the uncovered code itself. `--inspect-file` (`-F`) picks the files, `--inspect-context` (`-P`) sets how many lines to show around each gap, and `--syntax-style` (`-Y`) sets the colors.
+* Function coverage, with `--function-threshold` (`-g`), `--total-function-threshold` (`-G`) and `functionThreshold` in the config file. It is off by default.
+* Uncovered functions are listed in reports. `--no-uncovered-functions` (`-O`) hides them.
+* `--diff-from` (`-d`) checks only the files changed since a git ref.
+* `--table-style` picks the table look: default, light, bold, rounded or double.
+* `--format heatmap` shows coverage as a grid of colored cells. `--heatmap-png` also saves it as an image, and `--heatmap-metric` picks which measure sets the colors.
+* `--comment` posts the results as a comment on a pull or merge request on GitHub, GitLab or Gitea.
+* The README now points to the GitHub Action for running go-covercheck in workflows.
 
 ### Changed
 
-* csv and tsv output has a new `Uncovered Functions` column, placed before
-  `Uncovered Lines`. Use `--no-uncovered-functions` to get the old columns.
+* History messages (saved, deleted, removed) start with `≡` instead of `✓`.
+* A warning is printed when a source file can't be found.
+* Release builds use Go 1.27.
 
 ### Fixed
 
-* History lookup (`FindByRef`, `DeleteByRef`) and the history/compare output no
-  longer panic when an entry's commit is shorter than 7 characters, such as in
-  a hand-edited or truncated history file.
+* The Docker image can now make secure web requests, which pull request comments need.
+* History no longer fails on commit ids shorter than 7 characters.
+* `--inspect-file` and source lookup match paths the same way on every operating system.
 
 ## [v0.6.1] - 2025-08-05
 
