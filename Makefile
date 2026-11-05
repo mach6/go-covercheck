@@ -67,21 +67,12 @@ dist:
 
 	strip ./dist/*linux_amd64*
 
+# Release the notes under [Unreleased] in CHANGELOG.md as a section for the tag in APP_VERSION.
+# See scripts/changelog.sh.
 changelog:
-	# Generate a changelog for tag and merge it with the existing CHANGELOG.md
-	# Yeah this is some ugly shell scripting, but it works.
-	@TAG=$(APP_VERSION); \
-	git-chglog $$TAG > NEW_TAG_CHANGELOG.md; \
-	start=$$(grep -n '^## \[Unreleased\]' CHANGELOG.md | head -n1 | cut -d: -f1); \
-	end=$$(grep -n '^## \[' CHANGELOG.md | grep -A1 '^'$$start':' | tail -n1 | cut -d: -f1); \
-	if [ -z "$$end" ]; then end=$$(wc -l < CHANGELOG.md); fi; \
-	head -n $$((start - 1)) CHANGELOG.md > TMP_CHANGELOG.md; \
-	cat NEW_TAG_CHANGELOG.md >> TMP_CHANGELOG.md; \
-	tail -n +$$end CHANGELOG.md >> TMP_CHANGELOG.md; \
-	mv TMP_CHANGELOG.md CHANGELOG.md; \
-	rm -f NEW_TAG_CHANGELOG.md
+	@./scripts/changelog.sh $(APP_VERSION)
 
 docker:
 	docker build -t $(APP_NAME):$(APP_VERSION) .
 
-.PHONY: clean lint build test covercheck dist docker
+.PHONY: clean lint build test covercheck dist docker changelog
