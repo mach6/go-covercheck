@@ -65,3 +65,13 @@ Example:
 ```text
 feat: add support for multi-file coverage filtering
 ```
+
+## 📝 Changelog
+
+User-facing changes are written under `## [Unreleased]` in `CHANGELOG.md`, in plain words, grouped as
+Breaking, Added, Deprecated, Changed or Fixed.
+
+When a version is tagged, the release workflow opens a pull request that moves those notes into a section for
+the tag, and updates the compare links (`scripts/changelog.sh`, run with `make changelog`). If `[Unreleased]` is
+empty, it generates the notes from the commits with `git-chglog` instead, using only `feat`, `fix`, `perf` and
+`refactor` commits. Edit that pull request before merging it if you like.
