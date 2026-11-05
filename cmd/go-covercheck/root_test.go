@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"path"
 	"strings"
 	"testing"
 
@@ -387,6 +388,111 @@ func Test_run_WithConfigFile(t *testing.T) {
 	require.InEpsilon(t, 1.0, r.ByPackage[0].BlockThreshold, 0)
 	require.InEpsilon(t, 3.0, r.ByTotal.Blocks.Threshold, 0)
 	require.InEpsilon(t, 2.0, r.ByTotal.Statements.Threshold, 0)
+}
+
+func Test_run_TotalThresholdsFollowGlobalsInConfigFile(t *testing.T) {
+	tests := []struct {
+		name                       string
+		config                     string
+		wantStatements, wantBlocks float64
+		wantLines                  float64
+	}{
+		{
+			name:           "totals not set follow the global thresholds",
+			config:         "statementThreshold: 1\nblockThreshold: 2\nlineThreshold: 3\n",
+			wantStatements: 1, wantBlocks: 2, wantLines: 3,
+		},
+		{
+			name:           "a global of 0 turns the total off too",
+			config:         "statementThreshold: 1\nblockThreshold: 2\nlineThreshold: 0\n",
+			wantStatements: 1, wantBlocks: 2, wantLines: 0,
+		},
+		{
+			name:           "an explicit total is used as is",
+			config:         "statementThreshold: 1\nblockThreshold: 2\nlineThreshold: 0\ntotal:\n  lines: 4\n",
+			wantStatements: 1, wantBlocks: 2, wantLines: 4,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cmd := setupTestCmd()
+			cmd.SetArgs([]string{
+				"--config", test.CreateTempConfigFile(t, tt.config), "-f", "yaml", "--no-color",
+				test.CreateTempCoverageFile(t, test.TestCoverageOut)},
+			)
+			stdOut, stdErr, err := runCmdForTest(t, cmd)
+			require.NoError(t, err)
+			requireOnlySourceWarnings(t, stdErr)
+
+			r := new(compute.Results)
+			require.NoError(t, yaml.Unmarshal([]byte(stdOut), &r))
+			require.InDelta(t, tt.wantStatements, r.ByTotal.Statements.Threshold, 0.001)
+			require.InDelta(t, tt.wantBlocks, r.ByTotal.Blocks.Threshold, 0.001)
+			require.InDelta(t, tt.wantLines, r.ByTotal.Lines.Threshold, 0.001)
+		})
+	}
+}
+
+func Test_run_TotalThresholdsFollowGlobalFlags(t *testing.T) {
+	tests := []struct {
+		name           string
+		config         string // empty means no config file
+		args           []string
+		wantStatements float64
+	}{
+		{
+			name:           "a global flag of 0 turns off a total that followed the config",
+			config:         "statementThreshold: 2\n",
+			args:           []string{"--statement-threshold", "0"},
+			wantStatements: 0,
+		},
+		{
+			name:           "a global flag raises a total that followed a config global of 0",
+			config:         "statementThreshold: 0\n",
+			args:           []string{"--statement-threshold", "2"},
+			wantStatements: 2,
+		},
+		{
+			name:           "a total set in the config file is kept",
+			config:         "statementThreshold: 2\ntotal:\n  statements: 1\n",
+			args:           []string{"--statement-threshold", "0"},
+			wantStatements: 1,
+		},
+		{
+			name:           "a total flag wins over the global flag",
+			config:         "statementThreshold: 2\n",
+			args:           []string{"--statement-threshold", "0", "--total-statement-threshold", "1"},
+			wantStatements: 1,
+		},
+		{
+			name:           "the config global is used when no flag is given",
+			config:         "statementThreshold: 2\n",
+			wantStatements: 2,
+		},
+		{
+			name:           "a global flag sets the total when there is no config file",
+			args:           []string{"--statement-threshold", "2"},
+			wantStatements: 2,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cfgPath := path.Join(t.TempDir(), "missing.yml") // not created: no config file
+			if tt.config != "" {
+				cfgPath = test.CreateTempConfigFile(t, tt.config)
+			}
+			cmd := setupTestCmd()
+			cmd.SetArgs(append([]string{"--config", cfgPath, "-f", "yaml", "--no-color"}, append(tt.args,
+				test.CreateTempCoverageFile(t, test.TestCoverageOut))...))
+			stdOut, stdErr, err := runCmdForTest(t, cmd)
+			require.NoError(t, err)
+			requireOnlySourceWarnings(t, stdErr)
+
+			r := new(compute.Results)
+			require.NoError(t, yaml.Unmarshal([]byte(stdOut), &r))
+			require.InDelta(t, tt.wantStatements, r.ByTotal.Statements.Threshold, 0.001)
+		})
+	}
 }
 
 func Test_run_WithConfigFileFailsToUnmarshal(t *testing.T) {

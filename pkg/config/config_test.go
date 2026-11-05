@@ -381,3 +381,112 @@ func TestValidate_HeatmapMetric(t *testing.T) {
 	cfg.HeatmapMetric = "branches"
 	require.ErrorContains(t, cfg.Validate(), "heatmap-metric must be one of")
 }
+
+func loadYAML(t *testing.T, content string) *config.Config {
+	t.Helper()
+	p := path.Join(t.TempDir(), ".go-covercheck.yml")
+	require.NoError(t, os.WriteFile(p, []byte(content), 0600))
+	cfg, err := config.Load(p)
+	require.NoError(t, err)
+	return cfg
+}
+
+func TestLoad_TotalDefaultsToGlobalThresholds(t *testing.T) {
+	cfg := loadYAML(t, `
+statementThreshold: 91
+blockThreshold: 92
+lineThreshold: 93
+functionThreshold: 94
+`)
+
+	require.InDelta(t, 91, cfg.Total[config.StatementsSection], 0.001)
+	require.InDelta(t, 92, cfg.Total[config.BlocksSection], 0.001)
+	require.InDelta(t, 93, cfg.Total[config.LinesSection], 0.001)
+	require.InDelta(t, 94, cfg.Total[config.FunctionsSection], 0.001)
+}
+
+func TestLoad_TotalDefaultsWhenNothingIsSet(t *testing.T) {
+	cfg := loadYAML(t, "format: table\n")
+
+	require.InDelta(t, config.StatementThresholdDefault, cfg.Total[config.StatementsSection], 0.001)
+	require.InDelta(t, config.BlockThresholdDefault, cfg.Total[config.BlocksSection], 0.001)
+	require.InDelta(t, config.LineThresholdDefault, cfg.Total[config.LinesSection], 0.001)
+	require.InDelta(t, config.FunctionThresholdDefault, cfg.Total[config.FunctionsSection], 0.001)
+}
+
+func TestLoad_TotalIsDisabledWithGlobalZero(t *testing.T) {
+	cfg := loadYAML(t, "lineThreshold: 0\n")
+
+	require.InDelta(t, 0, cfg.Total[config.LinesSection], 0.001)
+}
+
+func TestLoad_TotalOverridesAreIndependentOfGlobals(t *testing.T) {
+	cfg := loadYAML(t, `
+statementThreshold: 91
+lineThreshold: 0
+total:
+  lines: 40
+  blocks: 0
+`)
+
+	require.InDelta(t, 40, cfg.Total[config.LinesSection], 0.001, "an explicit total wins over the global threshold")
+	require.InDelta(t, 0, cfg.Total[config.BlocksSection], 0.001, "an explicit 0 disables the total")
+	require.InDelta(t, 91, cfg.Total[config.StatementsSection], 0.001, "totals not set follow their global threshold")
+}
+
+func TestFollowGlobalThresholds(t *testing.T) {
+	t.Run("totals filled in from the globals follow a changed global", func(t *testing.T) {
+		cfg := loadYAML(t, "statementThreshold: 91\nlineThreshold: 0\n")
+
+		cfg.StatementThreshold = 0
+		cfg.LineThreshold = 80
+		cfg.FollowGlobalThresholds()
+
+		require.InDelta(t, 0, cfg.Total[config.StatementsSection], 0.001)
+		require.InDelta(t, 80, cfg.Total[config.LinesSection], 0.001)
+	})
+
+	t.Run("totals set in the file are left alone", func(t *testing.T) {
+		cfg := loadYAML(t, "statementThreshold: 91\ntotal:\n  statements: 60\n  lines: 0\n")
+
+		cfg.StatementThreshold = 10
+		cfg.LineThreshold = 80
+		cfg.FollowGlobalThresholds()
+
+		require.InDelta(t, 60, cfg.Total[config.StatementsSection], 0.001)
+		require.InDelta(t, 0, cfg.Total[config.LinesSection], 0.001)
+	})
+
+	t.Run("a total changed after it was filled in is left alone", func(t *testing.T) {
+		cfg := new(config.Config)
+		cfg.ApplyDefaults()
+		cfg.Total[config.StatementsSection] = 65
+
+		cfg.StatementThreshold = 90
+		cfg.FollowGlobalThresholds()
+
+		require.InDelta(t, 65, cfg.Total[config.StatementsSection], 0.001)
+	})
+
+	t.Run("defaults follow the globals too", func(t *testing.T) {
+		cfg := new(config.Config)
+		cfg.ApplyDefaults()
+
+		cfg.BlockThreshold = 30
+		cfg.FollowGlobalThresholds()
+
+		require.InDelta(t, 30, cfg.Total[config.BlocksSection], 0.001)
+		require.InDelta(t, config.StatementThresholdDefault, cfg.Total[config.StatementsSection], 0.001)
+	})
+
+	t.Run("repeated calls keep following", func(t *testing.T) {
+		cfg := loadYAML(t, "statementThreshold: 91\n")
+
+		cfg.StatementThreshold = 50
+		cfg.FollowGlobalThresholds()
+		cfg.StatementThreshold = 20
+		cfg.FollowGlobalThresholds()
+
+		require.InDelta(t, 20, cfg.Total[config.StatementsSection], 0.001)
+	})
+}

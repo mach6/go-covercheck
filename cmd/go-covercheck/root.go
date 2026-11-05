@@ -572,6 +572,12 @@ func applyConfigOverrides(cfg *config.Config, cmd *cobra.Command, noConfigFile b
 	applyFloat64FlagOverride(cmd, BlockThresholdFlag, &cfg.BlockThreshold, noConfigFile)
 	applyFloat64FlagOverride(cmd, LineThresholdFlag, &cfg.LineThreshold, noConfigFile)
 	applyFloat64FlagOverride(cmd, FunctionThresholdFlag, &cfg.FunctionThreshold, noConfigFile)
+
+	// totals that were not set explicitly follow the global thresholds, then total flags override them.
+	if cfg.Total == nil {
+		cfg.Total = config.PerOverride{}
+	}
+	cfg.FollowGlobalThresholds()
 	applyFloat64TotalFlagOverride(cmd, TotalStatementThresholdFlag, config.StatementsSection, cfg.Total)
 	applyFloat64TotalFlagOverride(cmd, TotalBlockThresholdFlag, config.BlocksSection, cfg.Total)
 	applyFloat64TotalFlagOverride(cmd, TotalLineThresholdFlag, config.LinesSection, cfg.Total)
@@ -608,28 +614,6 @@ func applyConfigOverrides(cfg *config.Config, cmd *cobra.Command, noConfigFile b
 	applyBoolFlagOverride(cmd, CommentUpdateFlag, &cfg.Comment.Platform.UpdateExisting, noConfigFile)
 	if v, _ := cmd.Flags().GetBool(CommentNoEmojiFlag); cmd.Flags().Changed(CommentNoEmojiFlag) {
 		cfg.Comment.Platform.IncludeColors = !v
-	}
-
-	// set cfg.Total thresholds to the global values, iff no override was specified for each.
-	if cfg.Total == nil {
-		cfg.Total = config.PerOverride{}
-	}
-	applyGlobalThresholdToTotal(cmd, cfg.Total, StatementThresholdFlag, TotalStatementThresholdFlag,
-		config.StatementsSection, config.StatementThresholdDefault)
-	applyGlobalThresholdToTotal(cmd, cfg.Total, BlockThresholdFlag, TotalBlockThresholdFlag,
-		config.BlocksSection, config.BlockThresholdDefault)
-	applyGlobalThresholdToTotal(cmd, cfg.Total, LineThresholdFlag, TotalLineThresholdFlag,
-		config.LinesSection, config.LineThresholdDefault)
-	applyGlobalThresholdToTotal(cmd, cfg.Total, FunctionThresholdFlag, TotalFunctionThresholdFlag,
-		config.FunctionsSection, config.FunctionThresholdDefault)
-}
-
-// applyGlobalThresholdToTotal sets total[section] to the value of globalFlag
-// when totalFlag was not given and the total still holds its default.
-func applyGlobalThresholdToTotal(cmd *cobra.Command, total config.PerOverride,
-	globalFlag, totalFlag, section string, defaultValue float64) {
-	if v, _ := cmd.Flags().GetFloat64(globalFlag); !cmd.Flags().Changed(totalFlag) && total[section] == defaultValue {
-		total[section] = v
 	}
 }
 
