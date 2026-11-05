@@ -490,3 +490,72 @@ func TestFollowGlobalThresholds(t *testing.T) {
 		require.InDelta(t, 20, cfg.Total[config.StatementsSection], 0.001)
 	})
 }
+
+func TestLoad_HideColumns(t *testing.T) {
+	cfg := loadYAML(t, "hideColumns: [Statements, ' blocks ', statements, '', line-percent]\n")
+
+	// names are lower-cased and trimmed, and repeats and blanks are dropped.
+	require.Equal(t, []string{"statements", "blocks", "line-percent"}, cfg.HideColumns)
+	require.True(t, cfg.ColumnHidden(config.ColumnStatements))
+	require.True(t, cfg.ColumnHidden(config.ColumnBlocks))
+	require.True(t, cfg.ColumnHidden(config.ColumnLinePercent))
+	require.False(t, cfg.ColumnHidden(config.ColumnLines))
+}
+
+func TestLoad_HideColumnsNothingHiddenByDefault(t *testing.T) {
+	cfg := loadYAML(t, "format: table\n")
+
+	require.Empty(t, cfg.HideColumns)
+	for _, name := range config.HideableColumns {
+		require.False(t, cfg.ColumnHidden(name), name)
+	}
+}
+
+func TestValidate_HideColumns(t *testing.T) {
+	for _, name := range config.HideableColumns {
+		cfg := new(config.Config)
+		cfg.ApplyDefaults()
+		cfg.HideColumns = []string{name}
+		require.NoError(t, cfg.Validate(), name)
+	}
+
+	cfg := new(config.Config)
+	cfg.ApplyDefaults()
+	cfg.HideColumns = []string{"lines", "nope"}
+	err := cfg.Validate()
+	require.Error(t, err)
+	require.ErrorContains(t, err, `"nope"`)
+	require.ErrorContains(t, err, "statement-percent", "the error lists the valid names")
+}
+
+func TestLoad_HideColumnsRejectsUnknownName(t *testing.T) {
+	p := path.Join(t.TempDir(), ".go-covercheck.yml")
+	require.NoError(t, os.WriteFile(p, []byte("hideColumns: [sorting]\n"), 0600))
+
+	cfg, err := config.Load(p)
+
+	require.Error(t, err)
+	require.Nil(t, cfg)
+	require.ErrorContains(t, err, `"sorting"`)
+}
+
+func TestValidate_NoTableAndNoSummaryTogether(t *testing.T) {
+	for _, format := range []string{config.FormatTable, config.FormatMD, config.FormatCSV, config.FormatHeatmap} {
+		cfg := new(config.Config)
+		cfg.ApplyDefaults()
+		cfg.Format = format
+		cfg.NoTable = true
+		cfg.NoSummary = true
+		require.ErrorContains(t, cfg.Validate(), "cannot specify both no-summary and no-table", format)
+	}
+
+	// json and yaml ignore both flags, so the pair is allowed there.
+	for _, format := range []string{config.FormatJSON, config.FormatYAML} {
+		cfg := new(config.Config)
+		cfg.ApplyDefaults()
+		cfg.Format = format
+		cfg.NoTable = true
+		cfg.NoSummary = true
+		require.NoError(t, cfg.Validate(), format)
+	}
+}

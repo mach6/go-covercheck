@@ -249,30 +249,12 @@ func maxInt(a, b int) int {
 	return b
 }
 
-// Positions of the function cells in a table row before "Uncovered Lines".
-const (
-	functionsCellIdx   = 4
-	functionPctCellIdx = 8
-)
-
 // showFunctionColumns reports whether the Functions and Function % columns are
 // rendered. The human-facing formats (table, md, html) show them only when a
 // function threshold is in effect, keeping the default table narrow; csv and
 // tsv always carry them so the machine-read schema does not depend on config.
 func showFunctionColumns(cfg *config.Config) bool {
 	return cfg.Format == config.FormatCSV || cfg.Format == config.FormatTSV || cfg.HasFunctionThreshold()
-}
-
-// dropFunctionCells removes the Functions and Function % cells from a row of
-// the nine leading columns, plus any trailing cells.
-func dropFunctionCells(row table.Row) table.Row {
-	out := make(table.Row, 0, len(row)-2) //nolint:mnd
-	for i, c := range row {
-		if i != functionsCellIdx && i != functionPctCellIdx {
-			out = append(out, c)
-		}
-	}
-	return out
 }
 
 // showUncoveredFunctions reports whether the "Uncovered Functions" column is
@@ -282,24 +264,82 @@ func showUncoveredFunctions(cfg *config.Config) bool {
 	return !cfg.NoUncoveredFunctions && showFunctionColumns(cfg)
 }
 
-// withUncoveredCells appends the trailing uncovered cells to row, in column
-// order, for the columns that are shown.
-func withUncoveredCells(row table.Row, cfg *config.Config, uncoveredFuncs, uncoveredLines string) table.Row {
-	if showUncoveredFunctions(cfg) {
-		row = append(row, uncoveredFuncs)
-	}
-	if !cfg.NoUncoveredLines {
-		row = append(row, uncoveredLines)
-	}
-	return row
+// tableColumn is one column of the report table.
+type tableColumn struct {
+	header string // the header text
+	hide   string // the name --hide-columns uses; empty for the name column, which is always shown
+	config table.ColumnConfig
 }
 
-func dropFunctionColumns(columnConfigs []table.ColumnConfig) []table.ColumnConfig {
-	out := make([]table.ColumnConfig, 0, len(columnConfigs)-2) //nolint:mnd
-	for _, cc := range columnConfigs {
-		if cc.Name != colFunctions && cc.Name != colFunctionPct {
-			out = append(out, cc)
+func numberColumn(header, hide string) tableColumn {
+	return tableColumn{header: header, hide: hide, config: table.ColumnConfig{
+		Name: header, Align: text.AlignRight, AlignHeader: text.AlignLeft, AlignFooter: text.AlignRight,
+	}}
+}
+
+func listColumn(header, hide string) tableColumn {
+	return tableColumn{header: header, hide: hide, config: table.ColumnConfig{
+		Name: header, Align: text.AlignLeft, AlignHeader: text.AlignLeft, AlignFooter: text.AlignLeft,
+	}}
+}
+
+// tableColumns returns every column of the table, in the order they are shown. Each row is built with a cell
+// for every one of them, and the columns that are not shown are then dropped.
+func tableColumns() []tableColumn {
+	return []tableColumn{
+		{header: colName, config: table.ColumnConfig{Name: colName, Align: text.AlignLeft, AlignFooter: text.AlignLeft}},
+		numberColumn(colStatements, config.ColumnStatements),
+		numberColumn(colBlocks, config.ColumnBlocks),
+		numberColumn(colLines, config.ColumnLines),
+		numberColumn(colFunctions, config.ColumnFunctions),
+		numberColumn(colStatementPct, config.ColumnStatementPercent),
+		numberColumn(colBlockPct, config.ColumnBlockPercent),
+		numberColumn(colLinePct, config.ColumnLinePercent),
+		numberColumn(colFunctionPct, config.ColumnFunctionPercent),
+		listColumn(colUncoveredFuncs, config.ColumnUncoveredFunctions),
+		listColumn(colUncoveredLines, config.ColumnUncoveredLines),
+	}
+}
+
+// columnShown reports whether a column is rendered. The function columns follow showFunctionColumns, the
+// uncovered columns are suppressed with --no-uncovered-lines and --no-uncovered-functions, and any column can be
+// hidden with --hide-columns. Hiding is display only: the thresholds are still checked.
+func columnShown(cfg *config.Config, col tableColumn) bool {
+	switch col.header {
+	case colFunctions, colFunctionPct:
+		if !showFunctionColumns(cfg) {
+			return false
 		}
+	case colUncoveredFuncs:
+		if !showUncoveredFunctions(cfg) {
+			return false
+		}
+	case colUncoveredLines:
+		if cfg.NoUncoveredLines {
+			return false
+		}
+	}
+	return col.hide == "" || !cfg.ColumnHidden(col.hide)
+}
+
+// shownColumns returns the columns that are rendered and their positions among all the columns.
+func shownColumns(cfg *config.Config) ([]tableColumn, []int) {
+	var cols []tableColumn
+	var positions []int
+	for i, col := range tableColumns() {
+		if columnShown(cfg, col) {
+			cols = append(cols, col)
+			positions = append(positions, i)
+		}
+	}
+	return cols, positions
+}
+
+// shownCells keeps the cells of row, which has a cell for every column, at the given positions.
+func shownCells(row table.Row, positions []int) table.Row {
+	out := make(table.Row, 0, len(positions))
+	for _, i := range positions {
+		out = append(out, row[i])
 	}
 	return out
 }
@@ -315,42 +355,12 @@ func renderTable(results compute.Results, cfg *config.Config) {
 	t.SetAllowedRowLength(cfg.TerminalWidth)
 	t.SetStyle(getTableStyle(cfg))
 
-	headers := table.Row{
-		"", "Statements", "Blocks", "Lines", "Functions", "Statement %", "Block %", "Line %", "Function %",
-	}
-	columnConfigs := []table.ColumnConfig{
-		{Name: "", Align: text.AlignLeft, AlignFooter: text.AlignLeft},
-		{Name: "Statements", Align: text.AlignRight, AlignHeader: text.AlignLeft, AlignFooter: text.AlignRight},
-		{Name: "Blocks", Align: text.AlignRight, AlignHeader: text.AlignLeft, AlignFooter: text.AlignRight},
-		{Name: "Lines", Align: text.AlignRight, AlignHeader: text.AlignLeft, AlignFooter: text.AlignRight},
-		{Name: "Functions", Align: text.AlignRight, AlignHeader: text.AlignLeft, AlignFooter: text.AlignRight},
-		{Name: "Statement %", Align: text.AlignRight, AlignHeader: text.AlignLeft, AlignFooter: text.AlignRight},
-		{Name: "Block %", Align: text.AlignRight, AlignHeader: text.AlignLeft, AlignFooter: text.AlignRight},
-		{Name: "Line %", Align: text.AlignRight, AlignHeader: text.AlignLeft, AlignFooter: text.AlignRight},
-		{Name: "Function %", Align: text.AlignRight, AlignHeader: text.AlignLeft, AlignFooter: text.AlignRight},
-	}
-	showFunctions := showFunctionColumns(cfg)
-	if !showFunctions {
-		headers = dropFunctionCells(headers)
-		columnConfigs = dropFunctionColumns(columnConfigs)
-	}
-	if showUncoveredFunctions(cfg) {
-		headers = append(headers, colUncoveredFuncs)
-		columnConfigs = append(columnConfigs, table.ColumnConfig{
-			Name:        colUncoveredFuncs,
-			Align:       text.AlignLeft,
-			AlignHeader: text.AlignLeft,
-			AlignFooter: text.AlignLeft,
-		})
-	}
-	if !cfg.NoUncoveredLines {
-		headers = append(headers, colUncoveredLines)
-		columnConfigs = append(columnConfigs, table.ColumnConfig{
-			Name:        colUncoveredLines,
-			Align:       text.AlignLeft,
-			AlignHeader: text.AlignLeft,
-			AlignFooter: text.AlignLeft,
-		})
+	cols, positions := shownColumns(cfg)
+	headers := make(table.Row, 0, len(cols))
+	columnConfigs := make([]table.ColumnConfig, 0, len(cols))
+	for _, col := range cols {
+		headers = append(headers, col.header)
+		columnConfigs = append(columnConfigs, col.config)
 	}
 
 	// Width-based truncation only makes sense for the human-facing table format;
@@ -382,12 +392,11 @@ func renderTable(results compute.Results, cfg *config.Config) {
 			blockColor(fmt.Sprintf("%.1f", r.BlockPercentage)),
 			lineColor(fmt.Sprintf("%.1f", r.LinePercentage)),
 			functionColor(fmt.Sprintf("%.1f", r.FunctionPercentage)),
+			r.UncoveredFunctions,
+			r.UncoveredLines,
 		}
 
-		if !showFunctions {
-			row = dropFunctionCells(row)
-		}
-		t.AppendRow(withUncoveredCells(row, cfg, r.UncoveredFunctions, r.UncoveredLines))
+		t.AppendRow(shownCells(row, positions))
 	}
 
 	t.AppendSeparator()
@@ -410,12 +419,11 @@ func renderTable(results compute.Results, cfg *config.Config) {
 			blockColor(fmt.Sprintf("%.1f", r.BlockPercentage)),
 			lineColor(fmt.Sprintf("%.1f", r.LinePercentage)),
 			functionColor(fmt.Sprintf("%.1f", r.FunctionPercentage)),
+			// Packages don't have uncovered lines or functions, so these cells are empty.
+			"",
+			"",
 		}
-		if !showFunctions {
-			row = dropFunctionCells(row)
-		}
-		// Packages don't have uncovered lines or functions, so show empty cells.
-		t.AppendRow(withUncoveredCells(row, cfg, "", ""))
+		t.AppendRow(shownCells(row, positions))
 	}
 
 	stmtColor := severityColor(results.ByTotal.Statements.Percentage, results.ByTotal.Statements.Threshold)
@@ -437,11 +445,10 @@ func renderTable(results compute.Results, cfg *config.Config) {
 		blockColor(text.Bold.Sprintf("%.1f", results.ByTotal.Blocks.Percentage)),
 		lineColor(text.Bold.Sprintf("%.1f", results.ByTotal.Lines.Percentage)),
 		functionColor(text.Bold.Sprintf("%.1f", results.ByTotal.Functions.Percentage)),
+		"",
+		"",
 	}
-	if !showFunctions {
-		footer = dropFunctionCells(footer)
-	}
-	t.AppendFooter(withUncoveredCells(footer, cfg, "", ""))
+	t.AppendFooter(shownCells(footer, positions))
 
 	switch cfg.Format {
 	case config.FormatMD:

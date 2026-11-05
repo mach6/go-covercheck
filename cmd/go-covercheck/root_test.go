@@ -713,6 +713,91 @@ func Test_run_CompareHistory_FollowsSortFlags(t *testing.T) {
 	}
 }
 
+func Test_run_HideColumns(t *testing.T) {
+	// no threshold can fail, so run returns instead of exiting.
+	noThresholds := []string{"-s", "0", "-b", "0", "-n", "0", "-S", "0", "-B", "0", "-N", "0"}
+	header := func(t *testing.T, config string, args ...string) string {
+		t.Helper()
+		cfgPath := path.Join(t.TempDir(), "missing.yml") // not created: no config file
+		if config != "" {
+			cfgPath = test.CreateTempConfigFile(t, config)
+		}
+		argv := append([]string{"--config", cfgPath, "-f", "csv", "--no-color"}, noThresholds...)
+		argv = append(argv, args...)
+		cmd := setupTestCmd()
+		cmd.SetArgs(append(argv, test.CreateTempCoverageFile(t, test.TestCoverageOut)))
+		stdOut, _, err := runCmdForTest(t, cmd)
+		require.NoError(t, err)
+		return strings.SplitN(stdOut, "\n", 2)[0]
+	}
+	all := ",Statements,Blocks,Lines,Functions,Statement %,Block %,Line %,Function %,Uncovered Functions,Uncovered Lines"
+
+	t.Run("nothing hidden by default", func(t *testing.T) {
+		require.Equal(t, all, header(t, ""))
+	})
+	t.Run("a comma separated list", func(t *testing.T) {
+		require.Equal(t, ",Lines,Functions,Statement %,Block %,Line %,Function %,Uncovered Functions,Uncovered Lines",
+			header(t, "", "--hide-columns", "statements,blocks"))
+	})
+	t.Run("the flag repeated", func(t *testing.T) {
+		require.Equal(t, ",Lines,Functions,Statement %,Block %,Line %,Function %,Uncovered Functions,Uncovered Lines",
+			header(t, "", "--hide-columns", "statements", "--hide-columns", "blocks"))
+	})
+	t.Run("names are not case sensitive", func(t *testing.T) {
+		require.Equal(t, ",Blocks,Lines,Functions,Statement %,Block %,Line %,Function %,Uncovered Functions,"+
+			"Uncovered Lines", header(t, "", "--hide-columns", "Statements"))
+	})
+	t.Run("from the config file", func(t *testing.T) {
+		require.Equal(t, ",Statements,Blocks,Functions,Statement %,Block %,Line %,Function %,Uncovered Functions,"+
+			"Uncovered Lines", header(t, "hideColumns: [lines]\n"))
+	})
+	t.Run("the flag replaces the config file list", func(t *testing.T) {
+		require.Equal(t, ",Statements,Lines,Functions,Statement %,Block %,Line %,Function %,Uncovered Functions,"+
+			"Uncovered Lines", header(t, "hideColumns: [lines]\n", "--hide-columns", "blocks"))
+	})
+	t.Run("brings back the csv columns of v0.6.1", func(t *testing.T) {
+		require.Equal(t, ",Statements,Blocks,Statement %,Block %", header(t, "", "--hide-columns",
+			"lines,functions,line-percent,function-percent,uncovered-functions,uncovered-lines"))
+	})
+	t.Run("the no-uncovered flags still work", func(t *testing.T) {
+		require.Equal(t, ",Statements,Blocks,Lines,Functions,Statement %,Block %,Line %,Function %",
+			header(t, "", "-Q", "-O"))
+		require.Equal(t, ",Statements,Blocks,Lines,Functions,Statement %,Block %,Line %,Function %",
+			header(t, "", "--hide-columns", "uncovered-lines,uncovered-functions"))
+	})
+}
+
+func Test_run_HideColumnsUnknownName(t *testing.T) {
+	cmd := setupTestCmd()
+	cmd.SetArgs([]string{"--hide-columns", "lines,nope", test.CreateTempCoverageFile(t, test.TestCoverageOut)})
+
+	_, _, err := runCmdForTest(t, cmd)
+
+	require.Error(t, err)
+	require.ErrorContains(t, err, `"nope"`)
+	require.ErrorContains(t, err, "uncovered-lines", "the error lists the valid names")
+}
+
+func Test_run_HideColumnsDisabledForJSONAndYAML(t *testing.T) {
+	for _, format := range []string{"json", "yaml"} {
+		t.Run(format, func(t *testing.T) {
+			run := func(extra ...string) string {
+				cmd := setupTestCmd()
+				argv := append([]string{"-f", format, "--no-color", "-s", "0", "-b", "0", "-n", "0", "-S", "0", "-B", "0",
+					"-N", "0"}, extra...)
+				cmd.SetArgs(append(argv, test.CreateTempCoverageFile(t, test.TestCoverageOut)))
+				stdOut, _, err := runCmdForTest(t, cmd)
+				require.NoError(t, err)
+				return stdOut
+			}
+
+			plain := run()
+			require.NotEmpty(t, plain)
+			require.Equal(t, plain, run("--hide-columns", "statements,blocks,lines,statement-percent"))
+		})
+	}
+}
+
 func Test_run_WithConfigFileFailsToUnmarshal(t *testing.T) {
 	path := test.CreateTempConfigFile(t, test.ErrorTestConfig)
 	cmd := setupTestCmd()

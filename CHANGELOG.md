@@ -11,7 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 * Line coverage is now checked by default, at 50%. Builds that passed before can fail. Set `lineThreshold` to 0 to turn it off.
 * Total thresholds now follow the matching global threshold unless `total:` sets them. A config that raised a global threshold now checks the total at that level too.
-* CSV and TSV output has new columns, so existing columns have moved. Read columns by name, not by position.
+* CSV and TSV output has new columns, so existing columns have moved. Read columns by name, not by position, or get the old columns back with `--hide-columns lines,functions,line-percent,function-percent,uncovered-lines,uncovered-functions`.
 * Building from source needs Go 1.27 or newer.
 * Library users: `compute.CollectResults` no longer tidies file names itself. Call `compute.NormalizeNames` first. The command line does this for you.
 * With JSON or YAML output, `--compare-history` no longer prints text after the output. Read the new `comparison` section instead.
@@ -26,6 +26,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * `--diff-from` (`-d`) checks only the files changed since a git ref.
 * With JSON or YAML output, `--compare-history` adds a `comparison` section, so the output stays one valid document. Comparisons also list files and packages that are new or gone since the saved run.
 * `--table-style` picks the table look: default, light, bold, rounded or double.
+* `--hide-columns` leaves columns out of the table, md, html, csv and tsv reports. The config file has `hideColumns`. Hiding a column only changes what is shown; its threshold is still checked.
 * `--format heatmap` shows coverage as a grid of colored cells. `--heatmap-png` also saves it as an image, and `--heatmap-metric` picks which measure sets the colors.
 * `--comment` posts the results as a comment on a pull or merge request on GitHub, GitLab or Gitea.
 * The README now points to the GitHub Action for running go-covercheck in workflows.

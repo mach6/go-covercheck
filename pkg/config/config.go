@@ -56,6 +56,18 @@ const (
 	HeatmapMetricLines      = "lines"
 	HeatmapMetricFunctions  = "functions"
 
+	// The columns that hideColumns and --hide-columns accept. They are named like the --sort-by values.
+	ColumnStatements         = SortByStatements
+	ColumnBlocks             = SortByBlocks
+	ColumnLines              = SortByLines
+	ColumnFunctions          = SortByFunctions
+	ColumnStatementPercent   = SortByStatementPercent
+	ColumnBlockPercent       = SortByBlockPercent
+	ColumnLinePercent        = SortByLinePercent
+	ColumnFunctionPercent    = SortByFunctionPercent
+	ColumnUncoveredFunctions = "uncovered-functions"
+	ColumnUncoveredLines     = "uncovered-lines"
+
 	TableStyleDefault  = "default"
 	TableStyleLight    = "light"
 	TableStyleBold     = "bold"
@@ -118,6 +130,13 @@ type PerThresholdOverride struct {
 	Functions  PerOverride `yaml:"functions"`
 }
 
+// HideableColumns are the columns that hideColumns and --hide-columns accept, in the order they appear.
+var HideableColumns = []string{
+	ColumnStatements, ColumnBlocks, ColumnLines, ColumnFunctions,
+	ColumnStatementPercent, ColumnBlockPercent, ColumnLinePercent, ColumnFunctionPercent,
+	ColumnUncoveredFunctions, ColumnUncoveredLines,
+}
+
 // CommentPlatforms lists the supported comment platforms.
 var CommentPlatforms = []string{
 	CommentPlatformGitHub, CommentPlatformGitLab, CommentPlatformGitea,
@@ -175,6 +194,7 @@ type Config struct {
 	DiffFrom             string               `yaml:"diffFrom,omitempty"`
 	NoUncoveredLines     bool                 `yaml:"noUncoveredLines,omitempty"`
 	NoUncoveredFunctions bool                 `yaml:"noUncoveredFunctions,omitempty"`
+	HideColumns          []string             `yaml:"hideColumns,omitempty"`
 	InspectContext       int                  `yaml:"inspectContext,omitempty"`
 	SyntaxStyle          string               `yaml:"syntaxStyle,omitempty"`
 	Comment              CommentConfig        `yaml:"comment,omitempty"`
@@ -249,6 +269,12 @@ func (c *Config) HasFunctionThreshold() bool {
 	return false
 }
 
+// ColumnHidden reports whether the named column is hidden with hideColumns or --hide-columns.
+// Hiding a column only changes what is shown; the thresholds are still checked.
+func (c *Config) ColumnHidden(name string) bool {
+	return slices.Contains(c.HideColumns, name)
+}
+
 // Validate the config or return an error if it is not valid.
 func (c *Config) Validate() error { //nolint:cyclop
 	if c.StatementThreshold < StatementThresholdOff || c.StatementThreshold > StatementThresholdMax {
@@ -272,6 +298,10 @@ func (c *Config) Validate() error { //nolint:cyclop
 	if c.SyntaxStyle != "" && c.SyntaxStyle != SyntaxStyleAuto && styles.Get(c.SyntaxStyle) == styles.Fallback {
 		return fmt.Errorf("syntax-style %q is not a known chroma style; use %q or a bundled style name",
 			c.SyntaxStyle, SyntaxStyleAuto)
+	}
+
+	if err := c.normalizeHideColumns(); err != nil {
+		return err
 	}
 
 	switch c.SortBy {
@@ -357,6 +387,29 @@ func (c *Config) FollowGlobalThresholds() {
 			c.inheritedTotals[section] = globals[section]
 		}
 	}
+}
+
+// normalizeHideColumns lower-cases and trims the hidden column names, drops repeats, and rejects unknown names.
+func (c *Config) normalizeHideColumns() error {
+	if len(c.HideColumns) == 0 {
+		return nil
+	}
+	normalized := make([]string, 0, len(c.HideColumns))
+	for _, name := range c.HideColumns {
+		name = strings.ToLower(strings.TrimSpace(name))
+		if name == "" {
+			continue
+		}
+		if !slices.Contains(HideableColumns, name) {
+			return fmt.Errorf("hide-columns must be one or more of %s, not %q",
+				strings.Join(HideableColumns, "|"), name)
+		}
+		if !slices.Contains(normalized, name) {
+			normalized = append(normalized, name)
+		}
+	}
+	c.HideColumns = normalized
+	return nil
 }
 
 func (c *Config) initPerFileWhenNil() {

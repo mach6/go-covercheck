@@ -236,6 +236,7 @@ Flags:
   -h, --help                              help for go-covercheck
       --heatmap-metric string             metric the heat map colors cells by [worst|statements|blocks|lines|functions] (default "worst")
       --heatmap-png string                also write a coverage heat map PNG image to this path (ends in .png)
+      --hide-columns strings              hide columns from the tabular output; thresholds are still checked [statements|blocks|lines|functions|statement-percent|block-percent|line-percent|function-percent|uncovered-functions|uncovered-lines] [disabled for json|yaml|heatmap]
       --history-file string               path to go-covercheck history file (default ".go-covercheck.history.json")
       --init                              create a sample .go-covercheck.yml config file in the current directory
   -U, --inspect                           show uncovered source code
@@ -246,8 +247,8 @@ Flags:
   -L, --limit-history int                 limit number of historical entries to save or display [0=no limit]
   -m, --module-name string                explicitly set module name for path normalization (overrides module inference)
   -w, --no-color                          disable color output
-  -u, --no-summary                        suppress failure summary and only show tabular output [disabled for json|yaml]
-  -t, --no-table                          suppress tabular output and only show failure summary [disabled for json|yaml]
+  -u, --no-summary                        suppress failure summary and only show tabular output (or the heat map) [disabled for json|yaml]
+  -t, --no-table                          suppress tabular output (or the heat map) and only show failure summary [disabled for json|yaml]
   -O, --no-uncovered-functions            omit uncovered function names from all outputs (table column and structured json/yaml/md/csv/tsv fields); use --inspect to show them
   -Q, --no-uncovered-lines                omit uncovered line numbers from all outputs (table column and structured json/yaml/md/csv/tsv fields); use --inspect to show them
   -H, --save-history                      add coverage result to history
@@ -747,6 +748,12 @@ Note: `-u` (`--no-summary`) suppresses the failure summary, and `-Q`
 (`--no-uncovered-lines`) drops the "Uncovered Lines" column that is
 rendered by default. `-O` (`--no-uncovered-functions`) drops the "Uncovered Functions" column.
 
+Note: `--hide-columns` (or `hideColumns:` in the config file) leaves any of the columns out of the `table`, `md`,
+`html`, `csv` and `tsv` reports. It takes a comma-separated list of the names shown in `--help`, and it is disabled for
+`json`, `yaml` and `heatmap`. Hiding a column only changes what is shown: its threshold is still checked, and a
+failure is still listed in the failure summary. Unlike `-Q` and `-O`, which also leave the data out of the `json` and
+`yaml` fields, `--hide-columns uncovered-lines` and `uncovered-functions` only hide the column.
+
 
 ### 🔥 Heat Map
 The `heatmap` format draws a grid with one cell per file and per package, showing each name (20 columns wide; longer
@@ -770,6 +777,7 @@ coverage is at or below half of the goal, yellow when it is below the goal, and 
 below its goal is never green. When color is off (`--no-color`, `NO_COLOR`, or `FORCE_COLOR=0` with output that isn't a terminal), each
 level is shown by a shade glyph instead: `░` `▒` `█` `·`. By Total lists Statements, Blocks and Lines, plus Functions
 when a function threshold is set. The failure summary is printed after the grid, as with `table`.
+`--no-table` hides the grid and `--no-summary` hides the failure summary; the PNG from `--heatmap-png` is still written.
 
 ```text
 $ go-covercheck -f heatmap -w --term-width 60 -s 90 -n 85 -g 60 coverage.out

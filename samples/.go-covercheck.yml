@@ -38,11 +38,11 @@ sortBy: statement-percent
 # default asc
 sortOrder: desc
 
-# disable table output and only show the summary
+# disable the table (or heat map) output and only show the summary
 # default false
 noTable: false
 
-# disable the summary and only show the table output
+# disable the summary and only show the table (or heat map) output
 # default false
 noSummary: false
 
@@ -57,6 +57,13 @@ noUncoveredLines: false
 # leave uncovered function names out of all outputs
 # default false
 noUncoveredFunctions: false
+
+# hide columns from the tabular output; the thresholds are still checked
+# disabled for json|yaml|heatmap
+# any of: statements, blocks, lines, functions, statement-percent, block-percent, line-percent,
+# function-percent, uncovered-functions, uncovered-lines
+# default []
+hideColumns: []
 
 # the format for output
 # table|json|yaml|md|html|csv|tsv|heatmap

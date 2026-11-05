@@ -146,6 +146,8 @@ const (
 	NoUncoveredFunctionsFlagUsage = "omit uncovered function names from all outputs (table column and structured " +
 		"json/yaml/md/csv/tsv fields); use --inspect to show them"
 
+	HideColumnsFlag = "hide-columns"
+
 	InspectFlag      = "inspect"
 	InspectFlagShort = "U"
 	InspectFlagUsage = "show uncovered source code"
@@ -215,13 +217,18 @@ var (
 	HistoryFileFlagDefault = "." + config.AppName + ".history.json"
 
 	NoTableFlagUsage = fmt.Sprintf(
-		"suppress tabular output and only show failure summary [disabled for %s|%s]",
+		"suppress tabular output (or the heat map) and only show failure summary [disabled for %s|%s]",
 		config.FormatJSON, config.FormatYAML,
 	)
 
 	NoSummaryFlagUsage = fmt.Sprintf(
-		"suppress failure summary and only show tabular output [disabled for %s|%s]",
+		"suppress failure summary and only show tabular output (or the heat map) [disabled for %s|%s]",
 		config.FormatJSON, config.FormatYAML,
+	)
+
+	HideColumnsFlagUsage = fmt.Sprintf(
+		"hide columns from the tabular output; thresholds are still checked [%s] [disabled for %s|%s|%s]",
+		strings.Join(config.HideableColumns, "|"), config.FormatJSON, config.FormatYAML, config.FormatHeatmap,
 	)
 
 	SortByFlagUsage = fmt.Sprintf(
@@ -601,6 +608,7 @@ func applyConfigOverrides(cfg *config.Config, cmd *cobra.Command, noConfigFile b
 	applyBoolFlagOverride(cmd, NoColorFlag, &cfg.NoColor, noConfigFile)
 	applyBoolFlagOverride(cmd, NoUncoveredLinesFlag, &cfg.NoUncoveredLines, noConfigFile)
 	applyBoolFlagOverride(cmd, NoUncoveredFunctionsFlag, &cfg.NoUncoveredFunctions, noConfigFile)
+	applyStringSliceFlagOverride(cmd, HideColumnsFlag, &cfg.HideColumns, noConfigFile)
 	applyBoolFlagOverride(cmd, InspectFlag, &cfg.Inspect, true)
 	if len(cfg.InspectFiles) > 0 {
 		cfg.Inspect = true
@@ -638,6 +646,12 @@ func applyFloat64TotalFlagOverride(cmd *cobra.Command, flagName string, section 
 
 func applyStringFlagOverride(cmd *cobra.Command, flagName string, target *string, noConfigFile bool) {
 	if v, _ := cmd.Flags().GetString(flagName); cmd.Flags().Changed(flagName) || noConfigFile {
+		*target = v
+	}
+}
+
+func applyStringSliceFlagOverride(cmd *cobra.Command, flagName string, target *[]string, noConfigFile bool) {
+	if v, _ := cmd.Flags().GetStringSlice(flagName); cmd.Flags().Changed(flagName) || noConfigFile {
 		*target = v
 	}
 }
@@ -885,6 +899,12 @@ func initFlags(cmd *cobra.Command) {
 		NoUncoveredFunctionsFlagShort,
 		false,
 		NoUncoveredFunctionsFlagUsage,
+	)
+
+	cmd.Flags().StringSlice(
+		HideColumnsFlag,
+		nil,
+		HideColumnsFlagUsage,
 	)
 
 	cmd.Flags().BoolP(
