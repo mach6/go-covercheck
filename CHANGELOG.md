@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [v0.7.0] - 2026-11-05
+
 ### Breaking
 
 * Line coverage is now checked by default, at 50%. Builds that passed before can fail. Set `lineThreshold` to 0 to turn it off.
@@ -167,7 +169,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Color-coded results with severity indicators
 - Summary reporting for failed coverage checks
 
-[Unreleased]: https://github.com/mach6/go-covercheck/compare/v0.6.1...HEAD
+[Unreleased]: https://github.com/mach6/go-covercheck/compare/v0.7.0...HEAD
+[v0.7.0]: https://github.com/mach6/go-covercheck/compare/v0.6.1...v0.7.0
 [v0.6.1]: https://github.com/mach6/go-covercheck/compare/v0.6.0...v0.6.1
 [v0.6.0]: https://github.com/mach6/go-covercheck/compare/v0.5.0...v0.6.0
 [v0.5.0]: https://github.com/mach6/go-covercheck/compare/v0.4.1...v0.5.0
