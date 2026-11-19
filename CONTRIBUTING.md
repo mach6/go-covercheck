@@ -65,3 +65,17 @@ Example:
 ```text
 feat: add support for multi-file coverage filtering
 ```
+
+## 📝 Changelog
+
+User-facing changes are written under `## [Unreleased]` in `CHANGELOG.md`, in plain words, grouped as
+Breaking, Added, Deprecated, Changed or Fixed. Add them in the pull request that makes the change.
+
+The text under `[Unreleased]` is the release notes. When a version is tagged, the release workflow:
+
+1. fails before it builds anything when `[Unreleased]` is empty (`scripts/changelog.sh notes`),
+2. uses that text as the notes of the GitHub release,
+3. opens a pull request that moves it into a section for the tag and updates the compare links
+   (`scripts/changelog.sh release <tag>`).
+
+Nothing is generated from the commits, so what is not written under `[Unreleased]` is not in the notes.

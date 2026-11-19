@@ -14,6 +14,14 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v7
 
+      - name: Check that the changelog describes the release
+        # the notes of the release are the [Unreleased] section of CHANGELOG.md, write them before tagging
+        run: |
+          if ! scripts/changelog.sh notes > release-notes.md; then
+            echo "::error::The [Unreleased] section of CHANGELOG.md is empty. Describe the release there, then tag again."
+            exit 1
+          fi
+
       - name: Install GitHub CLI
         run: |
           sudo apt-get update
@@ -41,6 +49,7 @@ jobs:
         uses: softprops/action-gh-release@v3
         with:
           files: dist/*
+          body_path: release-notes.md
 
       - name: Build Docker image
         run: make docker
@@ -62,9 +71,8 @@ jobs:
           docker push $IMAGE_NAME:latest
 
       - name: Update Changelog
-        run: |
-          go install github.com/git-chglog/git-chglog/cmd/git-chglog@latest
-          APP_VERSION="${GITHUB_REF#refs/tags/}" make changelog
+        # [Unreleased] becomes the section of the tag, and a new empty one is left
+        run: scripts/changelog.sh release "${GITHUB_REF#refs/tags/}"
 
       - name: Commit and Push Changelog As Branch
         env:
@@ -78,7 +86,7 @@ jobs:
 
           # Create a PR using gh CLI
           gh pr create --title "chore: update changelog for ${TAG}" \
-            --body "Automated update to changelog for ${TAG}" \
+            --body "Automated update of CHANGELOG.md for ${TAG}: [Unreleased] is now the ${TAG} section." \
             --head update_changelog_${TAG#v} \
             --base main
 
